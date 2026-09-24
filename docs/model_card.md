@@ -192,6 +192,10 @@ Persistence repeats the window's last flow. The model has clearly lower MSE than
 
 Early-warning lead time (in flows, because CIC-IDS2017 timestamps are synthetic): of 134 test sessions that have at least 6 benign flows before the first malicious flow, the rollout alert fired before the attack in 32 (23.9%). Only 5 (3.7%) fired within 12 flows of the attack start; the rest fired much earlier, which on this data is mostly an unrelated earlier alert rather than a forecast. Genuine early warning is therefore weak. The strong results in section 6 are for detecting the current or next flow, not for warning ahead of time.
 
+### 6.2 V2 network-state experiment
+
+An experimental network-state model with multi-step training targets is documented in `docs/world_model_v2.md`. Under the same early-warning protocol it warned before attack onset in 70% of eligible test sessions versus 54% for this model, and within 12 flows in 38% versus 18%. It is not shipped, it does not improve detection, and false alarms remain high for both models.
+
 ## 7. Explainability & Trust Architecture
 
 1. **Fast Gradient Attribution ($\mathcal{O}(1)$):**
