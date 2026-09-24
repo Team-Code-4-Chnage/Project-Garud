@@ -38,28 +38,26 @@ A few things this system does, beyond plain classification:
 
 ## Benchmark Performance on CIC-IDS2017 + CIC-IDS2018
 
-Evaluated on 328,868 real-world flows — CIC-IDS2017 (all 8 capture days) plus 7,940 real Lateral
+Evaluated on 331,048 real-world flows — CIC-IDS2017 (all 8 capture days) plus 7,940 real Lateral
 Movement (Infiltration) flows and 928 real Initial Access (Web Attack) flows pulled in from
-CIC-IDS2018, added because CIC-IDS2017 alone only has around 36 real Lateral Movement examples in
-its entire public release (see `data/augment_lateral_movement.py`, `data/augment_initial_access.py`).
-A session-level 3-way split (1,481 train / 212 validation / 424 test sessions) means checkpoint
-selection during training only ever looks at the validation set — the test set (58,945 windowed
-sequences) is touched exactly once, for the numbers below, and its session boundary is computed
-identically to every prior split in this project's history, so these numbers are directly
-comparable to earlier ones.
+CIC-IDS2018, plus 2,180 real CIC-IDS2017 Initial Access rows re-chunked into pure attack-only
+sessions alongside their original mixed-session form (`data/fix_initial_access_sessions.py` — see
+below for why). A session-level 3-way split (1,673 train / 239 validation / 478 test sessions)
+means checkpoint selection during training only ever looks at the validation set — the test set
+(64,642 windowed sequences) is touched exactly once, for the numbers below.
 
 | Model Architecture | F1-Score | Precision | Recall (Detection Rate) | False Positive Rate (FPR) | Latency (Inference, CPU) |
 |---|:---:|:---:|:---:|:---:|:---:|
-| Logistic Regression *(Linear Baseline)* | 0.535 | 0.694 | 0.436 | 6.42% | < 1 ms |
-| Isolation Forest *(Unsupervised Baseline)* | 0.355 | 0.338 | 0.373 | 24.41% | ~ 8 ms |
-| NetForecast World Model *(Proposed, MAX Config)* | **0.862** | **0.859** | **0.865** | **4.75%** | **~ 0.7 ms** (measured, single-window forward pass) |
+| Logistic Regression *(Linear Baseline)* | 0.523 | 0.689 | 0.421 | 6.16% | < 1 ms |
+| Isolation Forest *(Unsupervised Baseline)* | 0.402 | 0.374 | 0.434 | 23.49% | ~ 8 ms |
+| NetForecast World Model *(Proposed, MAX Config)* | **0.861** | **0.862** | **0.860** | **4.47%** | **~ 0.7 ms** (measured, single-window forward pass) |
 
 > [!NOTE]
 > The training pipeline uses a genuine 3-way train/val/test split for checkpoint selection, so these test numbers are honest — checkpoint selection never sees the test set. See `docs/model_card.md` §5 for details.
 
-The table above is binary malicious-vs-benign detection, and shouldn't be read as "detects all 6 stages equally well" — per-stage capability varies a lot. Focal loss on the MITRE stage head (gamma=2, generalizing the earlier class-weighted cross-entropy — see `docs/model_card.md` §5) plus a tuned class-weight clip (6x, down from an initial 50x that over-corrected) and positive-weighted BCE (`pos_weight≈2.94`) get 86.5% recall at the binary level with a 4.75% FPR, well below the Isolation Forest baseline's 24.41% FPR. Benign, Reconnaissance, C2, and Lateral Movement are all reliably classified (F1 0.80–0.96, calibrated). Lateral Movement in particular reaches precision 98.5%, recall 86.5%, F1 0.92 on 857 real held-out test flows, after real CIC-IDS2018 Infiltration data replaced an earlier synthetic-oversampling attempt that a held-out evaluation confirmed did not transfer to real traffic.
+The table above is binary malicious-vs-benign detection, and shouldn't be read as "detects all 6 stages equally well" — per-stage capability varies a lot. Focal loss on the MITRE stage head (gamma=2, generalizing the earlier class-weighted cross-entropy — see `docs/model_card.md` §5) plus a tuned class-weight clip (6x, down from an initial 50x that over-corrected) and positive-weighted BCE (`pos_weight≈2.94`) get 86.0% recall at the binary level with a 4.47% FPR, well below the Isolation Forest baseline's 23.49% FPR. Benign, Reconnaissance, C2, and Lateral Movement are all reliably classified (F1 0.79–0.96, calibrated). Lateral Movement in particular reaches precision 97.1%, recall 87.3%, F1 0.92 on 771 real held-out test flows, after real CIC-IDS2018 Infiltration data replaced an earlier synthetic-oversampling attempt that a held-out evaluation confirmed did not transfer to real traffic.
 
-Initial Access (web attacks) has been through three rounds of tuning — real CIC-IDS2018 web-attack data, a retuned class-weight clip, and post-hoc per-class logit-bias calibration (`experiments/calibrate_stage_logits.py`) — moving precision from 6.2% to 27.0% to 35.1% (recall 53%), roughly a 5.7x improvement overall. It's still the weakest of the six stages. The ML model does not detect Exfiltration on its own (0% recall — CIC-IDS2017 has only around 11 Heartbleed flows in its entire public release, 2 in this sample, too little to learn from), but Exfiltration/Heartbleed is separately covered by a deterministic signature detector (`capture/signatures.py`) that doesn't rely on ML at all: CVE-2014-0160 has a fixed wire-format signature, verified end-to-end against a crafted malicious packet with zero false positives on legitimate traffic. Full per-stage numbers and root-cause analysis are in [`docs/model_card.md`](docs/model_card.md#6-evaluation--comparative-benchmark).
+Initial Access (web attacks) was the weakest stage for most of this project, and closing it took real root-cause work, not just more tuning. A confusion-matrix analysis (not just the aggregate P/R/F1 numbers) found its errors were concentrated almost entirely in the original CIC-IDS2017 rows — those alone scored recall 0.476 / precision 0.300, while the CIC-IDS2018 rows added earlier scored recall 0.969 / precision 1.000 on the identical test split, a stark gap between two real sources of the same attack type. The cause: CIC-IDS2017 sessions are grouped by `(src_ip, dst_ip, time_bucket)` — the same grouping used in production — so a real attacker's requests and ordinary benign HTTP traffic from the same IP pair end up in the same session, diluting the training signal. `data/fix_initial_access_sessions.py` adds a second, pure-session view of the same real rows (not fabricated data) alongside the original mixed-session rows, since production sessions are mixed the same way and that harder signal is worth keeping. Combined with the earlier real-data augmentation, class-weight retuning, and post-hoc logit-bias calibration, precision moved 6.2% → 16.6% → 27.0% → 35.1% → 53.5% (recall 52.5%) across five fixes — roughly 8.6x overall. It's still the weakest of the six stages; two further attempts (gating the stage decision on the binary infiltration head, and an architectural skip connection) were tested properly and didn't help, so what's left is payload-aware features, a genuinely bigger change. The ML model does not detect Exfiltration on its own (0% recall — CIC-IDS2017 has only around 11 Heartbleed flows in its entire public release, 2 in this sample, too little to learn from), but Exfiltration/Heartbleed is separately covered by a deterministic signature detector (`capture/signatures.py`) that doesn't rely on ML at all: CVE-2014-0160 has a fixed wire-format signature, verified end-to-end against a crafted malicious packet with zero false positives on legitimate traffic. Full per-stage numbers and root-cause analysis are in [`docs/model_card.md`](docs/model_card.md#6-evaluation--comparative-benchmark).
 
 We also directly tested generalization to unseen attack tools (`experiments/family_holdout_eval.py`, results in [§9 of the model card](docs/model_card.md#9-generalization-to-unseen-attack-families)): holding an entire attack family out of training, a held-out DoS variant (slowloris) is still correctly flagged 64% of the time, while a held-out botnet family (Bot) and a payload-driven attack (XSS) show no meaningful transfer. That's an honest, uneven result rather than a cherry-picked win.
 
@@ -291,7 +289,17 @@ python data/preprocess_cicids.py --input-dir data/raw_cicids --output real_flows
 #    from. Optional but strongly recommended; skip only if you don't need that stage.
 python data/augment_lateral_movement.py --target real_flows.csv
 
-# 4. Train MAX-configuration World Model
+# 4. Augment Initial Access with real CIC-IDS2018 Web Attack data (~317MB download,
+#    same two days). CIC-IDS2017 alone under-represents web-attack diversity.
+python data/augment_initial_access.py --target real_flows.csv
+
+# 5. Fix Initial Access's session construction: re-chunks the original CIC-IDS2017
+#    web-attack rows into pure attack-only sessions, added alongside (not replacing)
+#    the mixed-session rows. See docs/model_card.md section 5 for why this matters --
+#    it's the single biggest lever for this stage.
+python data/fix_initial_access_sessions.py --target real_flows.csv
+
+# 6. Train MAX-configuration World Model
 python pipeline_fixed.py \
   --data real_flows.csv \
   --out ./backend/artifacts \
@@ -307,6 +315,12 @@ python pipeline_fixed.py \
   --class-weight-max 6.0 \
   --stage-loss focal \
   --focal-gamma 2.0
+
+# 7. Recalibrate per-class stage logit bias against the freshly retrained weights
+#    (copy the printed "Final bias" dict into backend/artifacts/config.json's
+#    stage_logit_bias field by hand -- see experiments/calibrate_stage_logits.py's
+#    module docstring for why this stays a manual step).
+python experiments/calibrate_stage_logits.py
 ```
 
 > [!TIP]
@@ -390,8 +404,10 @@ Network_Attack_Detection/
 │       ├── test_inference.py        # Model/inference/explainability/calibration unit tests
 │       ├── test_api_integration.py  # End-to-end API, ingestion & Heartbleed-alert flow tests
 │       ├── test_flow_parity.py      # PCAP vs live-capture feature-extraction parity tests
-│       └── test_signatures.py       # Deterministic Heartbleed (CVE-2014-0160) signature tests
-│       # 35 tests total, currently passing
+│       ├── test_signatures.py       # Deterministic Heartbleed (CVE-2014-0160) signature tests
+│       ├── test_model_quality.py    # Real-data QA: per-stage capability, forecast, regression guard
+│       └── fixtures/                # Real held-out flows used by test_model_quality.py
+│       # 55 tests total, currently passing
 ├── frontend/                        # React 18 + Vite SOC Dashboard
 │   ├── src/
 │   │   ├── components/              # Reusable UI components
@@ -408,6 +424,7 @@ Network_Attack_Detection/
 │   ├── preprocess_cicids.py         # 22-feature mapper with stratified sampling
 │   ├── augment_lateral_movement.py  # Real CIC-IDS2018 Infiltration data -> Lateral Movement
 │   ├── augment_initial_access.py    # Real CIC-IDS2018 Web Attack data -> Initial Access
+│   ├── fix_initial_access_sessions.py # Real CIC-IDS2017 web-attack rows, re-chunked into pure sessions
 │   ├── raw_cicids/                  # 8 official CIC-IDS2017 CSV files (844 MB)
 │   └── raw_cicids2018/              # CIC-IDS2018 infiltration-day and web-attack-day CSVs
 ├── experiments/                     # Side experiments, not part of the shipped model

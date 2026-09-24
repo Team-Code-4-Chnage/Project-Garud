@@ -85,7 +85,7 @@
 If running via terminal during live evaluation:
 
 ```powershell
-# 1. Run all backend unit & API integration tests (35 tests)
+# 1. Run all backend unit & API integration tests (55 tests)
 backend\venv\Scripts\python.exe -m pytest backend/tests -v
 
 # 2. Build and verify production frontend bundle

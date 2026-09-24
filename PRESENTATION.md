@@ -50,11 +50,11 @@ For uncertainty quantification, it simulates future attack trajectories $k=6$ st
 
 | Model | Technique | F1-Score | Precision | Recall | False Positive Rate (FPR) |
 |---|---|---|---|---|---|
-| Logistic Regression | Shallow Linear Baseline | 0.535 | 0.694 | 0.436 | 0.064 |
-| Isolation Forest | Unsupervised Anomaly Detection | 0.355 | 0.338 | 0.373 | 0.244 |
-| NetForecast (World Model) | 2-Layer LSTM + Multi-Head Rollout, Focal Loss + logit calibration | **0.862** | **0.859** | **0.865** | **0.048** |
+| Logistic Regression | Shallow Linear Baseline | 0.523 | 0.689 | 0.421 | 0.062 |
+| Isolation Forest | Unsupervised Anomaly Detection | 0.402 | 0.374 | 0.434 | 0.235 |
+| NetForecast (World Model) | 2-Layer LSTM + Multi-Head Rollout, Focal Loss + logit calibration | **0.861** | **0.862** | **0.860** | **0.045** |
 
-Binary malicious-vs-benign detection on a held-out real test set from CIC-IDS2017 + CIC-IDS2018, using a proper 3-way train/val/test split so checkpoint selection never touches the reported test data (`backend/artifacts/benchmark_comparison.csv`). Per stage, Benign, Reconnaissance, C2, and Lateral Movement are all reliable — Lateral Movement reaches F1 0.92 after fixing it with real CIC-IDS2018 data (see `docs/model_card.md` §6). Initial Access precision improved from 6% to 35% across four tuning passes (real CIC-IDS2018 web-attack data, class-weight retuning, focal loss, post-hoc logit-bias calibration) — still the weakest class, but no longer the open gap it was. Exfiltration isn't caught by the ML model at all (only 2 real examples exist in the test set) but is covered by a separate deterministic Heartbleed signature detector instead.
+Binary malicious-vs-benign detection on a held-out real test set from CIC-IDS2017 + CIC-IDS2018, using a proper 3-way train/val/test split so checkpoint selection never touches the reported test data (`backend/artifacts/benchmark_comparison.csv`). Per stage, Benign, Reconnaissance, C2, and Lateral Movement are all reliable — Lateral Movement reaches F1 0.92 after fixing it with real CIC-IDS2018 data (see `docs/model_card.md` §6). Initial Access precision improved from 6% to 54% across five fixes (real CIC-IDS2018 web-attack data, class-weight retuning, focal loss, post-hoc logit-bias calibration, and a root-cause fix to how the original CIC-IDS2017 rows were grouped into sessions — see `docs/model_card.md` §5) — still the weakest class, but no longer the open gap it was. Exfiltration isn't caught by the ML model at all (only 2 real examples exist in the test set) but is covered by a separate deterministic Heartbleed signature detector instead.
 
 Every alert is explainable, not just scored: SHAP (KernelExplainer) computes Shapley values identifying which of the 22 telemetry features pushed the model toward predicting compromise, and gradient×input attribution gives an instantaneous alternative for high-throughput triage where a full SHAP pass is too slow. An adaptive EMA threshold ($\bar{p} + 2\sigma$) adjusts alert sensitivity to baseline network noise instead of using one fixed cutoff, which is what keeps the false positive rate down without hiding real alerts.
 
