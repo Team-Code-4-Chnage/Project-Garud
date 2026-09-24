@@ -58,8 +58,8 @@
 | Stage ID | Stage Name | MITRE Tactic | Representative CIC-IDS2017 Traffic |
 |:---:|:---|:---|:---|
 | **0** | **Benign** | Normal Baseline | HTTP, HTTPS, DNS, NTP, SSH management |
-| **1** | **Reconnaissance** | TA0043 (Reconnaissance) | PortScan, Network sweeping, Host discovery |
-| **2** | **Initial Access** | TA0001 (Initial Access) | SSH-Patator, FTP-Patator, Web vulnerability probes |
+| **1** | **Reconnaissance** | TA0043 (Reconnaissance) | PortScan, Bot, SSH-Patator, FTP-Patator, Network sweeping, Host discovery |
+| **2** | **Initial Access** | TA0001 (Initial Access) | Web Attack (SQL Injection, XSS, Brute Force) |
 | **3** | **Lateral Movement** | TA0008 (Lateral Movement) | SMB exploit probes, Internal pivot flows |
 | **4** | **C2 (Command & Control)**| TA0011 (Command & Control) | Botnet beacons, periodic command channels |
 | **5** | **Exfiltration** | TA0010 (Exfiltration) | Large outbound byte bursts, HTTP data theft |
