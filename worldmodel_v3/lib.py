@@ -19,6 +19,7 @@ import torch.nn.functional as Fn
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 from worldmodel_v2.model import NetStateWorldModel  # noqa: E402
+from worldmodel_v3.state import DIRECTION_FEATURES, HOST_CONCENTRATION_FEATURES  # noqa: E402
 
 W, H = 6, 4
 STEP_W = [1.0, 0.8, 0.6, 0.5]
@@ -34,7 +35,15 @@ def load(feature_set):
     df = pd.read_csv(REPO_ROOT / "data" / "netwin_1min.csv.gz", parse_dates=["minute"])
     f_cols = [c for c in df.columns if c.startswith("f_")]
     n_cols = [c for c in df.columns if c.startswith("n_")]
-    cols = f_cols if feature_set == "flow" else f_cols + n_cols
+    if feature_set == "flow":
+        cols = f_cols
+    elif feature_set == "net":
+        cols = f_cols + n_cols
+    elif feature_set == "net_nodir":  # network context without direction and single-host-concentration features
+        drop = set(DIRECTION_FEATURES + HOST_CONCENTRATION_FEATURES)
+        cols = f_cols + [c for c in n_cols if c not in drop]
+    else:
+        raise ValueError(feature_set)
     days = {}
     for date, g in df.groupby("date"):
         g = g.sort_values("minute")

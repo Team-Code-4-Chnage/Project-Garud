@@ -7,6 +7,8 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parent
 lodo = json.load(open(ROOT / "v3_lodo.json"))
+if (ROOT / "v3_lodo_nodir.json").exists():  # ablation: network context without direction/host features
+    lodo.update(json.load(open(ROOT / "v3_lodo_nodir.json")))
 beh = json.load(open(ROOT / "v3_behaviour.json"))
 
 
@@ -31,7 +33,7 @@ rows = [("warned <=20 min", "pct_warned_20"), ("within 5 min", "pct_within_5"), 
         ("median lead (min)", "lead_median"), ("mean lead (min)", "lead_mean"),
         ("false alarms / quiet hour", "fa_events_per_quiet_hour"), ("alert rate, quiet windows", "fa_window_rate"),
         ("false-alarm 60-min blocks", "fa_hour_block_rate")]
-for fs in ("flow", "net"):
+for fs in [k for k in ("flow", "net", "net_nodir") if k in lodo]:
     S = list(lodo[fs]["seeds"].values())
     print(f"\n-- feature set {fs} ({lodo[fs]['n_features']} features) --")
     print(f"episodes eligible: {S[0]['eligible']}  quiet windows: {S[0]['quiet_windows']}  quiet 60-min blocks: "

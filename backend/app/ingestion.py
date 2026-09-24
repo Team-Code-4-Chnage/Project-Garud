@@ -167,20 +167,10 @@ async def ingest_single_flow(
     if not artifacts.is_loaded:
         raise RuntimeError("Model not loaded — cannot ingest flows")
 
-    dur_us = float(getattr(flow, "flow_duration", 0.0) or 0.0)
-    if dur_us < 10000.0 or getattr(flow, "flow_pkts_s", 0.0) > 100000.0:
-        eff_dur_us = max(dur_us, 10000.0)
-        eff_dur_sec = eff_dur_us / 1e6
-        fwd_p = float(getattr(flow, "tot_fwd_pkts", 0.0) or 0.0)
-        bwd_p = float(getattr(flow, "tot_bwd_pkts", 0.0) or 0.0)
-        tot_p = max(fwd_p + bwd_p, 1.0)
-        avg_sz = float(getattr(flow, "pkt_size_avg", 0.0) or 0.0)
-        tot_b = avg_sz * tot_p
-
-        flow.flow_duration = eff_dur_us
-        flow.flow_bytes_s = float(tot_b / eff_dur_sec)
-        flow.flow_pkts_s = float(tot_p / eff_dur_sec)
-
+    # Features are used exactly as received. They must already follow the training definitions
+    # (CICFlowMeter output; capture/flow_state.py reproduces it). Short flows keep their real duration
+    # and rates: the training data has no duration floor, and a floor here would change what the
+    # model sees for most scan and probe flows.
     raw_features = np.array([flow.to_feature_array()], dtype=np.float32)
 
     if np.any(~np.isfinite(raw_features)):

@@ -103,7 +103,8 @@ class FlowExtractor:
         features["dst_port"] = flow.dst_port
         proto_map = {6: "TCP", 17: "UDP", 1: "ICMP"}
         features["protocol"] = proto_map.get(flow.protocol, str(flow.protocol))
-        features["timestamp"] = datetime.now(timezone.utc).isoformat()
+        # flow start time, as in the training data (the network state groups flows by the minute they start)
+        features["timestamp"] = datetime.fromtimestamp(flow.start_time, tz=timezone.utc).isoformat()
         features["source"] = "live_capture"
         features["heartbleed_signature"] = flow.heartbleed_detected
 

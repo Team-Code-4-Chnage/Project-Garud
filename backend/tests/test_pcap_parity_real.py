@@ -91,3 +91,51 @@ def test_pcap_upload_end_to_end_flags_real_attack_flows():
     body = res.json()
     assert body["flows_accepted"] == 24 and body["flows_rejected"] == 0
     assert body["alerts_generated"] >= 1  # the 12 web brute-force flows share one attacker/victim session
+
+
+def test_ingestion_stores_features_unchanged(pairs):
+    """The server must not alter extracted features (an earlier version floored short flows at 10 ms
+    and recomputed their rates)."""
+    from datetime import datetime, timezone
+
+    from fastapi.testclient import TestClient
+
+    from app.ingestion import derive_session_key
+    from app.main import app
+
+    fl = min((fl for _, fl, _ in pairs), key=lambda f: f.to_features()["flow_duration"])
+    key = derive_session_key(fl.src_ip, fl.dst_ip, datetime.fromtimestamp(fl.start_time, tz=timezone.utc))
+    with TestClient(app) as client:
+        with open(FIX / "cic2017_parity.pcap", "rb") as fh:
+            assert client.post("/ingest/pcap", files={"file": ("f.pcap", fh, "application/octet-stream")}).status_code == 200
+        stored = client.get(f"/sessions/{key}/flows", params={"limit": 500}).json()
+    want = fl.to_features()
+    match = [s for s in stored if s["src_port"] == fl.src_port and s["features"]["tot_fwd_pkts"] == want["tot_fwd_pkts"]]
+    assert match, "flow not stored"
+    for f in FLOW_FEATURES:
+        assert math.isclose(match[0]["features"][f], want[f], rel_tol=1e-9, abs_tol=1e-9), f
+
+
+def test_sub_10ms_flow_is_not_floored():
+    """A 3-microsecond flow (common for scans in the training data) must keep its duration and rates."""
+    import io
+
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    row = {f: 0.0 for f in FLOW_FEATURES}
+    row.update(flow_duration=3.0, tot_fwd_pkts=1.0, tot_bwd_pkts=1.0, flow_pkts_s=666666.6667, flow_iat_mean=3.0,
+               tcp_win_size=1024.0)
+    header = ",".join(FLOW_FEATURES + ["src_ip", "dst_ip"])
+    line = ",".join(str(row[f]) for f in FLOW_FEATURES) + ",10.9.9.1,10.9.9.2"
+    with TestClient(app) as client:
+        body = "\n".join([header, line]) + "\n"
+        res = client.post("/ingest/csv", files={"file": ("f.csv", io.BytesIO(body.encode()), "text/csv")})
+        assert res.status_code == 200, res.text
+        sessions = client.get("/sessions").json()
+        keys = [s["session_key"] for s in sessions if "10.9.9.1" in s["session_key"]]
+        assert keys
+        stored = client.get(f"/sessions/{keys[0]}/flows").json()
+    assert stored[0]["features"]["flow_duration"] == 3.0
+    assert math.isclose(stored[0]["features"]["flow_pkts_s"], 666666.6667)

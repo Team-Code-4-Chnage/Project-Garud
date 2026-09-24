@@ -124,9 +124,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="experiments/v3_lodo.json")
     ap.add_argument("--seeds", type=int, nargs="*", default=SEEDS)
+    ap.add_argument("--feature-sets", nargs="*", default=["flow", "net"])
     args = ap.parse_args()
     results = {}
-    for fs in ("flow", "net"):
+    for fs in args.feature_sets:
         days, cols = load(fs)
         print(f"== feature set {fs}: {len(cols)} features", flush=True)
         results[fs] = dict(n_features=len(cols), seeds={}, lr=None)

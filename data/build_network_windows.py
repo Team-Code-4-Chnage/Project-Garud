@@ -28,9 +28,12 @@ Output: data/netwin_1min.csv.gz
 import argparse
 import glob
 import os
+import sys
 
-import numpy as np
 import pandas as pd
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from worldmodel_v3.state import full_grid, minute_states  # noqa: E402
 
 BEHAVIOUR = {
     "BENIGN": "Benign",
@@ -49,12 +52,6 @@ COLS = ["Source IP", "Destination IP", "Source Port", "Destination Port", "Proto
         "URG Flag Count", "Down/Up Ratio", "Average Packet Size", "Init_Win_bytes_forward", "Label"]
 
 
-def entropy(df, key):
-    g = df.groupby(["m", key]).size()
-    p = g / g.groupby(level=0).transform("sum")
-    return -(p * np.log2(p)).groupby(level=0).sum()
-
-
 def build_day(path):
     d = pd.read_parquet(path, columns=COLS)
     d.columns = ["src", "dst", "sport", "dport", "proto", "ts", "dur", "fp", "bp", "fb", "bb", "bps", "pps",
@@ -67,72 +64,15 @@ def build_day(path):
         d = d[~blank].copy()
     d["beh"] = d["label"].map(lambda s: "WebAttack" if s.startswith("Web Attack") else BEHAVIOUR.get(s))
     assert d["beh"].notna().all(), d.loc[d["beh"].isna(), "label"].unique()
-    d = d.replace([np.inf, -np.inf], np.nan).fillna(0)
-    d["m"] = d["ts"].dt.floor("min")
-    d["pk"] = d["fp"] + d["bp"]
-    d["by"] = d["fb"] + d["bb"]
-    d["mal"] = (d["beh"] != "Benign").astype(int)
-    si = d["src"].str.startswith("192.168.")
-    di = d["dst"].str.startswith("192.168.")
-    d["inb"], d["outb"], d["intl"] = (~si & di), (si & ~di), (si & di)
-    d["tcp"], d["udp"], d["icmp"] = d["proto"] == 6, d["proto"] == 17, d["proto"] == 1
-    d["synf"], d["rstf"], d["small"] = d["syn"] > 0, d["rst"] > 0, d["pk"] <= 2
-    d["si_col"], d["di_col"] = d["src"].where(si), d["dst"].where(di)
-    g = d.groupby("m")
-    out = pd.DataFrame(index=g.size().index)
-    n = g.size()
-    out["n_flows"] = n
-    tp = g["pk"].sum().clip(lower=1)
-    out["f_total_packets"], out["f_total_bytes"] = g["pk"].sum(), g["by"].sum()
-    out["f_dur_mean"], out["f_dur_std"], out["f_dur_max"] = g["dur"].mean(), g["dur"].std(), g["dur"].max()
-    out["f_iat_mean"], out["f_iat_max"], out["f_iat_mean_std"] = g["iat"].mean(), g["iat"].max(), g["iat"].std()
-    out["f_iat_std_mean"] = g["iat_std"].mean()
-    out["f_pps_mean"], out["f_bps_mean"] = g["pps"].mean(), g["bps"].mean()
-    out["f_pkt_size_mean"], out["f_pkt_size_std"] = g["pkt"].mean(), g["pkt"].std()
-    out["f_down_up_mean"] = g["du"].mean()
-    out["f_tcp_win_mean"], out["f_tcp_win_std"] = g["win"].mean(), g["win"].std()
-    for f in ("syn", "ack", "fin", "rst", "psh", "urg"):
-        out[f"f_{f}_ratio"] = g[f].sum() / tp
-    for f in ("synf", "rstf", "small"):
-        out[f"f_{f}_flow_frac"] = g[f].mean()
-    # ---- network context ----
-    out["n_uniq_src_ip"], out["n_uniq_dst_ip"] = g["src"].nunique(), g["dst"].nunique()
-    out["n_uniq_src_port"], out["n_uniq_dst_port"] = g["sport"].nunique(), g["dport"].nunique()
-    out["n_uniq_pairs"] = d.groupby(["m", "src", "dst"]).ngroups and d.groupby(["m", "src", "dst"]).size() \
-        .groupby(level=0).size()
-    out["n_uniq_internal_src"], out["n_uniq_internal_dst"] = g["si_col"].nunique(), g["di_col"].nunique()
-    for f in ("tcp", "udp", "icmp"):
-        out[f"n_{f}_ratio"] = g[f].mean()
-    out["n_other_proto_ratio"] = 1 - out[["n_tcp_ratio", "n_udp_ratio", "n_icmp_ratio"]].sum(axis=1)
-    for f in ("inb", "outb", "intl"):
-        out[f"n_{f}_flow_ratio"] = g[f].mean()
-    ib = d["by"].where(d["inb"], 0).groupby(d["m"]).sum()
-    ob = d["by"].where(d["outb"], 0).groupby(d["m"]).sum()
-    out["n_inbound_bytes"], out["n_outbound_bytes"] = ib, ob
-    out["n_in_out_byte_ratio"] = ib / (ob + 1.0)
-    out["n_conn_rate"] = n / 60.0
-    out["n_new_conn_rate"] = g["synf"].sum() / 60.0
-    out["n_ent_dst_port"], out["n_ent_src_ip"], out["n_ent_dst_ip"] = (
-        entropy(d, "dport"), entropy(d, "src"), entropy(d, "dst"))
-    out["n_top_src_share"] = d.groupby(["m", "src"]).size().groupby(level=0).max() / n
-    out["n_dst_port_diversity"] = out["n_uniq_dst_port"] / n
-    per_src_ports = d.groupby(["m", "src"])["dport"].nunique().groupby(level=0)
-    out["n_dport_per_src_mean"], out["n_dport_per_src_max"] = per_src_ports.mean(), per_src_ports.max()
-    per_src_hosts = d.groupby(["m", "src"])["dst"].nunique().groupby(level=0)
-    out["n_dst_per_src_mean"], out["n_dst_per_src_max"] = per_src_hosts.mean(), per_src_hosts.max()
-    # ---- labels (never features) ----
-    out["y_n_mal"] = g["mal"].sum()
-    mal = d[d["mal"] == 1]
-    beh = mal.groupby("m")["beh"].agg(lambda s: s.value_counts().idxmax())
+    out = minute_states(d.drop(columns=["label", "beh"]).copy())  # labels never reach the features
+    m = d["ts"].dt.floor("min")
+    mal = (d["beh"] != "Benign").astype(int)
+    out["y_n_mal"] = mal.groupby(m).sum()
+    beh = d[mal == 1].groupby(m[mal == 1])["beh"].agg(lambda s: s.value_counts().idxmax())
     out["y_behaviour"] = beh.reindex(out.index).fillna("Benign")
-    out = out.fillna(0)
-    # reindex to the full minute grid; empty minutes become an all-zero "no traffic" state
-    grid = pd.date_range(out.index.min(), out.index.max(), freq="min")
-    out = out.reindex(grid)
-    out["y_behaviour"] = out["y_behaviour"].fillna("Benign")
-    out = out.fillna(0)
+    out = full_grid(out)
+    out["y_behaviour"] = out["y_behaviour"].replace(0, "Benign")
     out["day"] = os.path.basename(path)
-    out.index.name = "minute"
     return out
 
 
