@@ -22,14 +22,15 @@ Mean agreement over the 22 model features on the same compared flows, before (ex
 |---|---|---|---|---|---|
 | Tue 2017-07-04 12:18:56, 16 s, benign | 209 | 45.3% | 99.8% | none in slice | |
 | Tue 12:24:59, 3 s, during FTP-Patator | 17 | 13.4% | 95.2% | 0 (attack connections outlast the 3 s slice) | |
+| Tue 12:39:55, 115 s, FTP-Patator | 850 | 49.2% | 100.0% | 120 FTP-Patator | 9.1% / 100.0% |
 | Wed 2017-07-05 12:49:57, 117 s, DoS | 905 | 52.4% | 99.8% | 22 DoS slowloris | 37.2% / 92.1% |
 | Thu 2017-07-06 12:24:17, 143 s, web attack | 1,484 | 56.3% | 99.3% | 78 Web Attack Brute Force | 15.1% / 100.0% |
 | Fri 2017-07-07 19:04:58, 23 s, DDoS | 1,307 | 30.7% | 99.6% | 990 DDoS | 13.0% / 99.9% |
 | Fri 17:09:53, 124 s, benign | 1,463 | 54.6% | 99.2% | none in slice | |
 
-Tuesday is scored with `--no-padding` (see the padding rule below). Direction agreement is 99.3% to 100% after the change (44% to 96% before), and packet counts match exactly in 98% to 99.6% of flows.
+Tuesday is scored with `--no-padding` (see the padding rule below). With the default padding rule the 115 s Tuesday slice still scores 98.8% overall and 100% on the FTP-Patator flows. Direction agreement is 99.3% to 100% after the change (44% to 96% before), and packet counts match exactly in 98% to 99.6% of flows.
 
-Model-level check (`experiments/pcap_model_parity.py`): the shipped model scored the same 6-flow windows twice, once with PCAP-extracted features and once with the official features. Alert decisions agreed on 99.1% to 100% of windows and predicted stages on 100%. Every attack window (slowloris, web brute force, DDoS) alerted on both paths; benign windows alerted on at most 0.9% (PCAP) versus 0% (official). These attack families are in the training data, so this shows the pipeline is faithful, not that the model generalises.
+Model-level check (`experiments/pcap_model_parity.py`): the shipped model scored the same 6-flow windows twice, once with PCAP-extracted features and once with the official features. Alert decisions agreed on 99.1% to 100% of windows and predicted stages on 100%. Every attack window (slowloris, web brute force, DDoS, and all 110 FTP-Patator windows) alerted on both paths; benign windows alerted on at most 0.9% (PCAP) versus 0% (official). These attack families are in the training data, so this shows the pipeline is faithful, not that the model generalises.
 
 Regression tests: `backend/tests/test_pcap_parity_real.py` holds 24 real flows (12 web brute force, 12 benign) cut from the Thursday capture with their official label rows. It checks all 22 features and uploads the file through the real `/ingest/pcap` route. `backend/tests/test_cic_semantics.py` checks each rule below on constructed packets.
 
@@ -64,7 +65,7 @@ Real TTL statistics, retransmission counts and payload-size spread are computed 
 
 ## Not covered
 
-- FTP/SSH-Patator attack flows: they last several seconds, and at about 7.5 MB/s on the Tuesday link a complete flow needs a slice of a few hundred MB, which was not downloaded.
+- SSH-Patator: not sliced (FTP-Patator, from the same tool and day, is covered).
 - Port-scan attack flows: the Friday slice at 17:10 UTC contained no scan flows (the scan runs in bursts).
 - Heartbleed, infiltration, bot: not sliced.
 - CIC-IDS2018: not checked; its files were produced by a newer CICFlowMeter release and may differ.
