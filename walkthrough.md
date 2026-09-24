@@ -21,18 +21,18 @@ All identified gaps from the initial audit have been resolved. The system now fu
 
 ## 2. Benchmark Comparison Results on Real CIC-IDS2017 + CIC-IDS2018 Data
 
-The system was evaluated on **327,940 real flows** — 320,000 from CIC-IDS2017 (all 8 capture days) plus 7,940 real Lateral Movement flows from CIC-IDS2018's two infiltration days, split three ways: 1,400 train / 200 validation / 401 test sessions (234,750 training rows including train-only synthetic oversampling of Exfiltration only, 35,224 validation rows, 61,566 100%-real test rows). Checkpoint selection during training uses the validation set only — the test set is touched exactly once, for final reporting, and is byte-identical to the test set used in every prior benchmark in this project's history. See `data/augment_lateral_movement.py` and `docs/model_card.md` §5.
+The system was evaluated on **328,868 real flows** — CIC-IDS2017 (all 8 capture days) plus 7,940 real Lateral Movement flows and 928 real Initial Access (web attack) flows from CIC-IDS2018, split three ways: 1,481 train / 212 validation / 424 test sessions. Checkpoint selection during training uses the validation set only — the test set (58,945 windowed sequences) is touched exactly once, for final reporting. See `data/augment_lateral_movement.py`, `data/augment_initial_access.py`, and `docs/model_card.md` §5.
 
-The upgraded **2-layer LSTM World Model (hidden_size=256, dropout=0.25, AdamW + CosineAnnealingLR, Focal Loss γ=2 + class-weight clip 8x)** was evaluated against supervised and unsupervised baselines in `backend/artifacts/benchmark_comparison.csv`:
+The upgraded **2-layer LSTM World Model (hidden_size=256, dropout=0.25, AdamW + CosineAnnealingLR, Focal Loss γ=2 + class-weight clip 6x, plus post-hoc per-class logit-bias calibration — see `experiments/calibrate_stage_logits.py`)** was evaluated against supervised and unsupervised baselines in `backend/artifacts/benchmark_comparison.csv`:
 
 | Model | F1-Score | Precision | Recall | False Positive Rate (FPR) |
 |---|---|---|---|---|
-| **Logistic Regression (baseline)** | 0.558 | 0.696 | 0.465 | 0.0673 (6.73%) |
-| **Isolation Forest (baseline)** | 0.313 | 0.287 | 0.343 | 0.2823 (28.23%) |
-| **LSTM World Model (MAX Config)** | **0.859** | **0.849** | **0.870** | **0.0515 (5.15%)** |
+| **Logistic Regression (baseline)** | 0.535 | 0.694 | 0.436 | 0.0642 (6.42%) |
+| **Isolation Forest (baseline)** | 0.355 | 0.338 | 0.373 | 0.2441 (24.41%) |
+| **LSTM World Model (MAX Config)** | **0.862** | **0.859** | **0.865** | **0.0475 (4.75%)** |
 
 > [!NOTE]
-> These are binary malicious-vs-benign numbers, honestly measured after fixing a checkpoint-selection leakage bug (the pipeline used to pick its best epoch by evaluating on the same set it reported final metrics on — see `docs/model_card.md` §5). Per-MITRE-stage: Benign/Reconnaissance/C2 are reliably classified, and **Lateral Movement is reliable (Precision 73%, Recall 92%, F1 0.81 on 900 real held-out CIC-IDS2018 test flows)** after replacing the earlier failed synthetic-oversampling attempt with real data. Initial Access has real recall (62%) but weak precision (17%) — improved from 6% across three tuning passes (class-weight retuning → focal loss → tighter weight clip) but still the one remaining known gap. **Exfiltration is not detected by the ML model (0% recall, only 2 real examples exist)** but is separately covered by a deterministic Heartbleed (CVE-2014-0160) signature detector that doesn't need training data at all. See `docs/model_card.md` §6 and §8 for the full per-stage breakdown and root-cause analysis.
+> These are binary malicious-vs-benign numbers (a separate model head, unaffected by stage-logit calibration). Per-MITRE-stage (calibrated): Benign/Reconnaissance/C2 are reliably classified, and **Lateral Movement is reliable (Precision 98.5%, Recall 86.5%, F1 0.92 on 857 real held-out CIC-IDS2018 test flows)** after replacing the earlier failed synthetic-oversampling attempt with real data. Initial Access precision moved 6% → 17% → 27% → 35% (recall 53%) across four tuning passes (class-weight retuning → focal loss → real CIC-IDS2018 web-attack data → logit-bias calibration) — a ~5.7x improvement overall, though it remains the weakest class. **Exfiltration is not detected by the ML model (0% recall, only 2 real examples exist)** but is separately covered by a deterministic Heartbleed (CVE-2014-0160) signature detector that doesn't need training data at all. See `docs/model_card.md` §6 and §8 for the full per-stage breakdown and root-cause analysis.
 
 ---
 

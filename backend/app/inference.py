@@ -38,6 +38,7 @@ def predict_single(window: np.ndarray) -> dict:
     x = torch.tensor(window, dtype=torch.float32).unsqueeze(0).to(device)
     with torch.no_grad():
         next_state, inf_logit, stage_logits = model(x)
+        stage_logits = stage_logits + artifacts.stage_logit_bias
 
     prob = torch.sigmoid(inf_logit).item()
     stage_id = torch.argmax(stage_logits, dim=1).item()
@@ -69,6 +70,7 @@ def forward_simulate(
     with torch.no_grad():
         for step in range(k_steps):
             next_state, inf_logit, stage_logits = model(window)
+            stage_logits = stage_logits + artifacts.stage_logit_bias
             prob = torch.sigmoid(inf_logit).item()
             stage = STAGES[torch.argmax(stage_logits, dim=1).item()]
             timeline.append({

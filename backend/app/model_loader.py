@@ -93,6 +93,7 @@ class ModelArtifacts:
         self.model_hash: str | None = None
         self.scaler_hash: str | None = None
         self._scaler_mean: np.ndarray | None = None
+        self.stage_logit_bias: torch.Tensor | None = None
 
     @property
     def is_loaded(self) -> bool:
@@ -184,6 +185,13 @@ class ModelArtifacts:
         self.model_hash = _hash_file(MODEL_PATH)
         self.scaler_hash = _hash_file(SCALER_PATH)
         self.model_version = self.config.get("version", "1.0.0")
+
+        bias_cfg = self.config.get("stage_logit_bias")
+        if bias_cfg:
+            bias_vec = [bias_cfg.get(stage, 0.0) for stage in cfg_stages]
+            self.stage_logit_bias = torch.tensor(bias_vec, dtype=torch.float32, device=self.device)
+        else:
+            self.stage_logit_bias = torch.zeros(N_STAGES, dtype=torch.float32, device=self.device)
 
         logger.info("  world_model.pt: OK (hidden=%d, layers=%d, dropout=%.2f, sha256=%s)",
                      HIDDEN_SIZE, NUM_LSTM_LAYERS, LSTM_DROPOUT, self.model_hash)

@@ -59,11 +59,11 @@ NetForecast outperforms both traditional supervised classifiers and unsupervised
 
 | Model | Technique | F1-Score | Precision | Recall | False Positive Rate (FPR) |
 |---|---|---|---|---|---|
-| **Logistic Regression** | Shallow Linear Baseline | 0.558 | 0.696 | 0.465 | 0.067 |
-| **Isolation Forest** | Unsupervised Anomaly Detection | 0.313 | 0.287 | 0.343 | 0.282 |
-| **NetForecast (World Model)** | 2-Layer LSTM + Multi-Head Rollout, Focal Loss | **0.859** | **0.849** | **0.870** | **0.052** |
+| **Logistic Regression** | Shallow Linear Baseline | 0.535 | 0.694 | 0.436 | 0.064 |
+| **Isolation Forest** | Unsupervised Anomaly Detection | 0.355 | 0.338 | 0.373 | 0.244 |
+| **NetForecast (World Model)** | 2-Layer LSTM + Multi-Head Rollout, Focal Loss + logit calibration | **0.862** | **0.859** | **0.865** | **0.048** |
 
-> Binary malicious-vs-benign detection on a held-out real test set from CIC-IDS2017 + CIC-IDS2018, using a proper 3-way train/val/test split so checkpoint selection never touches the reported test data (`backend/artifacts/benchmark_comparison.csv`). Per-stage: Benign/Reconnaissance/C2/**Lateral Movement** are all reliable — Lateral Movement (F1 0.81) after fixing it with real CIC-IDS2018 data (see `docs/model_card.md` §6). Initial Access over-alerts (17% precision, up from 6% after tuning) — the one remaining known gap. Exfiltration isn't caught by the ML model at all (only 2 real examples exist) but is covered by a separate deterministic Heartbleed signature detector instead.
+> Binary malicious-vs-benign detection on a held-out real test set from CIC-IDS2017 + CIC-IDS2018, using a proper 3-way train/val/test split so checkpoint selection never touches the reported test data (`backend/artifacts/benchmark_comparison.csv`). Per-stage: Benign/Reconnaissance/C2/**Lateral Movement** are all reliable — Lateral Movement (F1 0.92) after fixing it with real CIC-IDS2018 data (see `docs/model_card.md` §6). Initial Access precision improved from 6% → 35% across four tuning passes (real CIC-IDS2018 web-attack data + class-weight retuning + focal loss + post-hoc logit-bias calibration) — still the weakest class, but no longer the open gap it was. Exfiltration isn't caught by the ML model at all (only 2 real examples exist) but is covered by a separate deterministic Heartbleed signature detector instead.
 
 #### Interpretable Decision Support:
 - **SHAP (KernelExplainer)**: Calculates exact Shapley values to identify which of the 22 telemetry features pushed the model toward predicting malicious compromise.

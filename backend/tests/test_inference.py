@@ -48,6 +48,14 @@ class TestModelLoading:
         assert len(artifacts.config["features"]) == N_FEATURES
         assert len(artifacts.config["stages"]) == N_STAGES
 
+    def test_stage_logit_bias_loaded_and_aligned(self):
+        """Bias tensor must exist, match N_STAGES, and follow config.json's stage order."""
+        assert artifacts.stage_logit_bias is not None
+        assert artifacts.stage_logit_bias.shape == (N_STAGES,)
+        bias_cfg = artifacts.config.get("stage_logit_bias", {})
+        for i, stage in enumerate(artifacts.config["stages"]):
+            assert artifacts.stage_logit_bias[i].item() == pytest.approx(bias_cfg.get(stage, 0.0))
+
 
 class TestPrediction:
     def test_predict_single_shape(self):

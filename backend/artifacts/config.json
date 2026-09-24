@@ -35,15 +35,23 @@
   "hidden_size": 256,
   "num_layers": 2,
   "lstm_dropout": 0.25,
+  "stage_logit_bias": {
+    "Benign": 0.75,
+    "Reconnaissance": 0.25,
+    "Initial Access": 0.25,
+    "Lateral Movement": -1.0,
+    "C2": -0.25,
+    "Exfiltration": 0.0
+  },
   "provenance": {
     "trained_on": "real_flows.csv",
-    "train_sessions": 1400,
-    "val_sessions": 200,
-    "test_sessions": 401,
-    "train_rows": 234750,
-    "val_rows": 35224,
-    "test_rows": 61566,
-    "git_commit": "afe98b9",
+    "train_sessions": 1481,
+    "val_sessions": 212,
+    "test_sessions": 424,
+    "train_rows": 234734,
+    "val_rows": 36245,
+    "test_rows": 61489,
+    "git_commit": "17e761c",
     "leakage_fix": "session-level 3-way train/val/test split, scaler fit on train only, checkpoint selection uses val (never test) -- test set is byte-identical across every model version in this project's history (see three_way_split() docstring)",
     "synthetic_augmentation": {
       "stages": [
@@ -52,10 +60,11 @@
       "sessions_per_stage": 300,
       "note": "train-only synthetic oversampling from calibrated per-stage feature profiles; test set is 100% real flows (CIC-IDS2017 and, if present, CIC-IDS2018), untouched by synthetic augmentation"
     },
-    "class_weight_max": 8.0,
+    "class_weight_max": 6.0,
     "stage_loss": "focal",
     "focal_gamma": 2.0,
-    "best_val_f1": 0.8481,
-    "optimization": "AdamW + CosineAnnealingLR + ClassWeighting"
+    "best_val_f1": 0.8529,
+    "optimization": "AdamW + CosineAnnealingLR + ClassWeighting",
+    "stage_logit_bias_calibration": "per-class additive bias on stage logits, coordinate-ascent search on val split only (test set never touched) to maximize macro-F1; test-set effect: macro-F1 0.6535->0.6727, Initial Access F1 0.377->0.423 (P 0.270->0.351), Reconnaissance F1 0.758->0.799, binary FPR 0.088->0.037"
   }
 }

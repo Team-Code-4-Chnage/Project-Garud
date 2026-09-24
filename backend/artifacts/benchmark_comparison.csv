@@ -1,4 +1,4 @@
 ,f1,precision,recall,fpr
-Logistic Regression (baseline),0.5578,0.6962,0.4653,0.0673
-Isolation Forest (baseline),0.3126,0.2872,0.3429,0.2823
-LSTM World Model (proposed),0.8592,0.8486,0.8701,0.0515
+Logistic Regression (baseline),0.5352,0.6935,0.4357,0.0642
+Isolation Forest (baseline),0.3547,0.3378,0.3734,0.2441
+LSTM World Model (proposed),0.8618,0.8586,0.8651,0.0475

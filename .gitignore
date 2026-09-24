@@ -37,7 +37,7 @@ data/raw/
 data/raw_cicids/
 data/raw_cicids2018/
 real_flows.csv
-real_flows.csv.pre_cicids2018_backup
+real_flows.csv.pre_*_backup
 data/*.pcap
 data/*.pcapng
 *.tmp
