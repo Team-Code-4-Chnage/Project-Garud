@@ -263,6 +263,8 @@ A 5-stage workflow for live judge demonstrations:
 
 ## Live Traffic & PCAP Ingestion
 
+PCAP upload and live capture share one extractor (`capture/flow_table.py`, `capture/flow_state.py`) that rebuilds flows and features the way CICFlowMeter did when it produced the training data, including that tool's quirks. Measured on six slices of the original CIC-IDS2017 captures, the extracted features agree with the official flow files on 95% to 99.8% of values (45% to 56% before this extractor was rewritten), and 99.9% to 100% on DDoS and web brute-force attack flows. The shipped model makes the same alert decision on 99.1% to 100% of windows whichever source the features come from. Details, the CICFlowMeter rules and what is still unchecked are in [docs/pcap_parity.md](docs/pcap_parity.md).
+
 ### A. Upload PCAP / PCAPNG Files
 Drop any standard Wireshark or tcpdump `.pcap` or `.pcapng` file directly into the dashboard UI, or stream via API:
 ```bash

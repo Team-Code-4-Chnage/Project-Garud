@@ -42,7 +42,7 @@ Limits stated up front:
 
 ## 4. Network-state schema
 
-One state per minute, network-wide. All columns are computed by `data/build_network_windows.py`. Aggregation window is one minute of flow start times. Every column is available in training. Inference availability is "yes" if the same fields exist in the live pipeline (`capture/flow_state.py` produces IPs, ports, protocol, flags and timing) with the caveat in section 12 that live flow features are defined differently from CICFlowMeter.
+One state per minute, network-wide. All columns are computed by `data/build_network_windows.py`. Aggregation window is one minute of flow start times. Every column is available in training. Inference availability is "yes" if the same fields exist in the live pipeline (`capture/flow_state.py` produces IPs, ports, protocol, flags and timing) The flow extractor now reproduces CICFlowMeter's definitions (docs/pcap_parity.md), but the V3 network-state builder itself has not been run on live or PCAP input.
 
 | Feature | Formula | Source fields |
 |---|---|---|
@@ -168,7 +168,7 @@ Cause: the late-in-day test segments contain families with almost no training su
 
 ## 12. Unverified and not done
 
-- Behaviour of any of this on live or PCAP traffic: the live extractor computes several features differently from CICFlowMeter, and the V3 network-state features were never run through the live pipeline.
+- Behaviour of V3 on live or PCAP traffic: the flow extractor now matches CICFlowMeter (docs/pcap_parity.md), but the V3 network-state features were never built from live or PCAP input.
 - External dataset test: not run.
 - Attack-family holdout with the same-family generalization control (train and test on the same family, different time): not run.
 - Holding out Monday as a benign-only test day: not run.

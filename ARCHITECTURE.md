@@ -76,32 +76,32 @@ flowchart TD
 
 ## 3. Telemetry Feature Space (22-Vector Representation)
 
-Every network session is transformed into a continuous vector $s_t \in \mathbb{R}^{22}$. Derived from the **CIC-IDS2017** benchmark, these 22 features capture the complete temporal, volumetric, and structural characteristics of network flows:
+Every flow is transformed into a vector $s_t \in \mathbb{R}^{22}$. The definitions are the ones in the CIC-IDS2017 training data (CICFlowMeter output), including that tool's quirks, because the live and PCAP extractor (`capture/flow_state.py`, `capture/flow_table.py`) reproduces them. Parity against the official flow files is measured in `docs/pcap_parity.md`. Real TTL statistics, retransmissions and payload-size spread are computed separately (`FlowState.packet_features()`) and are not model inputs.
 
 | # | Feature Name | Domain | Protocol Layer | Extraction Formula / Source | ATT&CK Signal |
 |:---:|---|:---:|:---:|---|---|
 | **1** | `flow_duration` | Temporal | Transport | $t_{\text{last}} - t_{\text{first}}$ ($\mu\text{s}$) | Extended in C2 beaconing; micro-bursts in PortScan |
 | **2** | `tot_fwd_pkts` | Volumetric | Transport | $\sum p_{\text{fwd}}$ | High in volumetric DoS and brute force |
 | **3** | `tot_bwd_pkts` | Volumetric | Transport | $\sum p_{\text{bwd}}$ | Elevated during data exfiltration downloads |
-| **4** | `fwd_pkt_len_mean` | Packet | Transport | $\frac{1}{N_{\text{fwd}}}\sum \operatorname{len}(p_{\text{fwd}})$ | Identifies payload staging and buffer overflows |
-| **5** | `bwd_pkt_len_mean` | Packet | Transport | $\frac{1}{N_{\text{bwd}}}\sum \operatorname{len}(p_{\text{bwd}})$ | Reflects exfiltration payload density |
+| **4** | `fwd_pkt_len_mean` | Packet | Transport | mean transport payload bytes of forward packets (Ethernet padding counted, as CICFlowMeter did) | Identifies payload staging and buffer overflows |
+| **5** | `bwd_pkt_len_mean` | Packet | Transport | mean transport payload bytes of backward packets | Reflects exfiltration payload density |
 | **6** | `flow_bytes_s` | Rate | Network/Transport | $\frac{\text{Bytes}_{\text{total}}}{\Delta t}$ | Spikes during egress exfiltration |
 | **7** | `flow_pkts_s` | Rate | Network/Transport | $\frac{N_{\text{total}}}{\Delta t}$ | Indicator of SYN floods and port sweeps |
 | **8** | `flow_iat_mean` | Temporal | Transport | $\frac{1}{N-1}\sum (t_i - t_{i-1})$ | Identifies automated C2 beaconing periodicity |
 | **9** | `flow_iat_std` | Temporal | Transport | $\operatorname{std}(t_i - t_{i-1})$ | Differentiates human jitter from script automation |
 | **10** | `fwd_iat_mean` | Temporal | Transport | $\frac{1}{N_f-1}\sum (t_{f,i} - t_{f,i-1})$ | Pacing analysis for evasion techniques |
 | **11** | `bwd_iat_mean` | Temporal | Transport | $\frac{1}{N_b-1}\sum (t_{b,i} - t_{b,i-1})$ | Server throttling and response latency |
-| **12** | `syn_flag_cnt` | Protocol Flag | TCP Header | $\sum [\text{TCP}_{\text{flags}} \& \text{SYN}]$ | Stealth half-open SYN port scans |
-| **13** | `ack_flag_cnt` | Protocol Flag | TCP Header | $\sum [\text{TCP}_{\text{flags}} \& \text{ACK}]$ | Established connection validation |
-| **14** | `fin_flag_cnt` | Protocol Flag | TCP Header | $\sum [\text{TCP}_{\text{flags}} \& \text{FIN}]$ | Normal teardown vs scan termination |
-| **15** | `rst_flag_cnt` | Protocol Flag | TCP Header | $\sum [\text{TCP}_{\text{flags}} \& \text{RST}]$ | Port closed resets during network reconnaissance |
-| **16** | `psh_flag_cnt` | Protocol Flag | TCP Header | $\sum [\text{TCP}_{\text{flags}} \& \text{PSH}]$ | Interactive shell commands (Reverse Shells) |
-| **17** | `urg_flag_cnt` | Protocol Flag | TCP Header | $\sum [\text{TCP}_{\text{flags}} \& \text{URG}]$ | Out-of-band signaling and evasion |
-| **18** | `down_up_ratio` | Structural | Transport | $\frac{N_{\text{bwd}}}{N_{\text{fwd}}}$ | Asymmetric transfer ratio (C2 vs Egress) |
-| **19** | `pkt_size_avg` | Statistical | Transport | $\frac{\text{Bytes}_{\text{total}}}{N_{\text{total}}}$ | Overall flow payload density |
-| **20** | `ttl_variance` | Routing | IP Header | $\operatorname{Var}(\text{TTL})$ / Header Length $\Delta$ | Proxying, source-routing, or spoofed hops |
+| **12** | `syn_flag_cnt` | Protocol Flag | TCP Header | 0/1: PSH bit of the flow's first packet (CICFlowMeter quirk, see docs/pcap_parity.md) | Mislabelled in the source data; not a SYN count |
+| **13** | `ack_flag_cnt` | Protocol Flag | TCP Header | 0/1: ACK bit of the flow's first packet | Whether the flow was first seen mid-connection |
+| **14** | `fin_flag_cnt` | Protocol Flag | TCP Header | 0/1: FIN bit of the first packet (rule not yet confirmed on data) | Teardown-only flows |
+| **15** | `rst_flag_cnt` | Protocol Flag | TCP Header | 0/1: RST bit of the first packet (rule not yet confirmed on data) | Reset-only flows |
+| **16** | `psh_flag_cnt` | Protocol Flag | TCP Header | 0/1: SYN bit of the flow's first packet (CICFlowMeter quirk) | Whether the flow began with a connection open |
+| **17** | `urg_flag_cnt` | Protocol Flag | TCP Header | CICFlowMeter rule not identified; extractor emits 0 (agrees 90% of the time) | Weak, partly unmatched feature |
+| **18** | `down_up_ratio` | Structural | Transport | $\lfloor N_{\text{bwd}} / N_{\text{fwd}} \rfloor$ (integer division) | Asymmetric transfer ratio |
+| **19** | `pkt_size_avg` | Statistical | Transport | (payload bytes + first packet's payload) / packets (CICFlowMeter counts the first packet twice) | Overall flow payload density |
+| **20** | `ttl_variance` | Structural | TCP Header | $\lvert \text{Fwd Header Length} - \text{Bwd Header Length} \rvert$. Not TTL despite the name: the training files contain no TTL | Asymmetry of header bytes between directions |
 | **21** | `tcp_win_size` | Flow Control | TCP Header | $\text{Init\_Win}_{\text{forward}}$ | TCP window manipulation and fingerprinting |
-| **22** | `retransmit_cnt` | Reliability | TCP Header | $\max(0, \text{Total}_{\text{fwd}} - \text{Subflow}_{\text{fwd}})$ | Packet loss due to MITM injection or congestion |
+| **22** | `retransmit_cnt` | Reliability | TCP Header | $\max(0, \text{Total}_{\text{fwd}} - \text{Subflow}_{\text{fwd}})$, which is 0 in every training row; extractor emits 0 | No information in the current model |
 
 ---
 

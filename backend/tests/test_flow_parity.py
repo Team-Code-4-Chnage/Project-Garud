@@ -56,17 +56,19 @@ def test_identical_packets_produce_byte_identical_features():
 
 def test_scapy_packet_pipeline_parity():
     """
-    Construct real Scapy IP/TCP packets and process them through:
-    1. LivePacketCapture.process_packet
-    2. pcap.py packet parsing loop
-    Verify both produce identical flows with bit-for-bit identical 22-feature dictionaries.
+    The same Scapy packets through
+      1. live capture (capture/live_capture.FlowExtractor.process_packet)
+      2. PCAP upload (capture/flow_table.flows_from_pcap, used by backend/app/routes/pcap.py)
+    must produce the same flow with bit-for-bit identical 22-feature dictionaries.
     """
-    from scapy.layers.inet import IP, TCP
+    import tempfile
 
-    from app.routes.pcap import PcapFlowState
+    from scapy.layers.inet import IP, TCP
+    from scapy.utils import wrpcap
+
+    from capture.flow_table import flows_from_pcap
     from capture.live_capture import FlowExtractor
 
-    pcap_flows: dict[str, PcapFlowState] = {}
     live_capturer = FlowExtractor(api_url="http://mock", flow_timeout=3600.0, min_packets=1)
 
     p1 = IP(src="192.168.1.50", dst="172.16.0.4", ttl=64) / TCP(sport=50000, dport=443, flags="S", seq=100, window=64240)
@@ -83,54 +85,16 @@ def test_scapy_packet_pipeline_parity():
     for pkt in scapy_packets:
         live_capturer.process_packet(pkt)
 
-    for pkt in scapy_packets:
-        ip = pkt[IP]
-        src_ip = ip.src
-        dst_ip = ip.dst
-        proto = ip.proto
-        ttl = int(ip.ttl)
-        pkt_len = int(ip.len) if hasattr(ip, "len") and ip.len else len(pkt)
-        ts = float(pkt.time)
-        tcp = pkt[TCP]
-        src_port = int(tcp.sport)
-        dst_port = int(tcp.dport)
-        tcp_flags = int(tcp.flags)
-        tcp_win = int(tcp.window)
-        seq = int(tcp.seq)
-
-        if (src_ip, src_port) <= (dst_ip, dst_port):
-            key = f"{src_ip}:{src_port}-{dst_ip}:{dst_port}-{proto}"
-            is_fwd = True
-        else:
-            key = f"{dst_ip}:{dst_port}-{src_ip}:{src_port}-{proto}"
-            is_fwd = False
-
-        if key not in pcap_flows:
-            pcap_flows[key] = PcapFlowState(
-                src_ip=src_ip if is_fwd else dst_ip,
-                dst_ip=dst_ip if is_fwd else src_ip,
-                src_port=src_port if is_fwd else dst_port,
-                dst_port=dst_port if is_fwd else src_port,
-                protocol=proto,
-            )
-
-        pcap_flows[key].add_packet(
-            pkt_len=pkt_len,
-            is_forward=is_fwd,
-            timestamp=ts,
-            tcp_flags=tcp_flags,
-            ttl=ttl,
-            tcp_win=tcp_win,
-            seq=seq,
-        )
+    with tempfile.TemporaryDirectory() as d:
+        path = f"{d}/flow.pcap"
+        wrpcap(path, scapy_packets)
+        pcap_flows = flows_from_pcap(path)
 
     assert len(live_capturer.active_flows) == 1
     assert len(pcap_flows) == 1
-    key = list(pcap_flows.keys())[0]
-    assert key in live_capturer.active_flows
-
-    live_flow = live_capturer.active_flows[key]
-    pcap_flow = pcap_flows[key]
+    live_flow = list(live_capturer.active_flows.values())[0]
+    pcap_flow = pcap_flows[0]
+    assert (live_flow.src_ip, live_flow.src_port) == (pcap_flow.src_ip, pcap_flow.src_port) == ("192.168.1.50", 50000)
 
     live_feats = live_flow.to_features()
     pcap_feats = pcap_flow.to_features()
@@ -139,4 +103,3 @@ def test_scapy_packet_pipeline_parity():
         assert live_feats[feat] == pcap_feats[feat], (
             f"Feature disparity on {feat}: live={live_feats[feat]} vs pcap={pcap_feats[feat]}"
         )
-

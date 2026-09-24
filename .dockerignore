@@ -1,0 +1,9 @@
+# Build context is the repo root (docker-compose backend service). Send only what the image needs.
+*
+!backend/
+!capture/
+backend/venv/
+backend/data/
+backend/artifacts_v2/
+**/__pycache__/
+**/*.pyc

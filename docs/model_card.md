@@ -68,32 +68,32 @@
 
 ## 4. 22 Standardized CIC-IDS Flow Features
 
-Feature order is strictly invariant across training, serialization, REST ingestion, and SHAP explainability:
+Feature order is strictly invariant across training, serialization, REST ingestion, and SHAP explainability. The comments give the definitions actually present in the training data (CICFlowMeter output); the PCAP and live extractor reproduces them, measured in `docs/pcap_parity.md`:
 
 ```python
 FLOW_FEATURES = [
     "flow_duration",      # Flow duration in microseconds
     "tot_fwd_pkts",       # Total forward packets
     "tot_bwd_pkts",       # Total backward packets
-    "fwd_pkt_len_mean",   # Mean size of forward packets (bytes)
-    "bwd_pkt_len_mean",   # Mean size of backward packets (bytes)
+    "fwd_pkt_len_mean",   # Mean forward transport payload bytes
+    "bwd_pkt_len_mean",   # Mean backward transport payload bytes
     "flow_bytes_s",       # Flow throughput in bytes/second
     "flow_pkts_s",        # Flow throughput in packets/second
     "flow_iat_mean",      # Mean inter-arrival time across flow
     "flow_iat_std",       # Standard deviation of inter-arrival time
     "fwd_iat_mean",       # Mean IAT of forward direction
     "bwd_iat_mean",       # Mean IAT of backward direction
-    "syn_flag_cnt",       # SYN flag occurrences
-    "ack_flag_cnt",       # ACK flag occurrences
-    "fin_flag_cnt",       # FIN flag occurrences
-    "rst_flag_cnt",       # RST flag occurrences
-    "psh_flag_cnt",       # PSH flag occurrences
-    "urg_flag_cnt",       # URG flag occurrences
-    "down_up_ratio",      # Download to upload ratio
-    "pkt_size_avg",       # Average packet size across flow
-    "ttl_variance",       # Variance of IP Time-To-Live
+    "syn_flag_cnt",       # 0/1, PSH bit of the first packet (CICFlowMeter quirk)
+    "ack_flag_cnt",       # 0/1, ACK bit of the first packet
+    "fin_flag_cnt",       # 0/1, FIN bit of the first packet (rule unconfirmed)
+    "rst_flag_cnt",       # 0/1, RST bit of the first packet (rule unconfirmed)
+    "psh_flag_cnt",       # 0/1, SYN bit of the first packet (CICFlowMeter quirk)
+    "urg_flag_cnt",       # 0/1, rule unknown; extractor emits 0
+    "down_up_ratio",      # floor(backward packets / forward packets)
+    "pkt_size_avg",       # Mean payload size, first packet counted twice
+    "ttl_variance",       # |fwd header bytes - bwd header bytes|; NOT TTL
     "tcp_win_size",       # TCP initial window size
-    "retransmit_cnt",     # Retransmitted packet count
+    "retransmit_cnt",     # 0 in all training rows; extractor emits 0
 ]
 ```
 

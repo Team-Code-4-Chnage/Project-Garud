@@ -2,11 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Build context is the repository root: the backend imports the shared packet/flow code in capture/
+COPY backend/ .
+COPY capture/ ./capture/
 
 EXPOSE 8000
 

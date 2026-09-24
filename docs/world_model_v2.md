@@ -92,7 +92,7 @@ V2 detection is worse than V1's flow-level F1 (0.838 de-duplicated). The tasks d
 - V2 overfits quickly: validation loss was best in the first few epochs and free-running state error barely improves with training. More regularisation or more diverse data is needed before trusting fine-grained numbers.
 - V2 cannot forecast Lateral Movement or Exfiltration on this data, and its stage forecasts are weak.
 - The requested network-level features (IPs, ports, protocols, direction, real rates) are not in the CIC-IDS2017/2018 CSVs. Until a dataset with them is used, V2's state is a window aggregate of flow statistics, not a full network state.
-- Not verified: behaviour on live or PCAP traffic (the live feature extractor differs from the training feature definitions).
+- Not verified: behaviour on live or PCAP traffic. The flow extractor now matches the training definitions (`docs/pcap_parity.md`), but V2 itself was never run on PCAP-derived flows.
 
 ## Reproduce
 

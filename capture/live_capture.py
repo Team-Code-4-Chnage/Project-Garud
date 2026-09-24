@@ -45,8 +45,10 @@ except ImportError:
 
 try:
     from .flow_state import FlowState
+    from .flow_table import FlowTable, packet_fields
 except ImportError:
     from flow_state import FlowState
+    from flow_table import FlowTable, packet_fields
 
 
 
@@ -58,103 +60,40 @@ class FlowExtractor:
         self.min_packets = min_packets
         self.export_interval = export_interval
 
-        self.active_flows: dict[str, FlowState] = {}
+        self.table = FlowTable()
         self.exported_count = 0
         self.total_packets = 0
         self.alerts_triggered = 0
 
-    def _flow_key(self, src_ip: str, dst_ip: str, src_port: int,
-                  dst_port: int, proto: int) -> tuple[str, bool]:
-        if (src_ip, src_port) <= (dst_ip, dst_port):
-            key = f"{src_ip}:{src_port}-{dst_ip}:{dst_port}-{proto}"
-            return key, True
-        else:
-            key = f"{dst_ip}:{dst_port}-{src_ip}:{src_port}-{proto}"
-            return key, False
+    @property
+    def active_flows(self) -> dict:
+        return self.table.active
 
     def process_packet(self, pkt):
+        """Assemble packets into flows with the same rules as PCAP upload and the training data
+        (capture/flow_table.py). Flows closed by FIN/RST or the 120 s flow timeout are sent at once;
+        flows idle longer than `flow_timeout` seconds are sent by the periodic check (live traffic
+        needs an idle cut-off so quiet connections are not held for two minutes)."""
         self.total_packets += 1
-
-        if not pkt.haslayer(IP):
+        f = packet_fields(pkt)
+        if f is None:
             return
-
-        ip = pkt[IP]
-        src_ip = ip.src
-        dst_ip = ip.dst
-        ttl = ip.ttl
-        proto = ip.proto
-
-        src_port = 0
-        dst_port = 0
-        tcp_flags = 0
-        tcp_win = 0
-        seq = 0
-        payload = b""
-
-        if pkt.haslayer(TCP):
-            tcp = pkt[TCP]
-            src_port = int(tcp.sport)
-            dst_port = int(tcp.dport)
-            tcp_flags = int(tcp.flags)
-            tcp_win = int(tcp.window)
-            seq = int(tcp.seq)
-            if tcp.payload:
-                payload = bytes(tcp.payload)
-        elif pkt.haslayer(UDP):
-            udp = pkt[UDP]
-            src_port = int(udp.sport)
-            dst_port = int(udp.dport)
-
-        pkt_len = int(ip.len) if hasattr(ip, "len") and ip.len else len(pkt)
-        timestamp = float(pkt.time)
-
-        flow_key, is_forward = self._flow_key(src_ip, dst_ip, src_port, dst_port, proto)
-
-        if flow_key not in self.active_flows:
-            self.active_flows[flow_key] = FlowState(
-                src_ip=src_ip if is_forward else dst_ip,
-                dst_ip=dst_ip if is_forward else src_ip,
-                src_port=src_port if is_forward else dst_port,
-                dst_port=dst_port if is_forward else src_port,
-                protocol=proto,
-            )
-
-        self.active_flows[flow_key].add_packet(
-            pkt_len=pkt_len,
-            is_forward=is_forward,
-            timestamp=timestamp,
-            tcp_flags=tcp_flags,
-            ttl=ttl,
-            tcp_win=tcp_win,
-            seq=seq,
-            payload=payload,
-        )
+        for flow in self.table.add(f):
+            self._send(flow)
 
         now = time.time()
         last_check = getattr(self, "_last_export_check", 0.0)
         if (self.total_packets % 25 == 0) or (now - last_check >= 3.0):
             self._last_export_check = now
-            self._export_expired_flows(timestamp if timestamp > 0 else now)
+            self._export_expired_flows(f["ts"] if f["ts"] > 0 else now)
 
-    def _export_expired_flows(self, current_time: float):
-        expired_keys = []
-        stale_keys = []
-
-        for key, flow in self.active_flows.items():
-            idle_time = current_time - flow.last_time
-            is_terminated = (flow.fin_count > 0 or flow.rst_count > 0) and idle_time >= 1.0
-
-            if (idle_time > self.flow_timeout or is_terminated) and flow.packet_count >= self.min_packets:
-                expired_keys.append(key)
-            elif idle_time > (self.flow_timeout * 2):
-                stale_keys.append(key)
-
-        for key in expired_keys:
-            flow = self.active_flows.pop(key)
+    def _send(self, flow: FlowState):
+        if flow.packet_count >= self.min_packets:
             self._send_to_api(flow)
 
-        for key in stale_keys:
-            self.active_flows.pop(key, None)
+    def _export_expired_flows(self, current_time: float):
+        for flow in self.table.expire(current_time, self.flow_timeout):
+            self._send(flow)
 
     def _send_to_api(self, flow: FlowState):
         features = flow.to_features()
@@ -214,10 +153,8 @@ class FlowExtractor:
 
     def export_all_remaining(self):
         logger.info("Exporting %d remaining active flows...", len(self.active_flows))
-        for key in list(self.active_flows.keys()):
-            flow = self.active_flows.pop(key)
-            if flow.packet_count >= self.min_packets:
-                self._send_to_api(flow)
+        for flow in self.table.flush():
+            self._send(flow)
 
     def print_stats(self):
         print(f"\n{'='*60}")
