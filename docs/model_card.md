@@ -167,6 +167,31 @@ Macro-F1 over all six classes: 0.725 uncalibrated → 0.774 calibrated (Exfiltra
 
 ---
 
+### 6.1 Additional held-out metrics (experiments/evaluate_model.py)
+
+Measured on the same test split (477 sessions, 61,776 windows) with the shipped model. Raw output is in `experiments/eval_results.json`.
+
+| Metric | All windows | De-duplicated |
+|---|---|---|
+| Infiltration head ROC-AUC | 0.955 | 0.948 |
+| Infiltration head PR-AUC | 0.921 | 0.901 |
+| F1 at threshold 0.5 / FPR | 0.862 / 4.59% | 0.838 / 3.51% |
+
+De-duplicated drops the 21.5% of test windows whose last flow is bit-identical to a training flow.
+
+Next-state prediction error (scaled feature space, deterministic rollout):
+
+| Step | Model MSE | Persistence MSE | Model MAE | Persistence MAE |
+|---|---|---|---|---|
+| 1 | 0.510 | 0.895 | 0.264 | 0.248 |
+| 2 | 0.532 | 0.965 | 0.276 | 0.273 |
+| 3 | 0.548 | 1.008 | 0.281 | 0.289 |
+| 4 | 0.560 | 1.030 | 0.282 | 0.298 |
+
+Persistence repeats the window's last flow. The model has clearly lower MSE than persistence but about the same MAE, so it predicts the typical size of the next flow better than it predicts the exact values. Error grows slowly with the horizon.
+
+Early-warning lead time (in flows, because CIC-IDS2017 timestamps are synthetic): of 134 test sessions that have at least 6 benign flows before the first malicious flow, the rollout alert fired before the attack in 32 (23.9%). Only 5 (3.7%) fired within 12 flows of the attack start; the rest fired much earlier, which on this data is mostly an unrelated earlier alert rather than a forecast. Genuine early warning is therefore weak. The strong results in section 6 are for detecting the current or next flow, not for warning ahead of time.
+
 ## 7. Explainability & Trust Architecture
 
 1. **Fast Gradient Attribution ($\mathcal{O}(1)$):**
