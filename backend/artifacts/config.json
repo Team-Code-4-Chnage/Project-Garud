@@ -39,8 +39,8 @@
     "Benign": 1.0,
     "Reconnaissance": 0.25,
     "Initial Access": 0.0,
-    "Lateral Movement": 0.0,
-    "C2": 0.5,
+    "Lateral Movement": -0.75,
+    "C2": -0.25,
     "Exfiltration": 0.0
   },
   "provenance": {
@@ -51,8 +51,8 @@
     "train_rows": 236272,
     "val_rows": 33734,
     "test_rows": 64642,
-    "git_commit": "60e06ef",
-    "leakage_fix": "session-level 3-way train/val/test split, scaler fit on train only, checkpoint selection uses val (never test) -- test set is byte-identical across every model version in this project's history (see three_way_split() docstring)",
+    "git_commit": "613b028",
+    "leakage_fix": "session-level 3-way train/val/test split, scaler fit on train only, checkpoint selection uses val (never test)",
     "synthetic_augmentation": {
       "stages": [
         "Exfiltration"
@@ -63,9 +63,10 @@
     "class_weight_max": 6.0,
     "stage_loss": "focal",
     "focal_gamma": 2.0,
-    "best_val_f1": 0.8617,
+    "stage_target": "current",
+    "best_val_f1": 0.8625,
     "optimization": "AdamW + CosineAnnealingLR + ClassWeighting",
-    "initial_access_resession_fix": "data/fix_initial_access_sessions.py adds 2,180 real CIC-IDS2017 web-attack rows re-chunked into pure attack-only sessions, alongside (not replacing) the original mixed-session rows -- see docs/model_card.md section 5 for the root-cause analysis",
-    "stage_logit_bias_calibration": "per-class additive bias on stage logits, coordinate-ascent search on val split only (test set never touched) to maximize macro-F1; test-set effect after the resession fix: macro-F1 0.6514->0.6901, Initial Access F1 0.437->0.530 (P 0.317->0.535)"
+    "stage_target_note": "stage head is trained on the stage of the window's last flow -- the flow backend/app/ingestion.py annotates with predicted_stage -- rather than the unseen next flow; the infiltration head is still trained on the next flow",
+    "stage_logit_bias_calibration": "per-class additive bias on stage logits, coordinate-ascent search on val split only (test never touched); test-set effect: macro-F1 0.7251->0.7735, Initial Access F1 0.680->0.838"
   }
 }

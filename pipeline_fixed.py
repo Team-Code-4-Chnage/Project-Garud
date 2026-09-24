@@ -102,11 +102,11 @@ def three_way_split(unique_ids, val_size=0.1, test_size=0.2, random_state=42):
 
     The test boundary here is computed identically to train_test_split()
     above (same RNG, same permutation, same `int(n * (1-test_size))` cut),
-    so the resulting test_ids are byte-identical to every prior run's test
-    set -- the held-out set used for every benchmark number in this project's
-    history doesn't change, only the train/val boundary does (val is carved
-    out of what used to be "train"). This keeps all prior per-stage
-    evaluations in docs/model_card.md directly comparable to this one.
+    so for a given set of session ids the test split matches what the old
+    2-way split produced; only the train/val boundary differs (val is carved
+    out of what used to be "train"). Adding sessions to the dataset changes
+    the permutation, so test sets are only identical across runs on the same
+    data.
     """
     rng = np.random.RandomState(random_state)
     shuffled = rng.permutation(unique_ids)
@@ -315,8 +315,16 @@ def generate_synthetic_flows(n_sessions=400, session_len=30):
     return pd.DataFrame(rows)
 
 
+STAGE_TARGET = "current"
+
+
 def build_sequences(df, window=WINDOW):
+    # "current": stage label of the window's last flow -- the flow that
+    # backend/app/ingestion.py actually annotates with predicted_stage when it
+    # runs the model on the window ending at a newly-arrived flow.
+    # "next": label of the unseen flow after the window (the original setup).
     X_seq, y_next_state, y_malicious, y_stage = [], [], [], []
+    stage_offset = window - 1 if STAGE_TARGET == "current" else window
     for _sid, g in df.groupby("session_id"):
         feats = g[FLOW_FEATURES].values
         mal = g["is_malicious"].values
@@ -325,7 +333,7 @@ def build_sequences(df, window=WINDOW):
             X_seq.append(feats[i:i + window])
             y_next_state.append(feats[i + window])
             y_malicious.append(mal[i + window])
-            y_stage.append(stage[i + window])
+            y_stage.append(stage[i + stage_offset])
     return (np.array(X_seq, dtype=np.float32), np.array(y_next_state, dtype=np.float32),
             np.array(y_malicious, dtype=np.float32), np.array(y_stage, dtype=np.int64))
 
@@ -487,7 +495,14 @@ def main():
                           "the previous behavior exactly for comparison.")
     ap.add_argument("--focal-gamma", type=float, default=2.0,
                      help="Focusing parameter for --stage-loss focal. 0 reduces to weighted_ce.")
+    ap.add_argument("--stage-target", choices=["current", "next"], default="current",
+                     help="Which flow's stage the stage head learns: 'current' (last flow in the "
+                          "window, what production annotates) or 'next' (the unseen following flow, "
+                          "the original setup).")
     args = ap.parse_args()
+
+    global STAGE_TARGET
+    STAGE_TARGET = args.stage_target
 
     out_dir = args.out
     os.makedirs(out_dir, exist_ok=True)
@@ -710,9 +725,7 @@ def main():
                 "test_rows": int(len(test_df)),
                 "git_commit": git_commit,
                 "leakage_fix": "session-level 3-way train/val/test split, scaler fit on "
-                               "train only, checkpoint selection uses val (never test) -- "
-                               "test set is byte-identical across every model version in "
-                               "this project's history (see three_way_split() docstring)",
+                               "train only, checkpoint selection uses val (never test)",
                 "synthetic_augmentation": {
                     "stages": augment_stages,
                     "sessions_per_stage": args.augment_sessions_per_stage if augment_stages else 0,
@@ -723,6 +736,7 @@ def main():
                 "class_weight_max": args.class_weight_max,
                 "stage_loss": args.stage_loss,
                 "focal_gamma": args.focal_gamma if args.stage_loss == "focal" else None,
+                "stage_target": args.stage_target,
                 "best_val_f1": best_val_f1,
                 "optimization": "AdamW + CosineAnnealingLR + ClassWeighting",
             }

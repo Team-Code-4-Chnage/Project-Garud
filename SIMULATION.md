@@ -479,7 +479,7 @@ Run the simulator from the repository root:
    - Attack sessions will progressively advance from green (`Benign`) to orange (`Reconnaissance`, `Initial Access`) and red (`C2`, `Exfiltration`).
 2. **Forecast View (`/forecast`):**
    - Click on any active attack session.
-   - Observe the **Monte Carlo 6-Step Lookahead** chart with shaded 95% confidence bands showing the projected risk trajectory.
+   - Observe the **Monte Carlo 6-Step Lookahead** chart with a shaded ±1σ uncertainty band showing the projected risk trajectory.
    - Click `VIEW REPORT` to generate an interactive printable forecast dossier.
 3. **Explainability View (`/explain`):**
    - Click on the session to view real-time **SHAP** and **Gradient $\times$ Input** attributions.

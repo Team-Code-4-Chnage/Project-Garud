@@ -1,4 +1,5 @@
 import logging
+import secrets
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -153,8 +154,8 @@ except ImportError:
 @app.middleware("http")
 async def api_key_auth_middleware(request: Request, call_next):
     if API_KEY and not request.url.path.startswith(("/health", "/docs", "/openapi.json", "/redoc", "/ws")):
-        key = request.headers.get("X-API-Key")
-        if key != API_KEY:
+        key = request.headers.get("X-API-Key") or ""
+        if not secrets.compare_digest(key.encode(), API_KEY.encode()):
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Unauthorized: Invalid or missing X-API-Key header"},

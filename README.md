@@ -8,10 +8,10 @@
 [![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)](https://pytorch.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
-[![Vite](https://img.shields.io/badge/Vite-5.0-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev)
 [![MITRE ATT&CK](https://img.shields.io/badge/MITRE-ATT%26CK-red?style=for-the-badge)](https://attack.mitre.org)
-[![Dataset](https://img.shields.io/badge/Dataset-CIC--IDS2017-orange?style=for-the-badge)](https://www.unb.ca/cic/datasets/ids-2017.html)
+[![Dataset](https://img.shields.io/badge/Dataset-CIC--IDS2017%20%2B%202018-orange?style=for-the-badge)](https://www.unb.ca/cic/datasets/ids-2017.html)
 
 [Quickstart](#quickstart) • [Architecture](ARCHITECTURE.md) • [Simulation Playbook](SIMULATION.md) • [Presentation Deck](PRESENTATION.md) • [Benchmarks](#benchmark-performance-on-cic-ids2017--cic-ids2018) • [API Reference](#api-endpoints) • [Lab Setup](LAB_SETUP.md)
 
@@ -29,9 +29,9 @@ A few things this system does, beyond plain classification:
 
 - Monte Carlo rollouts (k=6 steps, N=20 samples) give confidence intervals on the forecast instead of a single point estimate.
 - An adaptive EMA threshold (mean + 2 standard deviations, tuned to live background traffic) keeps the alert rate sane instead of firing on every minor fluctuation.
-- Every alert carries an explanation: SHAP (Shapley values) and gradient×input attribution both point to the specific telemetry features that drove the score.
-- Live sockets are resolved back to local PIDs and executable names (`chrome.exe`, `python.exe`, `nmap.exe`), with IPs classified as host/LAN/NAT.
-- Monitoring state survives server hot-reloads and tab switches, with on-demand archiving of a cycle's flows and sessions.
+- Any session can be explained on demand: SHAP (sampled Shapley value estimates) and gradient×input attribution both point to the specific telemetry features that drove the score.
+- Live sockets are resolved back to local PIDs and executable names (`chrome.exe`, `python.exe`, `powershell.exe`), with IPs classified as host/LAN/NAT.
+- Captured flows persist across dashboard tab switches; each monitoring cycle's sessions and alerts are archived to disk on demand and automatically on every backend shutdown.
 - Incident reports export as themed HTML, CSV, or JSON for SIEM ingestion or a printable dossier.
 
 ---
@@ -44,20 +44,36 @@ CIC-IDS2018, plus 2,180 real CIC-IDS2017 Initial Access rows re-chunked into pur
 sessions alongside their original mixed-session form (`data/fix_initial_access_sessions.py` — see
 below for why). A session-level 3-way split (1,673 train / 239 validation / 478 test sessions)
 means checkpoint selection during training only ever looks at the validation set — the test set
-(64,642 windowed sequences) is touched exactly once, for the numbers below.
+(61,776 six-flow windows from 64,642 test flows) is touched exactly once, for the numbers below.
 
-| Model Architecture | F1-Score | Precision | Recall (Detection Rate) | False Positive Rate (FPR) | Latency (Inference, CPU) |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Logistic Regression *(Linear Baseline)* | 0.523 | 0.689 | 0.421 | 6.16% | < 1 ms |
-| Isolation Forest *(Unsupervised Baseline)* | 0.402 | 0.374 | 0.434 | 23.49% | ~ 8 ms |
-| NetForecast World Model *(Proposed, MAX Config)* | **0.861** | **0.862** | **0.860** | **4.47%** | **~ 0.7 ms** (measured, single-window forward pass) |
+### Binary detection (malicious vs. benign)
 
-> [!NOTE]
-> The training pipeline uses a genuine 3-way train/val/test split for checkpoint selection, so these test numbers are honest — checkpoint selection never sees the test set. See `docs/model_card.md` §5 for details.
+| Model | F1-Score | Precision | Recall | False Positive Rate |
+|---|:---:|:---:|:---:|:---:|
+| Logistic Regression *(linear baseline)* | 0.523 | 0.689 | 0.421 | 6.16% |
+| Isolation Forest *(unsupervised baseline)* | 0.402 | 0.374 | 0.434 | 23.49% |
+| NetForecast World Model | **0.862** | **0.859** | **0.864** | **4.59%** |
 
-The table above is binary malicious-vs-benign detection, and shouldn't be read as "detects all 6 stages equally well" — per-stage capability varies a lot. Focal loss on the MITRE stage head (gamma=2, generalizing the earlier class-weighted cross-entropy — see `docs/model_card.md` §5) plus a tuned class-weight clip (6x, down from an initial 50x that over-corrected) and positive-weighted BCE (`pos_weight≈2.94`) get 86.0% recall at the binary level with a 4.47% FPR, well below the Isolation Forest baseline's 23.49% FPR. Benign, Reconnaissance, C2, and Lateral Movement are all reliably classified (F1 0.79–0.96, calibrated). Lateral Movement in particular reaches precision 97.1%, recall 87.3%, F1 0.92 on 771 real held-out test flows, after real CIC-IDS2018 Infiltration data replaced an earlier synthetic-oversampling attempt that a held-out evaluation confirmed did not transfer to real traffic.
+Source: `backend/artifacts/benchmark_comparison.csv`, at the fixed 0.5 threshold. Measured CPU latency of the shipped model: 1.2 ms per single-window prediction, about 160 ms for a full 6-step forecast with 20 Monte Carlo runs.
 
-Initial Access (web attacks) was the weakest stage for most of this project, and closing it took real root-cause work, not just more tuning. A confusion-matrix analysis (not just the aggregate P/R/F1 numbers) found its errors were concentrated almost entirely in the original CIC-IDS2017 rows — those alone scored recall 0.476 / precision 0.300, while the CIC-IDS2018 rows added earlier scored recall 0.969 / precision 1.000 on the identical test split, a stark gap between two real sources of the same attack type. The cause: CIC-IDS2017 sessions are grouped by `(src_ip, dst_ip, time_bucket)` — the same grouping used in production — so a real attacker's requests and ordinary benign HTTP traffic from the same IP pair end up in the same session, diluting the training signal. `data/fix_initial_access_sessions.py` adds a second, pure-session view of the same real rows (not fabricated data) alongside the original mixed-session rows, since production sessions are mixed the same way and that harder signal is worth keeping. Combined with the earlier real-data augmentation, class-weight retuning, and post-hoc logit-bias calibration, precision moved 6.2% → 16.6% → 27.0% → 35.1% → 53.5% (recall 52.5%) across five fixes — roughly 8.6x overall. It's still the weakest of the six stages; two further attempts (gating the stage decision on the binary infiltration head, and an architectural skip connection) were tested properly and didn't help, so what's left is payload-aware features, a genuinely bigger change. The ML model does not detect Exfiltration on its own (0% recall — CIC-IDS2017 has only around 11 Heartbleed flows in its entire public release, 2 in this sample, too little to learn from), but Exfiltration/Heartbleed is separately covered by a deterministic signature detector (`capture/signatures.py`) that doesn't rely on ML at all: CVE-2014-0160 has a fixed wire-format signature, verified end-to-end against a crafted malicious packet with zero false positives on legitimate traffic. Full per-stage numbers and root-cause analysis are in [`docs/model_card.md`](docs/model_card.md#6-evaluation--comparative-benchmark).
+### Per-MITRE-stage classification (held-out test set, shipped calibrated model)
+
+| Stage | Precision | Recall | F1 | Test windows |
+|---|:---:|:---:|:---:|---:|
+| Benign | 0.978 | 0.987 | 0.983 | 46,676 |
+| Reconnaissance | 0.934 | 0.911 | 0.922 | 7,116 |
+| Initial Access | 0.815 | 0.862 | 0.838 | 623 |
+| Lateral Movement | 0.989 | 0.855 | 0.917 | 771 |
+| C2 | 0.996 | 0.967 | 0.981 | 6,588 |
+| Exfiltration | — | — | — | 2 (covered by signature detector, see below) |
+
+All five learnable stages are now at F1 0.84 or above. Source: `experiments/calibrate_stage_logits.py`; full breakdown, uncalibrated numbers, and history in [`docs/model_card.md`](docs/model_card.md#6-evaluation--comparative-benchmark).
+
+The stage head classifies the stage of the most recent flow in the 6-flow window, which is exactly the flow the live system annotates when it runs the model (`backend/app/ingestion.py`). An earlier version trained it to guess the stage of the *next*, not-yet-seen flow while the dashboard displayed that guess against the current flow. That mismatch was the main reason Initial Access stayed weak for so long: a web-attack request is often one flow surrounded by benign traffic, so it can't be predicted from the benign flows before it. Aligning training with what production actually displays moved Initial Access F1 from 0.530 to 0.838. Forecasting is unaffected: future states still come from the next-state head and the autoregressive Monte Carlo rollout.
+
+Initial Access got there through several verified fixes, in order: real CIC-IDS2018 web-attack data (`data/augment_initial_access.py`), class-weight retuning with focal loss, per-class logit calibration, re-chunking the original CIC-IDS2017 web-attack rows into pure attack-only sessions alongside their mixed-session form (`data/fix_initial_access_sessions.py` — CIC-IDS2017 sessions are grouped by IP pair and time bucket, which mixed attacker requests with benign traffic), and the label-alignment fix above. Two further ideas (gating on the infiltration head, an architectural skip connection) were tested and did not help, so they were not shipped.
+
+The ML model does not detect Exfiltration: CIC-IDS2017 has only about 11 Heartbleed flows in its entire public release (2 in this test set), too few to learn from. Heartbleed is instead covered by a deterministic signature detector (`capture/signatures.py`) that checks the CVE-2014-0160 wire format directly; it's tested against a crafted malicious packet and does not fire on the legitimate TLS, heartbeat, and non-TLS cases in `backend/tests/test_signatures.py`.
 
 We also directly tested generalization to unseen attack tools (`experiments/family_holdout_eval.py`, results in [§9 of the model card](docs/model_card.md#9-generalization-to-unseen-attack-families)): holding an entire attack family out of training, a held-out DoS variant (slowloris) is still correctly flagged 64% of the time, while a held-out botnet family (Bot) and a payload-driven attack (XSS) show no meaningful transfer. That's an honest, uneven result rather than a cherry-picked win.
 
@@ -70,22 +86,24 @@ NetForecast classifies every network flow and forecasts future progression acros
 ```mermaid
 stateDiagram-v2
     [*] --> Benign: Normal Baseline Traffic
-    Benign --> Reconnaissance: PortScan, Patator, Botnet Probing
+    Benign --> Reconnaissance: PortScan, Patator, Bot
     Reconnaissance --> Initial_Access: Web Attacks (SQLi, XSS, Brute Force)
-    Initial_Access --> Lateral_Movement: Internal Infiltration, SMB/RDP Spreading
-    Lateral_Movement --> Command_and_Control: Beaconing, C2 Heartbeats, DoS Spikes
-    Command_and_Control --> Exfiltration: High-Volume Data Egress, Heartbleed
+    Initial_Access --> Lateral_Movement: Infiltration
+    Lateral_Movement --> Command_and_Control: DoS / DDoS
+    Command_and_Control --> Exfiltration: Heartbleed
     Exfiltration --> [*]: Attack Objective Achieved
 ```
 
-| MITRE Stage | Target ATT&CK Techniques | CIC-IDS2017 Mapped Attacks | Key Telemetry Signatures |
+| MITRE Stage | Target ATT&CK Techniques | Training Data (actual labels mapped in) | Detection Path |
 |---|---|---|---|
-| Benign | N/A (Standard Business Traffic) | Normal HTTP/S, DNS, SSH | Balanced flow rates, standard TCP flags |
-| Reconnaissance | T1595 (Active Scanning), T1046 (Network Service Discovery) | PortScan, Bot, FTP-Patator, SSH-Patator | High SYN/RST flag counts, small packet sizes, rapid IAT |
-| Initial Access | T1190 (Exploit Public-Facing App), T1110 (Brute Force) | Web Attack (SQL Injection, XSS, Brute Force) | Asymmetric forward packet size, PSH flags, repeated requests |
-| Lateral Movement | T1021 (Remote Services), T1210 (Exploitation of Remote Services) | Infiltration, Internal SMB/RDP scans | Internal IP-to-IP bursts, header length variance spikes |
-| Command & Control | T1071 (Application Layer Protocol), T1573 (Encrypted Channel) | DDoS LOIC, DoS Hulk, DoS GoldenEye, Slowloris | Periodic IAT intervals, persistent window size, flood volumes |
-| Exfiltration | T1041 (Exfiltration Over C2), T1048 (Exfiltration Over Alt Protocol) | Heartbleed, Data exfiltration egress | Skewed down/up ratio, high backward packet lengths, TCP window changes |
+| Benign | N/A (Standard Business Traffic) | CIC-IDS2017 BENIGN | ML stage head |
+| Reconnaissance | T1595 (Active Scanning), T1046 (Network Service Discovery) | CIC-IDS2017 PortScan, Bot, FTP-Patator, SSH-Patator | ML stage head |
+| Initial Access | T1190 (Exploit Public-Facing App), T1110 (Brute Force) | CIC-IDS2017 + CIC-IDS2018 Web Attack (Brute Force, XSS, SQL Injection) | ML stage head |
+| Lateral Movement | T1021 (Remote Services), T1210 (Exploitation of Remote Services) | CIC-IDS2017 + CIC-IDS2018 Infiltration | ML stage head |
+| Command & Control | T1071 (Application Layer Protocol), T1573 (Encrypted Channel) | CIC-IDS2017 DDoS, DoS Hulk, GoldenEye, Slowloris, Slowhttptest | ML stage head |
+| Exfiltration | T1041 (Exfiltration Over C2), T1048 (Exfiltration Over Alt Protocol) | CIC-IDS2017 Heartbleed (only ~11 real flows exist) | Deterministic Heartbleed signature detector (`capture/signatures.py`) |
+
+Note that "Command & Control" here is learned from CIC-IDS2017's DoS/DDoS traffic (the dataset has no dedicated C2-beaconing label), so it recognizes sustained flood/slow-connection patterns rather than low-and-slow beaconing specifically.
 
 ---
 
@@ -152,7 +170,7 @@ flowchart TB
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\start_all.ps1
 ```
-Activates the virtual environment, verifies model artifacts, and launches the FastAPI backend on `:8000` and the Vite frontend on `:5173`.
+Launches the FastAPI backend on `:8000` (using `backend/venv`'s Python) and the Vite frontend on `:5173`, sets the backend's traffic mode to match `-Mode`, then starts live packet capture (elevated via UAC if needed) or, with `-Mode simulator`, the traffic simulator. Requires `backend/venv` and `frontend/node_modules` to already be installed (see Option B).
 
 ---
 
@@ -187,7 +205,7 @@ npm run dev
 
 ### Option C: Containerized Deployment (Docker Compose)
 
-Spin up the entire stack (FastAPI backend, Vite/Nginx frontend, shared volume) with one command:
+Spin up the backend (with a persistent data volume and read-only model artifacts) and the Nginx-served frontend build with one command. Live packet capture is not containerized; run `capture/live_capture.py` on the host if you need it.
 
 ```bash
 # Build and start all services
@@ -257,8 +275,7 @@ A 5-stage workflow for live judge demonstrations:
 Drop any standard Wireshark or tcpdump `.pcap` or `.pcapng` file directly into the dashboard UI, or stream via API:
 ```bash
 curl -X POST http://localhost:8000/ingest/pcap \
-  -F "file=@sample_attack.pcap" \
-  -F "session_id=incident_042"
+  -F "file=@sample_attack.pcap"
 ```
 
 ### B. Live NIC Sniffing
@@ -314,7 +331,8 @@ python pipeline_fixed.py \
   --augment-sessions-per-stage 300 \
   --class-weight-max 6.0 \
   --stage-loss focal \
-  --focal-gamma 2.0
+  --focal-gamma 2.0 \
+  --stage-target current
 
 # 7. Recalibrate per-class stage logit bias against the freshly retrained weights
 #    (copy the printed "Final bias" dict into backend/artifacts/config.json's
@@ -337,11 +355,14 @@ python experiments/calibrate_stage_logits.py
 > [!NOTE]
 > All HTTP routes share a single global SlowAPI limit of 120 requests/minute per client IP (`backend/app/main.py`) — there is currently no differentiated per-endpoint throttling.
 
+> [!IMPORTANT]
+> `/predict`, `/forecast`, and `/explain` take a `window` of 6 flows × 22 features and by default assume it is **already scaled**. If you send raw flow statistics (as they appear in CIC-IDS CSVs or `real_flows.csv`), add `"needs_scaling": true` to the request body, or the model will see unscaled values and return meaningless predictions. `/ingest`, `/ingest/csv`, and `/ingest/pcap` always scale for you.
+
 | Category | Method | Endpoint | Description |
 |:---:|:---:|---|---|
 | Health & Info | `GET` | `/health` | System status, device (CPU/CUDA), active features count |
-| Forecasting | `POST` | `/predict` | Single-step state transition & stage prediction from a 6x22 window |
-| | `POST` | `/forecast` | k-step Monte Carlo rollout with uncertainty intervals & EMA |
+| Forecasting | `POST` | `/predict` | Stage + infiltration probability for one 6x22 window |
+| | `POST` | `/forecast` | k-step Monte Carlo rollout (`k_steps` ≤ 20, `n_mc_samples` ≤ 100) with mean, ±σ, and EMA |
 | | `GET` | `/forecast/view/html` | Printable in-browser HTML forecast trajectory dossier |
 | | `GET` | `/forecast/export/html` | Download themed HTML forecast dossier |
 | | `GET` | `/forecast/export/csv` | Download forecast steps as CSV |
@@ -355,18 +376,27 @@ python experiments/calibrate_stage_logits.py
 | | `GET` | `/reports/export/html` | Download themed HTML forensic report |
 | | `GET` | `/reports/export/csv` | Export forensic CSV report for sessions and alerts |
 | | `GET` | `/reports/export/json` | Export full structured JSON telemetry & kill-chain report |
-| Ingestion | `POST` | `/ingest` | Ingest single flow telemetry record (gated by mode) |
+| Ingestion | `POST` | `/ingest` | Ingest single flow telemetry record (simulated-source flows rejected in live mode) |
 | | `POST` | `/ingest/csv` | Bulk upload flow log CSV |
-| | `POST` | `/ingest/pcap` | Upload raw `.pcap` file for Scapy flow reconstruction |
+| | `POST` | `/ingest/pcap` | Upload raw `.pcap`/`.pcapng` file for Scapy flow reconstruction |
+| | `GET` | `/ingest/buffer-status` | Per-session sliding-window buffer fill levels |
+| Sessions & Dashboard | `GET` | `/sessions` | Tracked sessions (supports `active_within_seconds` filter) |
+| | `GET` | `/sessions/{session_key}/flows` | Flow records for one session |
+| | `GET` | `/dashboard/stats` | Aggregate counters for the dashboard header |
+| | `GET` | `/dashboard/stage-distribution` | Session counts per MITRE stage |
 | System & Cycle | `GET/POST`| `/system/mode` | Query or toggle between `live` and `simulated` modes |
+| | `POST` | `/system/simulator/start` | Start the built-in traffic simulator (simulated mode only) |
+| | `POST` | `/system/simulator/stop` | Stop the built-in traffic simulator |
 | | `POST` | `/system/purge-simulated` | Delete all simulated flows, sessions, and alerts |
+| | `GET` | `/system/host-identity` | This machine's hostname, IPs, and adapters |
 | | `POST` | `/system/cycle/start` | Archive current monitoring cycle and start a fresh cycle |
 | | `GET` | `/system/cycle/current` | Query the currently active monitoring cycle |
-| | `GET` | `/system/cycles` | List historical cycle archives |
+| | `GET` | `/system/cycles` | List archived cycles |
+| | `GET` | `/system/cycles/{cycle_id}` | One archived cycle's contents |
 | Alerts & WS | `GET` | `/alerts` | Query active & historical alerts with triage status |
 | | `GET` | `/alerts/stats` | Aggregate alert statistics |
-| | `POST` | `/alerts/{id}/acknowledge` | Acknowledge alert with operator notes |
-| | `WS` | `/ws/live` | WebSocket real-time flow telemetry stream |
+| | `POST` | `/alerts/{alert_id}/acknowledge` | Acknowledge an alert |
+| | `WS` | `/ws/live` | WebSocket real-time flow telemetry stream (alias: `/api/packets/ws`) |
 
 ---
 
@@ -380,21 +410,24 @@ Network_Attack_Detection/
 │   │   ├── database.py              # SQLite + async SQLAlchemy session models
 │   │   ├── inference.py             # World Model forward pass, MC rollout & SHAP
 │   │   ├── ingestion.py             # Sliding window buffer & adaptive EMA threshold
-│   │   ├── network_identity.py      # IP subnetting & loopback/private-range classification
-│   │   ├── process_resolver.py      # Cross-platform (psutil) socket-to-PID & executable correlation
+│   │   ├── network_identity.py      # Host discovery & HOST/LAN_PEER/NAT_PEER IP classification
+│   │   ├── process_resolver.py      # psutil socket-to-PID & process-name correlation
 │   │   ├── signatures.py            # Re-export of capture/signatures.py (Docker/standalone packaging)
-│   │   ├── main.py                  # App factory, SlowAPI rate limiter & CORS
+│   │   ├── flow_state.py            # Re-export of capture/flow_state.py (Docker/standalone packaging)
+│   │   ├── live.py                  # WebSocket broadcast registry shared by ws.py and ingestion.py
+│   │   ├── main.py                  # App factory, SlowAPI rate limiter, API-key middleware & CORS
 │   │   ├── model_loader.py          # Dynamic artifact loader (hidden_size, scaler, calibration bias)
 │   │   ├── schemas.py               # Pydantic request/response validation schemas
 │   │   └── routes/                  # Modular endpoint routers
 │   │       ├── alerts.py            # Alert triage & acknowledge
 │   │       ├── explain.py           # SHAP / Gradient attribution & HTML/CSV/JSON dossiers
-│   │       ├── forecast.py          # Prediction, MC rollout & HTML/CSV/JSON dossiers
+│   │       ├── forecast.py          # MC rollout & HTML/CSV/JSON dossiers
+│   │       ├── predict.py           # Single-window prediction
 │   │       ├── ingest.py            # Single & batch flow ingestion (mode-gated)
 │   │       ├── pcap.py              # Scapy PcapReader flow reconstruction
 │   │       ├── reports.py           # Forensic HTML dossiers & CSV/JSON exports
-│   │       ├── system.py            # Mode switcher, purge & cycle reset/persistence/archive
-│   │       └── ws.py                # Real-time WebSocket event broadcaster
+│   │       ├── system.py            # Mode switcher, simulator control, purge & cycle archive
+│   │       └── ws.py                # WebSocket stream, sessions & dashboard endpoints
 │   ├── artifacts/                   # Serialized production models & metrics
 │   │   ├── benchmark_comparison.csv # Baseline comparison table
 │   │   ├── config.json              # Model hyperparameters, calibration bias & provenance
@@ -408,17 +441,23 @@ Network_Attack_Detection/
 │       ├── test_model_quality.py    # Real-data QA: per-stage capability, forecast, regression guard
 │       └── fixtures/                # Real held-out flows used by test_model_quality.py
 │       # 55 tests total, currently passing
-├── frontend/                        # React 18 + Vite SOC Dashboard
+├── frontend/                        # React 19 + Vite 8 SOC Dashboard
 │   ├── src/
-│   │   ├── components/              # Reusable UI components
-│   │   │   ├── AlertFeed.jsx        # Live alert feed with triage buttons
+│   │   ├── components/
+│   │   │   ├── Dashboard.jsx        # Stat cards, active sessions & active-attacks tabs
+│   │   │   ├── SessionTable.jsx     # Session / attack tables with 1-click forecast
+│   │   │   ├── LiveLogsView.jsx     # Attack-only live log feed in column layout
+│   │   │   ├── ForecastView.jsx     # Monte Carlo forecast chart (±1σ band), ETA, kill chain
 │   │   │   ├── ExplainView.jsx      # SHAP / Gradient attribution toggle & charts
-│   │   │   ├── ForecastChart.jsx    # Recharts Monte Carlo uncertainty bands
-│   │   │   ├── IngestPanel.jsx      # PCAP & CSV upload interface
-│   │   │   ├── KillChainTracker.jsx # Visual 6-stage ATT&CK progress radar
-│   │   │   └── ReportsView.jsx      # CSV/JSON forensic report downloaders
-│   │   ├── api.js                   # Axios client with auth & error handling
-│   │   └── App.jsx                  # Main dashboard layout & state management
+│   │   │   ├── AlertPanel.jsx       # Alert triage & acknowledge
+│   │   │   ├── ReportsView.jsx      # Forensic report viewer & CSV/JSON/HTML export
+│   │   │   ├── UploadPanel.jsx      # PCAP & CSV upload
+│   │   │   ├── SettingsPanel.jsx    # Traffic mode, simulator control, model info
+│   │   │   ├── StageDistributionChart.jsx # Sessions per MITRE stage
+│   │   │   └── Badges.jsx           # Shared badges & network wellbeing modal
+│   │   ├── api.js                   # fetch-based API client with optional X-API-Key
+│   │   ├── utils.js                 # Stage colors & shared formatting helpers
+│   │   └── App.jsx                  # Layout, navigation & WebSocket state
 ├── data/                            # Dataset management & preprocessing
 │   ├── download_cicids.py           # Hugging Face mirror chunked downloader
 │   ├── preprocess_cicids.py         # 22-feature mapper with stratified sampling

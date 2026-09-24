@@ -179,15 +179,17 @@ sequenceDiagram
         MC->>Model: Recursive forward pass for k=1..6
     end
     MC->>MC: Compute mean, std dev (sigma), and modal stage
-    MC->>SOC: Stream forecast curve + uncertainty cone (95% CI)
+    MC->>SOC: Forecast curve + uncertainty band (mean +/- 1 sigma)
 ```
 
 ### Uncertainty Quantification
-For each forward step $i \in \{1, \dots, k\}$ across $N=20$ Monte Carlo rollouts:
+For each forward step $i \in \{1, \dots, k\}$ across $N=20$ Monte Carlo rollouts (Gaussian input noise, $\sigma_{\text{noise}}=0.05$):
 - **Expected Attack Probability:** $\mu_i = \frac{1}{N}\sum_{j=1}^N p_{i,j}$
-- **Forecast Uncertainty (Variance):** $\sigma_i = \sqrt{\frac{1}{N}\sum_{j=1}^N (p_{i,j} - \mu_i)^2}$
-- **95% Confidence Bounds:** $[\mu_i - 1.96\sigma_i, \; \mu_i + 1.96\sigma_i]$
+- **Forecast Uncertainty:** $\sigma_i = \sqrt{\frac{1}{N}\sum_{j=1}^N (p_{i,j} - \mu_i)^2}$
+- **Band shown in the UI:** $[\mu_i - \sigma_i, \; \mu_i + \sigma_i]$, clipped to $[0, 1]$ (`ForecastView.jsx`)
 - **Kill-Chain Consensus:** $\operatorname{mode}(y_{i,1}, \dots, y_{i,N})$
+
+The raw per-step mean is most reliable over the first 3-4 steps; later steps condition on the model's own predicted states and drift toward benign for most attack types. The alert flag latches on the first step that crosses threshold and the UI plots the EMA-smoothed curve, both of which hold up across the full horizon (see `docs/model_card.md` section 8).
 
 ---
 
@@ -222,7 +224,7 @@ Every alert is accompanied by feature attribution to enable immediate operationa
          ▼                                                 ▼
 ┌─────────────────────────────────┐       ┌─────────────────────────────────┐
 │       SHAP KernelExplainer      │       │     Gradient x Input Fast       │
-│  Exact marginal contributions   │       │  Instantaneous sensitivity      │
+│  Sampled Shapley estimates      │       │  Instantaneous sensitivity      │
 │  against zero-baseline space    │       │  grad(p) * x                    │
 └────────────────┬────────────────┘       └────────────────┬────────────────┘
                  │                                         │
@@ -237,8 +239,8 @@ Every alert is accompanied by feature attribution to enable immediate operationa
                       └───────────────────────────────┘
 ```
 
-- **SHAP (KernelExplainer):** Solves for Shapley values across permutations, providing mathematically consistent credit assignment for each of the 22 features.
-- **Gradient $\times$ Input:** Computes $\nabla_{x} \hat{p}_{\text{inf}} \odot x$ in sub-millisecond time for high-throughput live packet streams.
+- **SHAP (KernelExplainer):** Estimates Shapley values for each of the 22 features against an all-zeros baseline (the training mean in scaled space), using 50 coalition samples per request, so values are approximate. Falls back to gradient attribution if SHAP fails.
+- **Gradient $\times$ Input:** Computes $\nabla_{x} \hat{p}_{\text{inf}} \odot x$ in about 10 ms on CPU (measured), a fast alternative when a SHAP pass is too slow.
 - **Directional SOC Feedback:** Features pushing the score toward *Malicious* (positive attribution) are colored red; features indicating *Benign* behavior are colored green.
 
 ---
@@ -247,11 +249,11 @@ Every alert is accompanied by feature attribution to enable immediate operationa
 
 | Security Domain | Implementation | Technical Mechanism |
 |---|---|---|
-| **Rate Limiting** | SlowAPI (Token Bucket) | 120 requests/minute per client IP on inference routes; 30/minute on PCAP uploads |
-| **API Authentication** | `X-API-Key` Middleware | Constant-time string comparison (`secrets.compare_digest`) preventing timing attacks |
-| **CORS Isolation** | FastAPI CORSMiddleware | Restricts origin access to configured frontend production and staging URLs |
-| **Input Sanitization** | Pydantic v2 Models | Strict float/integer type enforcement, NaN/Inf replacement, dimension validation |
-| **Thread Isolation** | Async Worker Pools | Scapy packet sniffing runs on dedicated daemon threads to prevent event loop starvation |
+| **Rate Limiting** | SlowAPI | One global limit of 120 requests/minute per client IP across all HTTP routes (no per-route limits) |
+| **API Authentication** | `X-API-Key` Middleware | Optional (enabled only when `API_KEY` is set); constant-time comparison via `secrets.compare_digest`; `/health`, `/docs`, and `/ws` paths are exempt |
+| **CORS Isolation** | FastAPI CORSMiddleware | Restricts origin access to the URLs listed in `FRONTEND_URL` |
+| **Input Sanitization** | Pydantic v2 Models | Type enforcement and window-shape validation on request bodies |
+| **Process Isolation** | Separate capture process | `capture/live_capture.py` runs as its own (elevated) process and posts flows to `/ingest`, so packet sniffing never blocks the API event loop |
 | **Model Immutability** | Read-Only Inference Mode | `torch.no_grad()` and `model.eval()` prevent accidental gradient accumulation |
 
 ---
@@ -263,35 +265,36 @@ To bridge the gap between abstract network flow telemetry and actionable endpoin
 ```mermaid
 flowchart LR
     PKT["Live Packet 5-Tuple<br/>(Src IP, Src Port, Dst IP, Dst Port, Proto)"] --> PR["Process Resolver<br/>(process_resolver.py)"]
-    PR --> OS["OS Extended TCP/UDP Table<br/>(GetExtendedTcpTable / netstat / psutil)"]
-    OS --> PID["PID & Process Metadata<br/>(exe_name, cmdline, user)"]
-    PKT --> NI["Network Identity Engine<br/>(network_identity.py)"]
-    NI --> SUB["Subnet Classification<br/>(RFC1918 / Loopback / Bogon / Public)"]
-    NI --> DNS["Reverse DNS & SNI Resolver<br/>(PTR Lookups, In-Flight Cache)"]
-    PID & SUB & DNS --> BADGE["Enriched Session Metadata<br/>[Chrome] [Antigravity] [Python] [Nmap]"]
+    PR --> OS["Local Socket Table<br/>(psutil.net_connections, 1.5s cache)"]
+    OS --> PID["PID & Process Name<br/>(mapped to friendly app labels)"]
+    PKT --> NI["Network Identity<br/>(network_identity.py)"]
+    NI --> SUB["IP Classification<br/>(HOST / LAN_PEER / NAT_PEER)"]
+    PID & SUB --> BADGE["Enriched Session Metadata<br/>[Chrome] [VS Code] [Python] [PowerShell]"]
 ```
 
 1. **Process Attribution (`process_resolver.py`):**
-   - Continuously monitors active local sockets using OS socket APIs (`GetExtendedTcpTable` on Windows via `psutil`/`ctypes`).
-   - Correlates incoming/outgoing 5-tuples to local Process IDs (`PID`), process names (e.g. `chrome.exe`, `cursor.exe`, `python.exe`, `nmap.exe`), and executable paths.
-   - Decorates sessions with recognizable application badges, enabling SOC analysts to instantly distinguish legitimate browser activity from stealthy background tools.
+   - Reads active local sockets with `psutil.net_connections(kind="inet")`, cached for 1.5 seconds, with well-known-port fallbacks when no owning process is found.
+   - Maps the local port of each flow to the owning PID and process name (e.g. `chrome.exe`, `python.exe`, `powershell.exe`), and translates common executables to friendly labels.
+   - Lets analysts distinguish browser activity from background tools at a glance.
 
 2. **Network Identity (`network_identity.py`):**
-   - Classifies every IP address into topological scopes: `Loopback`, `Private (RFC1918)`, `Link-Local`, `Carrier-Grade NAT`, `Bogon / Reserved`, or `Public Internet`.
-   - Maintains an in-memory, thread-safe DNS/SNI cache for reverse hostname resolution, minimizing latency during high-speed live capture.
+   - Discovers this machine's hostname, primary IP, and active adapters.
+   - Classifies each source/destination IP as `HOST` (this machine or loopback), `LAN_PEER` (private/link-local address on the local network), `NAT_PEER` (anything else, i.e. routed/public), or `UNKNOWN` (unparseable).
 
 ---
 
 ## 10. Cycle Lifecycle & State Persistence Architecture
 
-In continuous operational monitoring, system hot-reloads, configuration edits, or analyst window switching must **never** cause loss of active telemetry. NetForecast implements a persistent **Cycle Architecture**:
+Telemetry is organized into monitoring cycles, and no captured data is discarded without first being archived:
 
-- **Continuous Persistence:** Active sessions, flow records, and alerts are stored in SQLite (`backend/data/netforecast.db`) and queried via async SQLAlchemy sessions.
-- **Zero Startup Wipe:** The application lifespan handler preserves existing sessions across server restarts, file edits, and browser tab switches.
-- **Explicit Cycle Archiving (`/system/cycle/start`):** A new monitoring cycle begins **only** when the user explicitly clicks `[NEW_CYCLE]` in the UI or invokes the cycle management API:
-  1. Active tables (`SessionDB`, `FlowRecordDB`, `AlertDB`) are atomically exported into an immutable JSON archive (`backend/data/archives/cycle_<timestamp>.json`).
-  2. Active tables are flushed clean for the new operational cycle.
-  3. Historical cycles remain fully accessible and auditable via `/system/cycles`.
+- **Storage:** Active sessions, flow records, and alerts live in SQLite (`backend/data/forecaster.db`), queried via async SQLAlchemy.
+- **Tab switching:** The frontend keeps the WebSocket stream state at the root `App` component, so moving between dashboard tabs does not lose captured flows.
+- **Cycle archiving** happens in two cases: when the user clicks `[NEW_CYCLE]` (`POST /system/cycle/start`), and automatically on every backend shutdown, including each `--reload` restart triggered by a code change. In both cases:
+  1. Sessions and alerts (plus flow counts and per-app statistics) are written to a JSON archive in `backend/data/archives/`.
+  2. The active tables and in-memory session buffers are cleared, and a fresh cycle begins.
+  3. Past cycles stay accessible via `GET /system/cycles` and `GET /system/cycles/{cycle_id}`.
+
+In practice: restarting the backend means the live dashboard starts empty, but the previous cycle's data is in the archive, not lost.
 
 ---
 

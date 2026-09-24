@@ -46,23 +46,23 @@
    - Enables recursive rollout (World Model dynamics): $\hat{x}_{t+1}$ is fed back into the LSTM to simulate future telemetry trajectories up to $k=20$ steps.
 2. **Infiltration Hazard Head ($f_{\text{infil}}$):**
    - 3-layer MLP with ReLU and Dropout yielding a single scalar logit $\to \sigma(z) \in [0, 1]$.
-   - Represents the calibrated probability of host or service compromise.
+   - Trained with weighted BCE on whether the next flow is malicious; its sigmoid output is used as the risk score (not separately probability-calibrated).
 3. **Stage Head ($f_{\text{stage}}$):**
    - 2-layer MLP yielding 6 unnormalized logits $\to \text{Softmax}(z) \in \Delta^5$.
-   - Identifies the operational MITRE ATT&CK stage of the session.
+   - Classifies the MITRE ATT&CK stage of the window's most recent flow (see §5, "Training targets per window").
 
 ---
 
 ## 3. MITRE ATT&CK 6-Stage Taxonomy
 
-| Stage ID | Stage Name | MITRE Tactic | Representative CIC-IDS2017 Traffic |
+| Stage ID | Stage Name | MITRE Tactic | Dataset labels mapped to this stage (`data/preprocess_cicids.py::map_label`) |
 |:---:|:---|:---|:---|
-| **0** | **Benign** | Normal Baseline | HTTP, HTTPS, DNS, NTP, SSH management |
-| **1** | **Reconnaissance** | TA0043 (Reconnaissance) | PortScan, Bot, SSH-Patator, FTP-Patator, Network sweeping, Host discovery |
-| **2** | **Initial Access** | TA0001 (Initial Access) | Web Attack (SQL Injection, XSS, Brute Force) |
-| **3** | **Lateral Movement** | TA0008 (Lateral Movement) | SMB exploit probes, Internal pivot flows |
-| **4** | **C2 (Command & Control)**| TA0011 (Command & Control) | Botnet beacons, periodic command channels |
-| **5** | **Exfiltration** | TA0010 (Exfiltration) | Large outbound byte bursts, HTTP data theft |
+| **0** | **Benign** | Normal Baseline | BENIGN |
+| **1** | **Reconnaissance** | TA0043 (Reconnaissance) | PortScan, Bot, SSH-Patator, FTP-Patator |
+| **2** | **Initial Access** | TA0001 (Initial Access) | Web Attack Brute Force, XSS, SQL Injection (CIC-IDS2017 + CIC-IDS2018) |
+| **3** | **Lateral Movement** | TA0008 (Lateral Movement) | Infiltration (CIC-IDS2017 + CIC-IDS2018) |
+| **4** | **C2 (Command & Control)**| TA0011 (Command & Control) | DDoS, DoS Hulk, GoldenEye, Slowloris, Slowhttptest (the dataset has no dedicated C2-beacon label) |
+| **5** | **Exfiltration** | TA0010 (Exfiltration) | Heartbleed (only ~11 real flows exist; detected by signature, not ML) |
 
 ---
 
@@ -104,12 +104,13 @@ FLOW_FEATURES = [
 - **Source Corpus:** CIC-IDS2017 benchmark dataset (Tuesday, Wednesday, Thursday, Friday captures), augmented with real Lateral Movement (Infiltration) flows from **CIC-IDS2018**'s two dedicated infiltration days (Wednesday-28-02-2018, Thursday-01-03-2018) and real Initial Access (Web Attack) flows from **CIC-IDS2018**'s two dedicated web-attack days (Thursday-22-02-2018, Friday-23-02-2018) — see below.
 - **Sessionization:**
   - CIC-IDS2017 flows grouped by `(src_ip, dst_ip, 300s_time_bucket)`.
-  - CIC-IDS2018's public CSVs have no Src/Dst IP columns (privacy-scrubbed); its added rows are chunked into synthetic-boundary sessions of 12 consecutive (by timestamp) real Infiltration flows instead. The feature *values* are real measured flow statistics; only the session *boundaries* are synthetic for this subset.
+  - CIC-IDS2018's public CSVs have no Src/Dst IP columns (privacy-scrubbed); its added rows are chunked into synthetic-boundary sessions of consecutive (by timestamp) real flows instead — 12 per session for Infiltration, 8 for Web Attack. The feature *values* are real measured flow statistics; only the session *boundaries* are synthetic for this subset.
   - Flows sequenced chronologically; sub-sequences sliced into sliding windows of length $W=6$.
+- **Training targets per window:** the next-state head and infiltration head learn the flow *after* the window; the stage head learns the stage of the window's *last* flow (`--stage-target current`, the default). The stage target matches production: `backend/app/ingestion.py` runs the model on the window ending with a newly arrived flow and stores `predicted_stage` on that flow. Until this change the stage head was trained on the next flow, so the dashboard showed a guess about a flow that hadn't arrived yet against the current one. That mismatch was the main remaining cause of weak Initial Access scores (a single attack request surrounded by benign flows can't be predicted from the benign flows before it). Aligning it moved Initial Access F1 from 0.530 to 0.838 with no other stage regressing (§6). Forecasting still comes from the next-state head and the autoregressive rollout, which are unchanged.
 - **Normalization:**
   - `StandardScaler` fitted on training split only (mean and variance preserved in `artifacts/scaler.pkl`).
   - Strict absence of test-set data leakage.
-- **3-way train/val/test split (`three_way_split()` in `pipeline_fixed.py`):** an earlier version of this pipeline picked its "best" checkpoint by evaluating each epoch on the *same* held-out set it then reported final metrics on — checkpoint-selection leakage, which optimistically biases the reported score toward whichever epoch happened to do best on that exact data. Sessions are now split three ways (currently 1,481 train / 212 validation / 424 test, after the CIC-IDS2018 Initial Access augmentation added more sessions — see §6); checkpoint selection uses validation only, and the test set is touched exactly once, at the very end. The split logic is unchanged from the original 2-way split (same RNG, same permutation, same cut ratios), so numbers stay comparable across retrains as new sessions are added.
+- **3-way train/val/test split (`three_way_split()` in `pipeline_fixed.py`):** an earlier version of this pipeline picked its "best" checkpoint by evaluating each epoch on the *same* held-out set it then reported final metrics on — checkpoint-selection leakage, which optimistically biases the reported score toward whichever epoch happened to do best on that exact data. Sessions are now split three ways (currently 1,673 train / 239 validation / 478 test); checkpoint selection uses validation only, and the test set is touched exactly once, at the very end. Adding sessions to the dataset (as each augmentation step did) reshuffles which sessions land in test, so numbers from before and after a data change are measured on different — though identically constructed — test sets.
 - **Handling Class Imbalance:**
   - **Stage head loss: Focal Loss** (Lin et al., 2017), `FL(p_t) = -alpha_t * (1-p_t)^gamma * log(p_t)`, `gamma=2.0`, generalizing the plain class-weighted cross-entropy tried earlier (`gamma=0` reduces exactly to it — see `pipeline_fixed.py::FocalLoss`). Down-weights already-confident predictions instead of blanket-boosting rare-class logits, which targets the specific "confidently wrong" false-positive pattern that caused Initial Access's poor precision, rather than just its recall.
   - `alpha_t` (per-class weight) is inverse-frequency, clipped to `[0.2, 6.0]` — tuned down three times: an initial `[0.2, 50.0]` clip over-corrected and collapsed Initial Access precision to ~6%; `[0.2, 15.0]` combined with focal loss improved it; `[0.2, 8.0]` improved it further; `[0.2, 6.0]` (final) gave the best macro-F1 balance — a further tightening to `[0.2, 4.0]` was tried and rejected because it improved Initial Access marginally (F1 0.377→0.406) at the cost of regressing Lateral Movement (F1 0.922→0.882) and Reconnaissance (F1 0.758→0.743), a worse overall trade. See §6 for exact current numbers (measured after the 3-way split fix above, so slightly different from numbers quoted in earlier commits).
@@ -124,24 +125,26 @@ FLOW_FEATURES = [
 
 ## 6. Evaluation & Comparative Benchmark
 
-Evaluated on a held-out, session-level test split (478 sessions / 64,642 windowed
-sequences) that never touches training, scaler fitting, **or checkpoint selection**
-(see the 3-way split note in §5) — it is touched exactly once, for the numbers
+Evaluated on a held-out, session-level test split (478 sessions; 64,642 flows forming
+61,776 six-flow windows) that never touches training, scaler fitting, **or checkpoint
+selection** (see the 3-way split note in §5) — it is touched exactly once, for the numbers
 below. All numbers are reproduced directly from `backend/artifacts/benchmark_comparison.csv`
-and `experiments/calibrate_stage_logits.py` — nothing here is estimated.
+and `python experiments/calibrate_stage_logits.py` — nothing here is estimated.
 
 > [!NOTE]
-> Binary detection numbers reflect the current shipped model (real CIC-IDS2018 Initial Access data + the session-construction fix in §5 + class-weight clip retuned to 6.0). Per-stage numbers are shown both **uncalibrated** (raw argmax) and **calibrated** (the shipped `stage_logit_bias` applied, see §5) — the calibration only changes which stage label is reported for an already-flagged window; it does not change the binary alert decision, which uses a separate model head untouched by this calibration.
+> Per-stage numbers are shown both **uncalibrated** (raw argmax) and **calibrated** (the shipped `stage_logit_bias` applied, see §5). The calibration only changes which stage label is reported; the binary alert decision uses the separate infiltration head, which calibration doesn't touch.
 
 ### Binary detection (malicious vs. benign)
 
 | Metric | Logistic Regression (baseline) | Isolation Forest (baseline) | NetForecast World Model (LSTM) |
 |:---|:---:|:---:|:---:|
 | **Temporal Context** | No (1 flow) | No (1 flow) | Yes ($W=6$ flow history) |
-| **F1-Score** | 0.523 | 0.402 | **0.861** |
-| **Precision** | 0.689 | 0.374 | **0.862** |
-| **Recall** | 0.421 | 0.434 | **0.860** |
-| **False Positive Rate** | 6.16% | 23.49% | **4.47%** |
+| **F1-Score** | 0.523 | 0.402 | **0.862** |
+| **Precision** | 0.689 | 0.374 | **0.859** |
+| **Recall** | 0.421 | 0.434 | **0.864** |
+| **False Positive Rate** | 6.16% | 23.49% | **4.59%** |
+
+Measured CPU latency of the shipped model: 1.2 ms per single-window prediction, about 160 ms for a 6-step forecast with 20 Monte Carlo runs, about 10 ms for a gradient explanation.
 
 ### Per-MITRE-stage classification (honest breakdown, not just binary)
 
@@ -153,12 +156,14 @@ adjustment, shown so the calibration's real effect is visible.
 
 | MITRE Stage | Test support | Precision (uncal → cal) | Recall (uncal → cal) | F1 (uncal → cal) | Status |
 |:---|---:|:---|:---|:---|:---|
-| C2 | 6,592 | 0.918 → 0.952 | 0.931 → 0.927 | 0.925 → 0.939 | Reliable, strongest class |
-| **Lateral Movement** | **771** | **0.887 → 0.971** | **0.890 → 0.873** | **0.889 → 0.919** | **Reliable — fixed via real CIC-IDS2018 data (was 0.000/0.000/0.000 before that fix)** |
-| Benign | 46,672 | 0.966 → 0.948 | 0.895 → 0.970 | 0.929 → 0.959 | Reliable |
-| Reconnaissance | 7,116 | 0.630 → 0.845 | 0.858 → 0.748 | 0.726 → 0.794 | Reliable |
-| Initial Access | 623 | 0.317 → 0.535 | 0.705 → 0.525 | 0.437 → 0.530 | Fixed by the §5 session-construction fix (was 0.351/0.532/0.423 before it, 0.166/0.623/0.262 before the CIC-IDS2018 data) — precision roughly doubled from the immediately preceding state and ~8.6x the original 0.062; still the weakest class, see §8 |
-| Exfiltration | 2 | 0.000 → 0.000 | 0.000 → 0.000 | 0.000 → 0.000 | Not functional in the ML model (n=2, statistically unmeasurable regardless) — caught instead by a deterministic signature detector, see §8 |
+| C2 | 6,588 | 0.976 → 0.996 | 0.981 → 0.967 | 0.979 → 0.981 | Reliable |
+| Benign | 46,676 | 0.989 → 0.978 | 0.947 → 0.987 | 0.968 → 0.983 | Reliable |
+| Reconnaissance | 7,116 | 0.806 → 0.934 | 0.959 → 0.911 | 0.875 → 0.922 | Reliable |
+| **Lateral Movement** | **771** | **0.783 → 0.989** | **0.929 → 0.855** | **0.849 → 0.917** | **Reliable — fixed via real CIC-IDS2018 data (was 0.000/0.000/0.000 before that fix)** |
+| **Initial Access** | **623** | **0.531 → 0.815** | **0.944 → 0.862** | **0.680 → 0.838** | **Reliable — weakest of the five learnable stages but no longer a gap. History of calibrated F1: 0.262 → 0.377 → 0.423 → 0.530 → 0.838 (see §5 and §8)** |
+| Exfiltration | 2 | 0.000 → 0.000 | 0.000 → 0.000 | 0.000 → 0.000 | Not learnable in the ML model (n=2) — caught instead by a deterministic signature detector, see §8 |
+
+Macro-F1 over all six classes: 0.725 uncalibrated → 0.774 calibrated (Exfiltration's 0.0 pulls it down; the mean over the five learnable stages is 0.928).
 
 ---
 
@@ -180,9 +185,9 @@ adjustment, shown so the calibration's real effect is visible.
 - **Lateral Movement and Exfiltration both originally had 0% recall.** CIC-IDS2017's entire public release contains only ~36 Infiltration flows and ~11 Heartbleed flows — real_flows.csv inherited that scarcity. Train-only synthetic oversampling (300 sessions/stage, from calibrated feature profiles) was tried first for both and confirmed via held-out evaluation to **not transfer** to real traffic — hand-crafted profiles don't match the real feature distribution closely enough. Both are now resolved, by two different mechanisms:
   - **Lateral Movement is fixed with real data.** `data/augment_lateral_movement.py` pulls 7,940 real Infiltration flow rows from CIC-IDS2018's two dedicated infiltration days and merges them in as genuine (not synthetic) Lateral Movement training *and test* sessions. Held-out evaluation on 900 real CIC-IDS2018 test flows now shows Precision 0.732 / Recall 0.917 / F1 0.814 — one of the strongest-performing classes in the model. This is the real fix; synthetic data was never going to work for a behavioral pattern like this.
   - **Exfiltration/Heartbleed is covered by a separate deterministic signature detector** (`capture/signatures.py::detect_heartbleed`), not the ML model — CVE-2014-0160 has a well-known, deterministic wire-format signature (a TLS Heartbeat record whose internal `payload_length` field claims more bytes than the record actually contains), so it doesn't need to be learned from 2 training examples at all. Wired into both PCAP upload and live capture; fires an immediate critical alert on the very first matching flow, independent of the 6-flow ML window. Verified end-to-end against a synthetically crafted malicious packet (real detection, not a stub) and confirmed not to false-positive on legitimate HTTP/heartbeat traffic. This mechanism was the right call here because Heartbleed is a protocol bug, not a behavioral pattern — real training data for it barely exists anywhere (CIC-IDS2017/2018 combined have well under 20 real Heartbleed flows), so a signature was the only realistic fix.
-- **Initial Access precision has improved substantially (6.2% → 27.0% → 35.1% → 53.5%) but is still the weakest class.** Five independent, cumulative fixes improved this without ever badly regressing another class: reducing the class-weight clip 50x→15x→8x→6x, switching the stage loss to focal loss γ=2, adding 928 real CIC-IDS2018 Web Attack rows (`data/augment_initial_access.py`), post-hoc per-class logit-bias calibration (`experiments/calibrate_stage_logits.py`), and — the largest single jump — fixing how the original CIC-IDS2017 rows were grouped into sessions (`data/fix_initial_access_sessions.py`, see §5): a confusion-matrix analysis found the errors were concentrated almost entirely in those original rows (test recall 0.476 / precision 0.300 in isolation) versus the CIC-IDS2018 rows from the same augmentation era (recall 0.969 / precision 1.000), traced to CIC-IDS2017's `(src_ip, dst_ip, 300s_time_bucket)` session grouping mixing real attacker requests with ordinary benign HTTP traffic from the same IP pair. Two things this fix deliberately did *not* do, and why: it didn't discard the mixed-session rows (production sessionization is mixed the same way, and mixed sessions carry a harder, more realistic "forecast an attack from mostly-benign context" signal that pure sessions alone don't teach), and a follow-up architecture experiment (giving the stage head a skip connection to the window's raw last timestep, hypothesizing the LSTM's hidden-state bottleneck was the bottleneck) was tested and reverted after it produced no measurable gain (F1 0.423→0.422) — the LSTM's final hidden state already implicitly contains that information, so the skip connection added no new signal, and it turned out the actual bottleneck was the training data's session construction, not the architecture. Precision moved 0.062 → 0.166 → 0.270 → 0.351 → 0.535 (calibrated) across the five fixes, roughly 8.6x overall. Two levers were tried and evaluated properly, then not shipped because they didn't help: a binary-infiltration-head gate on the stage decision (macro-F1 +0.002, noise) and the skip-connection architecture change above. What's left as a real, unexplored option is payload-aware features (a larger architectural change, not a tuning pass) — CIC-IDS2017/2018's 22 flow-level statistical features may still not distinguish SQLi/XSS/brute-force traffic from ordinary web browsing as sharply as packet-payload features would.
+- **Initial Access was the hardest stage and is now at F1 0.838 (precision 0.815, recall 0.862).** It got there through six cumulative, individually verified changes: tightening the class-weight clip (50x → 6x), focal loss (γ=2), 928 real CIC-IDS2018 Web Attack rows (`data/augment_initial_access.py`), per-class logit-bias calibration (`experiments/calibrate_stage_logits.py`), re-chunking the original CIC-IDS2017 web-attack rows into pure attack-only sessions alongside their mixed-session form (`data/fix_initial_access_sessions.py` — CIC-IDS2017's `(src_ip, dst_ip, 300s_time_bucket)` grouping had put attacker requests in the same sessions as benign traffic), and — the largest single step, F1 0.530 → 0.838 — training the stage head on the flow production actually labels rather than the unseen next flow (§5, "Training targets per window"). Calibrated F1 history: 0.262 → 0.377 → 0.423 → 0.530 → 0.838. Two ideas were tested and not shipped because they didn't help: gating the stage decision on the infiltration head (macro-F1 +0.002) and a skip connection from the window's last raw flow into the heads (F1 0.423 → 0.422). It remains the lowest of the five learnable stages; its residual errors are mostly confusion with Benign web traffic, which payload-aware features could address.
 - **Checkpoint-selection leakage has been fixed.** `pipeline_fixed.py` used to select its "best" epoch checkpoint by evaluating on the same held-out set it then reported final metrics on — an evaluation-methodology bug, not a data leak, but still an optimistic bias in the reported numbers. It now uses a genuine 3-way train/val/test split (`three_way_split()`); see §5 and the note at the top of §6 for the resulting (honestly lower) numbers. **A family-holdout generalization *experiment* has since been added (§9) and demonstrates real, if uneven, transfer to genuinely unseen attack tools — on a separate, throwaway model, not the shipped `backend/artifacts/` model.** The production model's own train/val/test split is still purely random at the session level; §9's result is evidence about the architecture and training recipe's capacity to generalize, not a claim that the shipped weights were themselves family-holdout validated. Two rigor gaps remain for the *production* model specifically, both explicitly out of scope rather than silently skipped: it has no family-holdout validation of its own, and the split is not **temporal** (train-on-past/test-on-future, which the PS's evaluation methodology also mentions for deployment realism). A true temporal split isn't straightforward for this project as-is: `real_flows.csv` merges CIC-IDS2017 (real 2017 capture times), CIC-IDS2018 (real 2018 capture times, discarded and replaced with a synthetic 2026 epoch during merging so session grouping stays consistent — see `data/augment_lateral_movement.py`), and synthetic Exfiltration sessions on yet another synthetic epoch, so a naive chronological cut would separate by *data source* rather than by genuine temporal drift within one capture.
-- **These per-stage numbers are the accuracy that matters for a live demo audience.** The judge-facing simulator (`demo/traffic_simulator.py`) drives all 6 stages from hand-authored synthetic profiles for a smooth visual progression; it does not reflect the trained model's real per-stage capability shown in §6. As of this evaluation, Benign/Reconnaissance/C2/Lateral Movement all correctly reflect real attack traffic if fed through PCAP or live capture; Initial Access is substantially improved but still over-alerts more than the other classes; Exfiltration is caught by the signature detector rather than the ML path.
+- **These per-stage numbers are the accuracy that matters for a live demo audience.** The judge-facing simulator (`demo/traffic_simulator.py`) drives all 6 stages from hand-authored synthetic profiles for a smooth visual progression; it does not reflect the trained model's real per-stage capability shown in §6. The simulator's hand-authored "Benign" profile doesn't match the real benign feature distribution closely, so it can trigger alerts on simulated benign sessions; judge real capability by the §6 numbers or by replaying real PCAPs, not by the simulator. Exfiltration is caught by the signature detector rather than the ML path.
 - **The k-step forecast's raw per-step probability decays in later steps for most attack types, found while building `backend/tests/test_model_quality.py`'s real-data QA tests.** Feeding a real, confidently-classified attack window (Reconnaissance, C2, or Initial Access) into `forecast_rollout` gives a highly confident first 3-4 steps, then the *raw* `infiltration_prob_mean` drifts toward 0 by steps 5-6 — classic autoregressive drift, since step $k{>}1$ conditions on the model's own predicted `next_state` from step $k{-}1$ rather than real telemetry, and small errors compound. Lateral Movement is the one stage that doesn't show this decay in testing. This doesn't reach the operator: `alert_triggered` latches on the *first* step that crosses threshold rather than requiring the last step to still be above it, and the EMA-smoothed value actually surfaced in the API/UI (`infiltration_prob_ema`) decays much more gently than the raw mean (e.g. a real C2 session's raw probability fell to 0.02 by step 6 while its EMA was still 0.41) — both were verified to hold up correctly on real attack sessions, per `TestForecastEscalation` in the same test file. Worth knowing if extending the forecast horizon past $k=6$: raw per-step confidence, unlike the EMA/alert signals, is not reliable that far out.
 
 ---

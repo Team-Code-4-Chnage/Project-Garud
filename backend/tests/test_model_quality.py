@@ -93,10 +93,8 @@ class TestRealDataCapability:
 
     @pytest.mark.parametrize("session_id", [90010, 90011])
     def test_initial_access_session_raises_alert(self, fixture_df, session_id):
-        """Initial Access is the weakest stage (see docs/model_card.md section 6) --
-        this asserts it clears the binary alert bar even where the exact stage
-        label sometimes doesn't, since a SOC analyst getting *an* alert on real
-        attack traffic matters more than getting the precise MITRE label."""
+        """Separate from the stage label: real Initial Access traffic must also
+        raise the binary alert, since that's what pages an analyst."""
         windows = windows_for_session(fixture_df, session_id)
         results = [predict_single(w) for w in windows]
         alert_rate = sum(r["is_alert"] for r in results) / len(results)
@@ -168,21 +166,20 @@ class TestForecastEscalation:
 
 
 class TestQualityRegression:
-    """Guards the specific fix in data/fix_initial_access_sessions.py (see
-    docs/model_card.md section 5): Initial Access precision must not silently
-    regress back toward the ~0.35 baseline this fix moved away from."""
+    """Guards the Initial Access fixes (docs/model_card.md section 5): the shipped
+    model gets every window of the real Initial Access fixture sessions right, so
+    a retrain that slips below 80% has regressed."""
 
-    def test_initial_access_precision_floor(self, fixture_df):
-        all_probs, all_preds = [], []
+    def test_initial_access_recall_floor(self, fixture_df):
+        all_preds = []
         for session_id in [90010, 90011]:
             for w in windows_for_session(fixture_df, session_id):
-                r = predict_single(w)
-                all_preds.append(r["predicted_stage"])
+                all_preds.append(predict_single(w)["predicted_stage"])
         hit_rate = sum(p == "Initial Access" for p in all_preds) / len(all_preds)
-        assert hit_rate >= 0.5, (
+        assert hit_rate >= 0.8, (
             f"Initial Access recall on pure real attack sessions dropped to {hit_rate:.0%} "
-            f"(expected >=50%) -- check whether data/fix_initial_access_sessions.py's pure "
-            f"sessions are still present in real_flows.csv and the model was retrained on them"
+            f"(expected >=80%) -- check that the model was trained with --stage-target current "
+            f"and that data/fix_initial_access_sessions.py's sessions are in real_flows.csv"
         )
 
     def test_all_six_stages_are_reachable_predictions(self, fixture_df):

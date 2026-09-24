@@ -23,6 +23,7 @@ overwrite config.json itself, to keep a human decision point between
 
 Run as: python experiments/calibrate_stage_logits.py
 """
+import argparse
 import json
 import pickle
 import sys
@@ -68,23 +69,23 @@ class WorldModel(nn.Module):
         return self.next_state_head(h), self.infiltration_head(h).squeeze(-1), self.stage_head(h)
 
 
-def build_sequences(d, window=WINDOW):
+def build_sequences(d, stage_offset, window=WINDOW):
     X, ys = [], []
     for _sid, g in d.groupby("session_id"):
         feats = g[FLOW_FEATURES].values
         stage = g["stage_id"].values
         for i in range(len(g) - window):
             X.append(feats[i:i + window])
-            ys.append(stage[i + window])
+            ys.append(stage[i + stage_offset])
     return np.array(X, dtype=np.float32), np.array(ys, dtype=np.int64)
 
 
-def load_split(df, sids, mean, scale):
+def load_split(df, sids, mean, scale, stage_offset):
     d = df[df["session_id"].isin(sids)].copy()
     d[FLOW_FEATURES] = (d[FLOW_FEATURES].values - mean) / scale
     d["stage_id"] = d["stage_label"].map(STAGE2ID)
     d = d.sort_values(["session_id", "timestamp"]).reset_index(drop=True)
-    return build_sequences(d)
+    return build_sequences(d, stage_offset)
 
 
 def get_logits(model, X):
@@ -105,22 +106,29 @@ def report(y_true, pred, header):
 
 
 def main():
-    df = pd.read_csv(REPO_ROOT / "real_flows.csv")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--artifacts", default="backend/artifacts")
+    args = ap.parse_args()
+    art = REPO_ROOT / args.artifacts
+
+    df = pd.read_csv(REPO_ROOT / "real_flows.csv", low_memory=False)
     uids = df["session_id"].unique()
     train_sids, val_sids, test_sids = three_way_split(uids, val_size=0.1, test_size=0.2, random_state=SEED)
 
-    with open(REPO_ROOT / "backend/artifacts/scaler.pkl", "rb") as f:
+    with open(art / "scaler.pkl", "rb") as f:
         raw = pickle.load(f)
     mean = np.asarray(raw["mean"], dtype=np.float32)
     scale = np.asarray(raw["scale"], dtype=np.float32)
 
-    cfg = json.load(open(REPO_ROOT / "backend/artifacts/config.json"))
+    cfg = json.load(open(art / "config.json"))
+    stage_target = cfg.get("provenance", {}).get("stage_target", "next")
+    stage_offset = WINDOW - 1 if stage_target == "current" else WINDOW
+    print(f"Artifacts: {art}  stage_target: {stage_target}")
     model = WorldModel(22, cfg["hidden_size"], 6, cfg["num_layers"], cfg["lstm_dropout"])
-    model.load_state_dict(torch.load(REPO_ROOT / "backend/artifacts/world_model.pt",
-                                      map_location="cpu", weights_only=True))
+    model.load_state_dict(torch.load(art / "world_model.pt", map_location="cpu", weights_only=True))
     model.eval()
 
-    X_val, y_val = load_split(df, val_sids, mean, scale)
+    X_val, y_val = load_split(df, val_sids, mean, scale, stage_offset)
     print(f"Val sequences: {X_val.shape}")
     logits_val = get_logits(model, X_val)
     report(y_val, np.argmax(logits_val, axis=1), "Baseline (no bias) VAL")
@@ -146,7 +154,7 @@ def main():
     print(f"\nFinal bias: {dict(zip(STAGES, best_bias.tolist()))}")
     report(y_val, np.argmax(logits_val + best_bias, axis=1), "\nCalibrated VAL")
 
-    X_test, y_test = load_split(df, test_sids, mean, scale)
+    X_test, y_test = load_split(df, test_sids, mean, scale, stage_offset)
     logits_test = get_logits(model, X_test)
     base_pred = np.argmax(logits_test, axis=1)
     cal_pred = np.argmax(logits_test + best_bias, axis=1)

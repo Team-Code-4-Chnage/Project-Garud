@@ -19,7 +19,7 @@
    - Click **SETTINGS** in the sidebar.
    - Show the Evaluator the **MODEL_INFO** card:
      - 2-Layer LSTM with 256 hidden units and 22 standardized CIC-IDS features.
-     - Monte Carlo dropout uncertainty sampling ($N=20$) and Adaptive EMA thresholding.
+     - Monte Carlo rollout uncertainty ($N=20$ runs with Gaussian input noise) and adaptive EMA thresholding on live alerts.
    - Note the SHA-256 Model Provenance hash displayed in `/health` confirming artifact integrity.
 
 ---
@@ -50,7 +50,7 @@
      - Explain how the LSTM's next-state head feeds $\hat{x}_{t+1}$ recursively into itself to simulate future flow dynamics.
    - **Confidence Intervals & Adaptive Threshold:**
      - Point out the shaded Monte Carlo uncertainty band ($\pm 1\sigma$).
-     - Point out the horizontal Adaptive Threshold line ($\mu_{\text{EMA}} + k\cdot\sigma$). Show how it automatically adjusts to noisy baseline traffic to prevent alert fatigue.
+     - Point out the dashed horizontal alert-threshold line (0.5). Mention that live ingestion additionally uses a per-session adaptive threshold ($\bar{p}_{\text{EMA}} + 2\sigma$, capped at 0.95) so noisy baseline traffic doesn't cause alert fatigue.
 
 ---
 
@@ -71,7 +71,7 @@
 1. **Triage Alerts (`SYS_VIEW // [ALERTS]`):**
    - Navigate to **ALERTS**.
    - Show prioritized alerts categorized by severity (`CRITICAL`, `HIGH`, `MEDIUM`).
-   - Highlight the **RECOMMENDED PLAYBOOK ACTION**:
+   - Highlight the recommended action shown with each alert:
      - *Example:* For Reconnaissance: *"Investigate port scanning activity from 192.168.1.105. Check firewall logs for SYN sweeps targeting 10.0.0.5."*
    - Click **ACK** to acknowledge an alert.
 2. **Network Wellbeing & Cycle Archival:**
