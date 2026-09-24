@@ -9,12 +9,11 @@ original CIC-IDS2017 web-attack rows (test recall 0.476, precision
 0.300), while the CIC-IDS2018 rows added earlier this project (built as
 pure attack-only sessions by data/augment_initial_access.py) score
 recall 0.969, precision 1.000 on the identical test split. The cause:
-preprocess_cicids.py groups CIC-IDS2017 flows into sessions by
-(src_ip, dst_ip, 300s_time_bucket) -- the SAME grouping
-backend/app/ingestion.py::derive_session_key uses in production. A real
-attacker's web-attack requests and ordinary benign HTTP traffic from the
-same IP pair land in the same session both in this training data and in
-live/PCAP capture. Every one of the 433 CIC-IDS2017-origin sessions
+the shipped CIC-IDS2017 CSVs have no IP or timestamp columns, so
+preprocess_cicids.py groups consecutive CSV rows into fixed-size chunks
+as sessions; web-attack rows land inside chunks that are mostly benign.
+Live sessions (backend/app/ingestion.py::derive_session_key: IP pair +
+5-minute bucket) can also mix attack and benign traffic. Every one of the 433 CIC-IDS2017-origin sessions
 containing an Initial Access row also contains Benign rows -- confirmed
 directly, not assumed.
 
