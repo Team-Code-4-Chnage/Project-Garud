@@ -1,0 +1,5321 @@
+{
+ "flow": {
+  "seeds": {
+   "42": {
+    "per_k": [
+     {
+      "step": 1,
+      "acc": 0.0,
+      "persist_acc": 0.8929824561403509,
+      "macro_f1": 0.0,
+      "persist_macro_f1": 0.5854995181685706,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.0,
+      "persist_macro_f1_supported": 0.9365580783152353,
+      "per_class": {
+       "Benign": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 507,
+        "persist_f1": 0.9397828232971372
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 8,
+        "persist_f1": 0.625
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.9333333333333333
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9523809523809523
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 16,
+        "persist_f1": 0.0625
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      },
+      "confusion": [
+       [
+        0,
+        0,
+        0,
+        26,
+        0,
+        0,
+        481,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        7,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        16,
+        0,
+        0,
+        5,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        5,
+        0,
+        0,
+        11,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        6,
+        0,
+        0,
+        5,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "step": 2,
+      "acc": 0.0,
+      "persist_acc": 0.9403508771929825,
+      "macro_f1": 0.0,
+      "persist_macro_f1": 0.7481906678820572,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.0,
+      "persist_macro_f1_supported": 0.9118391451068616,
+      "per_class": {
+       "Benign": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 510,
+        "persist_f1": 0.9665354330708661
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.4
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.8571428571428571
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9047619047619048
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.9090909090909091
+       }
+      }
+     },
+     {
+      "step": 3,
+      "acc": 0.0,
+      "persist_acc": 0.8982456140350877,
+      "macro_f1": 0.0,
+      "persist_macro_f1": 0.5511210592647946,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.0,
+      "persist_macro_f1_supported": 0.8561281547529092,
+      "per_class": {
+       "Benign": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 512,
+        "persist_f1": 0.9430255402750491
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.2857142857142857
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.7692307692307693
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8571428571428571
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      }
+     },
+     {
+      "step": 4,
+      "acc": 0.0,
+      "persist_acc": 0.9122807017543859,
+      "macro_f1": 0.0,
+      "persist_macro_f1": 0.6244322302197065,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.0,
+      "persist_macro_f1_supported": 0.8088235294117647,
+      "per_class": {
+       "Benign": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 514,
+        "persist_f1": 0.9509803921568627
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.3076923076923077
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 4,
+        "persist_f1": 0.6666666666666666
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8095238095238095
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.1935483870967742
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.8181818181818182
+       }
+      },
+      "confusion": [
+       [
+        0,
+        0,
+        0,
+        30,
+        0,
+        0,
+        484,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        5,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        4,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        15,
+        0,
+        0,
+        6,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        7,
+        0,
+        0,
+        8,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        6,
+        0,
+        0,
+        5,
+        0,
+        0
+       ]
+      ]
+     }
+    ],
+    "train_support_step1": [
+     1055,
+     2,
+     64,
+     73,
+     0,
+     68,
+     163,
+     0,
+     0
+    ],
+    "test_windows": 570
+   },
+   "123": {
+    "per_k": [
+     {
+      "step": 1,
+      "acc": 0.8842105263157894,
+      "persist_acc": 0.8929824561403509,
+      "macro_f1": 0.15879017013232513,
+      "persist_macro_f1": 0.5854995181685706,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4763705103969754,
+      "persist_macro_f1_supported": 0.9365580783152353,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9147005444646098,
+        "recall": 0.9940828402366864,
+        "f1": 0.9527410207939508,
+        "support": 507,
+        "persist_f1": 0.9397828232971372
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 8,
+        "persist_f1": 0.625
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.9333333333333333
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9523809523809523
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 16,
+        "persist_f1": 0.0625
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      },
+      "confusion": [
+       [
+        504,
+        0,
+        0,
+        2,
+        0,
+        0,
+        1,
+        0,
+        0
+       ],
+       [
+        8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        5,
+        0,
+        0,
+        16,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        16,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        11,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "step": 2,
+      "acc": 0.8894736842105263,
+      "persist_acc": 0.9403508771929825,
+      "macro_f1": 0.15928369462770972,
+      "persist_macro_f1": 0.7481906678820572,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.47785108388312914,
+      "persist_macro_f1_supported": 0.9118391451068616,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9201451905626135,
+        "recall": 0.9941176470588236,
+        "f1": 0.9557021677662583,
+        "support": 510,
+        "persist_f1": 0.9665354330708661
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.4
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.8571428571428571
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9047619047619048
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.9090909090909091
+       }
+      }
+     },
+     {
+      "step": 3,
+      "acc": 0.8912280701754386,
+      "persist_acc": 0.8982456140350877,
+      "macro_f1": 0.15944758317639673,
+      "persist_macro_f1": 0.5511210592647946,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4783427495291902,
+      "persist_macro_f1_supported": 0.8561281547529092,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9236363636363636,
+        "recall": 0.9921875,
+        "f1": 0.9566854990583804,
+        "support": 512,
+        "persist_f1": 0.9430255402750491
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.2857142857142857
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.7692307692307693
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8571428571428571
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      }
+     },
+     {
+      "step": 4,
+      "acc": 0.8947368421052632,
+      "persist_acc": 0.9122807017543859,
+      "macro_f1": 0.1596244131455399,
+      "persist_macro_f1": 0.6244322302197065,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4788732394366197,
+      "persist_macro_f1_supported": 0.8088235294117647,
+      "per_class": {
+       "Benign": {
+        "precision": 0.925589836660617,
+        "recall": 0.9922178988326849,
+        "f1": 0.9577464788732394,
+        "support": 514,
+        "persist_f1": 0.9509803921568627
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.3076923076923077
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 4,
+        "persist_f1": 0.6666666666666666
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8095238095238095
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.1935483870967742
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.8181818181818182
+       }
+      },
+      "confusion": [
+       [
+        510,
+        0,
+        0,
+        4,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        4,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        6,
+        0,
+        0,
+        15,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        15,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        11,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ]
+      ]
+     }
+    ],
+    "train_support_step1": [
+     1055,
+     2,
+     64,
+     73,
+     0,
+     68,
+     163,
+     0,
+     0
+    ],
+    "test_windows": 570
+   },
+   "456": {
+    "per_k": [
+     {
+      "step": 1,
+      "acc": 0.21403508771929824,
+      "persist_acc": 0.8929824561403509,
+      "macro_f1": 0.061991869918699184,
+      "persist_macro_f1": 0.5854995181685706,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.18597560975609756,
+      "persist_macro_f1_supported": 0.9365580783152353,
+      "per_class": {
+       "Benign": {
+        "precision": 0.8187919463087249,
+        "recall": 0.2406311637080868,
+        "f1": 0.3719512195121951,
+        "support": 507,
+        "persist_f1": 0.9397828232971372
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 8,
+        "persist_f1": 0.625
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.9333333333333333
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9523809523809523
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 16,
+        "persist_f1": 0.0625
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      },
+      "confusion": [
+       [
+        122,
+        0,
+        0,
+        1,
+        0,
+        0,
+        384,
+        0,
+        0
+       ],
+       [
+        5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3,
+        0,
+        0
+       ],
+       [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        4,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        2,
+        0,
+        0,
+        15,
+        0,
+        0,
+        4,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        9,
+        0,
+        0,
+        0,
+        0,
+        0,
+        7,
+        0,
+        0
+       ],
+       [
+        8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "step": 2,
+      "acc": 0.21052631578947367,
+      "persist_acc": 0.9403508771929825,
+      "macro_f1": 0.061068702290076333,
+      "persist_macro_f1": 0.7481906678820572,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.183206106870229,
+      "persist_macro_f1_supported": 0.9118391451068616,
+      "per_class": {
+       "Benign": {
+        "precision": 0.8275862068965517,
+        "recall": 0.23529411764705882,
+        "f1": 0.366412213740458,
+        "support": 510,
+        "persist_f1": 0.9665354330708661
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.4
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.8571428571428571
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9047619047619048
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.9090909090909091
+       }
+      }
+     },
+     {
+      "step": 3,
+      "acc": 0.19298245614035087,
+      "persist_acc": 0.8982456140350877,
+      "macro_f1": 0.057024364955935714,
+      "persist_macro_f1": 0.5511210592647946,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.17107309486780714,
+      "persist_macro_f1_supported": 0.8561281547529092,
+      "per_class": {
+       "Benign": {
+        "precision": 0.8396946564885496,
+        "recall": 0.21484375,
+        "f1": 0.3421461897356143,
+        "support": 512,
+        "persist_f1": 0.9430255402750491
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.2857142857142857
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.7692307692307693
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8571428571428571
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      }
+     },
+     {
+      "step": 4,
+      "acc": 0.15789473684210525,
+      "persist_acc": 0.9122807017543859,
+      "macro_f1": 0.048154093097913325,
+      "persist_macro_f1": 0.6244322302197065,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.14446227929373998,
+      "persist_macro_f1_supported": 0.8088235294117647,
+      "per_class": {
+       "Benign": {
+        "precision": 0.8256880733944955,
+        "recall": 0.17509727626459143,
+        "f1": 0.28892455858747995,
+        "support": 514,
+        "persist_f1": 0.9509803921568627
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.3076923076923077
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 4,
+        "persist_f1": 0.6666666666666666
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8095238095238095
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.1935483870967742
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.8181818181818182
+       }
+      },
+      "confusion": [
+       [
+        90,
+        0,
+        0,
+        3,
+        0,
+        0,
+        421,
+        0,
+        0
+       ],
+       [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        4,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        2,
+        0,
+        0,
+        13,
+        0,
+        0,
+        6,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        7,
+        0,
+        0
+       ],
+       [
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        4,
+        0,
+        0
+       ]
+      ]
+     }
+    ],
+    "train_support_step1": [
+     1055,
+     2,
+     64,
+     73,
+     0,
+     68,
+     163,
+     0,
+     0
+    ],
+    "test_windows": 570
+   },
+   "789": {
+    "per_k": [
+     {
+      "step": 1,
+      "acc": 0.007017543859649123,
+      "persist_acc": 0.8929824561403509,
+      "macro_f1": 0.002609262883235486,
+      "persist_macro_f1": 0.5854995181685706,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.007827788649706457,
+      "persist_macro_f1_supported": 0.9365580783152353,
+      "per_class": {
+       "Benign": {
+        "precision": 1.0,
+        "recall": 0.007889546351084813,
+        "f1": 0.015655577299412915,
+        "support": 507,
+        "persist_f1": 0.9397828232971372
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 8,
+        "persist_f1": 0.625
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.9333333333333333
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9523809523809523
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 16,
+        "persist_f1": 0.0625
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      },
+      "confusion": [
+       [
+        4,
+        0,
+        0,
+        2,
+        0,
+        0,
+        501,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        7,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        15,
+        0,
+        0,
+        6,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        16,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        11,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "step": 2,
+      "acc": 0.005263157894736842,
+      "persist_acc": 0.9403508771929825,
+      "macro_f1": 0.001949317738791423,
+      "persist_macro_f1": 0.7481906678820572,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.005847953216374269,
+      "persist_macro_f1_supported": 0.9118391451068616,
+      "per_class": {
+       "Benign": {
+        "precision": 1.0,
+        "recall": 0.0058823529411764705,
+        "f1": 0.011695906432748537,
+        "support": 510,
+        "persist_f1": 0.9665354330708661
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.4
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.8571428571428571
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9047619047619048
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.9090909090909091
+       }
+      }
+     },
+     {
+      "step": 3,
+      "acc": 0.0035087719298245615,
+      "persist_acc": 0.8982456140350877,
+      "macro_f1": 0.0012970168612191958,
+      "persist_macro_f1": 0.5511210592647946,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.0038910505836575876,
+      "persist_macro_f1_supported": 0.8561281547529092,
+      "per_class": {
+       "Benign": {
+        "precision": 1.0,
+        "recall": 0.00390625,
+        "f1": 0.007782101167315175,
+        "support": 512,
+        "persist_f1": 0.9430255402750491
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.2857142857142857
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.7692307692307693
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8571428571428571
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      }
+     },
+     {
+      "step": 4,
+      "acc": 0.0035087719298245615,
+      "persist_acc": 0.9122807017543859,
+      "macro_f1": 0.0012919896640826874,
+      "persist_macro_f1": 0.6244322302197065,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.003875968992248062,
+      "persist_macro_f1_supported": 0.8088235294117647,
+      "per_class": {
+       "Benign": {
+        "precision": 1.0,
+        "recall": 0.0038910505836575876,
+        "f1": 0.007751937984496124,
+        "support": 514,
+        "persist_f1": 0.9509803921568627
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.3076923076923077
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 4,
+        "persist_f1": 0.6666666666666666
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8095238095238095
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.1935483870967742
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.8181818181818182
+       }
+      },
+      "confusion": [
+       [
+        2,
+        0,
+        0,
+        8,
+        0,
+        0,
+        504,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        5,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        4,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        14,
+        0,
+        0,
+        7,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        15,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        11,
+        0,
+        0
+       ]
+      ]
+     }
+    ],
+    "train_support_step1": [
+     1055,
+     2,
+     64,
+     73,
+     0,
+     68,
+     163,
+     0,
+     0
+    ],
+    "test_windows": 570
+   },
+   "2026": {
+    "per_k": [
+     {
+      "step": 1,
+      "acc": 0.8596491228070176,
+      "persist_acc": 0.8929824561403509,
+      "macro_f1": 0.15750562520090003,
+      "persist_macro_f1": 0.5854995181685706,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4725168756027001,
+      "persist_macro_f1_supported": 0.9365580783152353,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9245283018867925,
+        "recall": 0.9664694280078896,
+        "f1": 0.9450337512054002,
+        "support": 507,
+        "persist_f1": 0.9397828232971372
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 8,
+        "persist_f1": 0.625
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.9333333333333333
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9523809523809523
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 16,
+        "persist_f1": 0.0625
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      },
+      "confusion": [
+       [
+        490,
+        0,
+        0,
+        17,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        5,
+        0,
+        0,
+        16,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        12,
+        0,
+        0,
+        4,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        8,
+        0,
+        0,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "step": 2,
+      "acc": 0.8614035087719298,
+      "persist_acc": 0.9403508771929825,
+      "macro_f1": 0.15767501605651893,
+      "persist_macro_f1": 0.7481906678820572,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4730250481695568,
+      "persist_macro_f1_supported": 0.9118391451068616,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9299242424242424,
+        "recall": 0.9627450980392157,
+        "f1": 0.9460500963391136,
+        "support": 510,
+        "persist_f1": 0.9665354330708661
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.4
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.8571428571428571
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9047619047619048
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.9090909090909091
+       }
+      }
+     },
+     {
+      "step": 3,
+      "acc": 0.8596491228070176,
+      "persist_acc": 0.8982456140350877,
+      "macro_f1": 0.15750562520090003,
+      "persist_macro_f1": 0.5511210592647946,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4725168756027001,
+      "persist_macro_f1_supported": 0.8561281547529092,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9333333333333333,
+        "recall": 0.95703125,
+        "f1": 0.9450337512054002,
+        "support": 512,
+        "persist_f1": 0.9430255402750491
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.2857142857142857
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.7692307692307693
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8571428571428571
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      }
+     },
+     {
+      "step": 4,
+      "acc": 0.8596491228070176,
+      "persist_acc": 0.9122807017543859,
+      "macro_f1": 0.15765765765765766,
+      "persist_macro_f1": 0.6244322302197065,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.47297297297297297,
+      "persist_macro_f1_supported": 0.8088235294117647,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9386973180076629,
+        "recall": 0.953307392996109,
+        "f1": 0.9459459459459459,
+        "support": 514,
+        "persist_f1": 0.9509803921568627
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.3076923076923077
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 4,
+        "persist_f1": 0.6666666666666666
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8095238095238095
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.1935483870967742
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.8181818181818182
+       }
+      },
+      "confusion": [
+       [
+        490,
+        0,
+        0,
+        24,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        4,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        6,
+        0,
+        0,
+        15,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        10,
+        0,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        7,
+        0,
+        0,
+        4,
+        0,
+        0,
+        0,
+        0,
+        0
+       ]
+      ]
+     }
+    ],
+    "train_support_step1": [
+     1055,
+     2,
+     64,
+     73,
+     0,
+     68,
+     163,
+     0,
+     0
+    ],
+    "test_windows": 570
+   }
+  }
+ },
+ "net": {
+  "seeds": {
+   "42": {
+    "per_k": [
+     {
+      "step": 1,
+      "acc": 0.8456140350877193,
+      "persist_acc": 0.8929824561403509,
+      "macro_f1": 0.15782580222658807,
+      "persist_macro_f1": 0.5854995181685706,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.47347740667976423,
+      "persist_macro_f1_supported": 0.9365580783152353,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9432485322896281,
+        "recall": 0.9506903353057199,
+        "f1": 0.9469548133595285,
+        "support": 507,
+        "persist_f1": 0.9397828232971372
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 8,
+        "persist_f1": 0.625
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.9333333333333333
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9523809523809523
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 16,
+        "persist_f1": 0.0625
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      },
+      "confusion": [
+       [
+        482,
+        0,
+        0,
+        25,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        3,
+        0,
+        0,
+        18,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        9,
+        0,
+        0,
+        7,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        2,
+        0,
+        0,
+        9,
+        0,
+        0,
+        0,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "step": 2,
+      "acc": 0.8456140350877193,
+      "persist_acc": 0.9403508771929825,
+      "macro_f1": 0.15813648293963253,
+      "persist_macro_f1": 0.7481906678820572,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4744094488188976,
+      "persist_macro_f1_supported": 0.9118391451068616,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9525691699604744,
+        "recall": 0.9450980392156862,
+        "f1": 0.9488188976377953,
+        "support": 510,
+        "persist_f1": 0.9665354330708661
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.4
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.8571428571428571
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9047619047619048
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.9090909090909091
+       }
+      }
+     },
+     {
+      "step": 3,
+      "acc": 0.8473684210526315,
+      "persist_acc": 0.8982456140350877,
+      "macro_f1": 0.15784313725490196,
+      "persist_macro_f1": 0.5511210592647946,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.47352941176470587,
+      "persist_macro_f1_supported": 0.8561281547529092,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9507874015748031,
+        "recall": 0.943359375,
+        "f1": 0.9470588235294117,
+        "support": 512,
+        "persist_f1": 0.9430255402750491
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.2857142857142857
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.7692307692307693
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8571428571428571
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      }
+     },
+     {
+      "step": 4,
+      "acc": 0.8578947368421053,
+      "persist_acc": 0.9122807017543859,
+      "macro_f1": 0.15856031128404668,
+      "persist_macro_f1": 0.6244322302197065,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.47568093385214005,
+      "persist_macro_f1_supported": 0.8088235294117647,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9513618677042801,
+        "recall": 0.9513618677042801,
+        "f1": 0.9513618677042801,
+        "support": 514,
+        "persist_f1": 0.9509803921568627
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.3076923076923077
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 4,
+        "persist_f1": 0.6666666666666666
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8095238095238095
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.1935483870967742
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.8181818181818182
+       }
+      },
+      "confusion": [
+       [
+        489,
+        0,
+        0,
+        25,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        4,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        5,
+        0,
+        0,
+        16,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        8,
+        0,
+        0,
+        7,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        3,
+        0,
+        0,
+        8,
+        0,
+        0,
+        0,
+        0,
+        0
+       ]
+      ]
+     }
+    ],
+    "train_support_step1": [
+     1055,
+     2,
+     64,
+     73,
+     0,
+     68,
+     163,
+     0,
+     0
+    ],
+    "test_windows": 570
+   },
+   "123": {
+    "per_k": [
+     {
+      "step": 1,
+      "acc": 0.8789473684210526,
+      "persist_acc": 0.8929824561403509,
+      "macro_f1": 0.15904761904761905,
+      "persist_macro_f1": 0.5854995181685706,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.47714285714285715,
+      "persist_macro_f1_supported": 0.9365580783152353,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9226519337016574,
+        "recall": 0.9881656804733728,
+        "f1": 0.9542857142857143,
+        "support": 507,
+        "persist_f1": 0.9397828232971372
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 8,
+        "persist_f1": 0.625
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.9333333333333333
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9523809523809523
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 16,
+        "persist_f1": 0.0625
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      },
+      "confusion": [
+       [
+        501,
+        0,
+        6,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        3,
+        0,
+        2,
+        16,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        16,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        8,
+        0,
+        2,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "step": 2,
+      "acc": 0.8824561403508772,
+      "persist_acc": 0.9403508771929825,
+      "macro_f1": 0.15937896070975918,
+      "persist_macro_f1": 0.7481906678820572,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4781368821292776,
+      "persist_macro_f1_supported": 0.9118391451068616,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9280442804428044,
+        "recall": 0.9862745098039216,
+        "f1": 0.9562737642585551,
+        "support": 510,
+        "persist_f1": 0.9665354330708661
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.4
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.8571428571428571
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9047619047619048
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.9090909090909091
+       }
+      }
+     },
+     {
+      "step": 3,
+      "acc": 0.8842105263157894,
+      "persist_acc": 0.8982456140350877,
+      "macro_f1": 0.15924170616113745,
+      "persist_macro_f1": 0.5511210592647946,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4777251184834123,
+      "persist_macro_f1_supported": 0.8561281547529092,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9281767955801105,
+        "recall": 0.984375,
+        "f1": 0.9554502369668246,
+        "support": 512,
+        "persist_f1": 0.9430255402750491
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.2857142857142857
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.7692307692307693
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8571428571428571
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      }
+     },
+     {
+      "step": 4,
+      "acc": 0.8859649122807017,
+      "persist_acc": 0.9122807017543859,
+      "macro_f1": 0.15970904490828589,
+      "persist_macro_f1": 0.6244322302197065,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4791271347248577,
+      "persist_macro_f1_supported": 0.8088235294117647,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9351851851851852,
+        "recall": 0.9824902723735408,
+        "f1": 0.9582542694497154,
+        "support": 514,
+        "persist_f1": 0.9509803921568627
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.3076923076923077
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 4,
+        "persist_f1": 0.6666666666666666
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8095238095238095
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.1935483870967742
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.8181818181818182
+       }
+      },
+      "confusion": [
+       [
+        505,
+        0,
+        9,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        4,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        5,
+        0,
+        15,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        15,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        6,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ]
+      ]
+     }
+    ],
+    "train_support_step1": [
+     1055,
+     2,
+     64,
+     73,
+     0,
+     68,
+     163,
+     0,
+     0
+    ],
+    "test_windows": 570
+   },
+   "456": {
+    "per_k": [
+     {
+      "step": 1,
+      "acc": 0.8035087719298246,
+      "persist_acc": 0.8929824561403509,
+      "macro_f1": 0.15546503733876443,
+      "persist_macro_f1": 0.5854995181685706,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4663951120162933,
+      "persist_macro_f1_supported": 0.9365580783152353,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9642105263157895,
+        "recall": 0.903353057199211,
+        "f1": 0.9327902240325866,
+        "support": 507,
+        "persist_f1": 0.9397828232971372
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 8,
+        "persist_f1": 0.625
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.9333333333333333
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9523809523809523
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 16,
+        "persist_f1": 0.0625
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      },
+      "confusion": [
+       [
+        458,
+        0,
+        0,
+        49,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        6,
+        0,
+        0,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        2,
+        0,
+        0,
+        18,
+        0,
+        0,
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        1,
+        0,
+        0,
+        15,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        1,
+        0,
+        1,
+        9,
+        0,
+        0,
+        0,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "step": 2,
+      "acc": 0.8070175438596491,
+      "persist_acc": 0.9403508771929825,
+      "macro_f1": 0.15582655826558264,
+      "persist_macro_f1": 0.7481906678820572,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.46747967479674796,
+      "persist_macro_f1_supported": 0.9118391451068616,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9704641350210971,
+        "recall": 0.9019607843137255,
+        "f1": 0.9349593495934959,
+        "support": 510,
+        "persist_f1": 0.9665354330708661
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.4
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.8571428571428571
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9047619047619048
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.9090909090909091
+       }
+      }
+     },
+     {
+      "step": 3,
+      "acc": 0.8035087719298246,
+      "persist_acc": 0.8982456140350877,
+      "macro_f1": 0.15514905149051492,
+      "persist_macro_f1": 0.5511210592647946,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4654471544715447,
+      "persist_macro_f1_supported": 0.8561281547529092,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9703389830508474,
+        "recall": 0.89453125,
+        "f1": 0.9308943089430894,
+        "support": 512,
+        "persist_f1": 0.9430255402750491
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.2857142857142857
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.7692307692307693
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8571428571428571
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      }
+     },
+     {
+      "step": 4,
+      "acc": 0.7947368421052632,
+      "persist_acc": 0.9122807017543859,
+      "macro_f1": 0.15376782077393075,
+      "persist_macro_f1": 0.6244322302197065,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.46130346232179226,
+      "persist_macro_f1_supported": 0.8088235294117647,
+      "per_class": {
+       "Benign": {
+        "precision": 0.967948717948718,
+        "recall": 0.8813229571984436,
+        "f1": 0.9226069246435845,
+        "support": 514,
+        "persist_f1": 0.9509803921568627
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.3076923076923077
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 4,
+        "persist_f1": 0.6666666666666666
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8095238095238095
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.1935483870967742
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.8181818181818182
+       }
+      },
+      "confusion": [
+       [
+        453,
+        0,
+        2,
+        59,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        4,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        4,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        5,
+        0,
+        0,
+        16,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        1,
+        0,
+        0,
+        14,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        1,
+        0,
+        0,
+        10,
+        0,
+        0,
+        0,
+        0,
+        0
+       ]
+      ]
+     }
+    ],
+    "train_support_step1": [
+     1055,
+     2,
+     64,
+     73,
+     0,
+     68,
+     163,
+     0,
+     0
+    ],
+    "test_windows": 570
+   },
+   "789": {
+    "per_k": [
+     {
+      "step": 1,
+      "acc": 0.8719298245614036,
+      "persist_acc": 0.8929824561403509,
+      "macro_f1": 0.1586845466155811,
+      "persist_macro_f1": 0.5854995181685706,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4760536398467433,
+      "persist_macro_f1_supported": 0.9365580783152353,
+      "per_class": {
+       "Benign": {
+        "precision": 0.925512104283054,
+        "recall": 0.980276134122288,
+        "f1": 0.9521072796934866,
+        "support": 507,
+        "persist_f1": 0.9397828232971372
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 8,
+        "persist_f1": 0.625
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.9333333333333333
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9523809523809523
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 16,
+        "persist_f1": 0.0625
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      },
+      "confusion": [
+       [
+        497,
+        0,
+        0,
+        10,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        3,
+        0,
+        0,
+        18,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        16,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        6,
+        0,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "step": 2,
+      "acc": 0.8789473684210526,
+      "persist_acc": 0.9403508771929825,
+      "macro_f1": 0.15919923736892277,
+      "persist_macro_f1": 0.7481906678820572,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4775977121067683,
+      "persist_macro_f1_supported": 0.9118391451068616,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9294990723562152,
+        "recall": 0.9823529411764705,
+        "f1": 0.9551954242135366,
+        "support": 510,
+        "persist_f1": 0.9665354330708661
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.4
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.8571428571428571
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9047619047619048
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.9090909090909091
+       }
+      }
+     },
+     {
+      "step": 3,
+      "acc": 0.8807017543859649,
+      "persist_acc": 0.8982456140350877,
+      "macro_f1": 0.1590621039290241,
+      "persist_macro_f1": 0.5511210592647946,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.47718631178707227,
+      "persist_macro_f1_supported": 0.8561281547529092,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9296296296296296,
+        "recall": 0.98046875,
+        "f1": 0.9543726235741445,
+        "support": 512,
+        "persist_f1": 0.9430255402750491
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.2857142857142857
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.7692307692307693
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8571428571428571
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      }
+     },
+     {
+      "step": 4,
+      "acc": 0.8859649122807017,
+      "persist_acc": 0.9122807017543859,
+      "macro_f1": 0.15970904490828589,
+      "persist_macro_f1": 0.6244322302197065,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.4791271347248577,
+      "persist_macro_f1_supported": 0.8088235294117647,
+      "per_class": {
+       "Benign": {
+        "precision": 0.9351851851851852,
+        "recall": 0.9824902723735408,
+        "f1": 0.9582542694497154,
+        "support": 514,
+        "persist_f1": 0.9509803921568627
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.3076923076923077
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 4,
+        "persist_f1": 0.6666666666666666
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8095238095238095
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.1935483870967742
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.8181818181818182
+       }
+      },
+      "confusion": [
+       [
+        505,
+        0,
+        0,
+        9,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        4,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        5,
+        0,
+        0,
+        16,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        15,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        6,
+        0,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0,
+        0
+       ]
+      ]
+     }
+    ],
+    "train_support_step1": [
+     1055,
+     2,
+     64,
+     73,
+     0,
+     68,
+     163,
+     0,
+     0
+    ],
+    "test_windows": 570
+   },
+   "2026": {
+    "per_k": [
+     {
+      "step": 1,
+      "acc": 0.10877192982456141,
+      "persist_acc": 0.8929824561403509,
+      "macro_f1": 0.03581744656268053,
+      "persist_macro_f1": 0.5854995181685706,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.10745233968804159,
+      "persist_macro_f1_supported": 0.9365580783152353,
+      "per_class": {
+       "Benign": {
+        "precision": 0.8857142857142857,
+        "recall": 0.1222879684418146,
+        "f1": 0.21490467937608318,
+        "support": 507,
+        "persist_f1": 0.9397828232971372
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 8,
+        "persist_f1": 0.625
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.9333333333333333
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9523809523809523
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 16,
+        "persist_f1": 0.0625
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      },
+      "confusion": [
+       [
+        62,
+        0,
+        3,
+        28,
+        0,
+        0,
+        414,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        2,
+        0,
+        0,
+        6,
+        0,
+        0
+       ],
+       [
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        17,
+        0,
+        0,
+        4,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        1,
+        0,
+        0,
+        9,
+        0,
+        0,
+        6,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        9,
+        0,
+        0,
+        2,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "step": 2,
+      "acc": 0.09649122807017543,
+      "persist_acc": 0.9403508771929825,
+      "macro_f1": 0.031995346131471786,
+      "persist_macro_f1": 0.7481906678820572,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.09598603839441536,
+      "persist_macro_f1_supported": 0.9118391451068616,
+      "per_class": {
+       "Benign": {
+        "precision": 0.873015873015873,
+        "recall": 0.10784313725490197,
+        "f1": 0.19197207678883071,
+        "support": 510,
+        "persist_f1": 0.9665354330708661
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7,
+        "persist_f1": 0.4
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.8571428571428571
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.9047619047619048
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.9090909090909091
+       }
+      }
+     },
+     {
+      "step": 3,
+      "acc": 0.08070175438596491,
+      "persist_acc": 0.8982456140350877,
+      "macro_f1": 0.02699530516431925,
+      "persist_macro_f1": 0.5511210592647946,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.08098591549295775,
+      "persist_macro_f1_supported": 0.8561281547529092,
+      "per_class": {
+       "Benign": {
+        "precision": 0.8214285714285714,
+        "recall": 0.08984375,
+        "f1": 0.1619718309859155,
+        "support": 512,
+        "persist_f1": 0.9430255402750491
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6,
+        "persist_f1": 0.2857142857142857
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.7692307692307693
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8571428571428571
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.45161290322580644
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.0
+       }
+      }
+     },
+     {
+      "step": 4,
+      "acc": 0.07017543859649122,
+      "persist_acc": 0.9122807017543859,
+      "macro_f1": 0.023767082590612002,
+      "persist_macro_f1": 0.6244322302197065,
+      "supported_classes": [
+       "Benign",
+       "BruteForce"
+      ],
+      "macro_f1_supported": 0.07130124777183601,
+      "persist_macro_f1_supported": 0.8088235294117647,
+      "per_class": {
+       "Benign": {
+        "precision": 0.851063829787234,
+        "recall": 0.07782101167315175,
+        "f1": 0.14260249554367202,
+        "support": 514,
+        "persist_f1": 0.9509803921568627
+       },
+       "PortScan": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5,
+        "persist_f1": 0.3076923076923077
+       },
+       "BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 4,
+        "persist_f1": 0.6666666666666666
+       },
+       "DoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "DDoS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 21,
+        "persist_f1": 0.8095238095238095
+       },
+       "WebAttack": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0,
+        "persist_f1": 0.0
+       },
+       "Infiltration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 15,
+        "persist_f1": 0.1935483870967742
+       },
+       "Heartbleed": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 11,
+        "persist_f1": 0.8181818181818182
+       }
+      },
+      "confusion": [
+       [
+        40,
+        0,
+        2,
+        59,
+        0,
+        0,
+        413,
+        0,
+        0
+       ],
+       [
+        1,
+        0,
+        0,
+        1,
+        0,
+        0,
+        3,
+        0,
+        0
+       ],
+       [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        16,
+        0,
+        0,
+        5,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       [
+        2,
+        0,
+        0,
+        7,
+        0,
+        0,
+        6,
+        0,
+        0
+       ],
+       [
+        1,
+        0,
+        0,
+        10,
+        0,
+        0,
+        0,
+        0,
+        0
+       ]
+      ]
+     }
+    ],
+    "train_support_step1": [
+     1055,
+     2,
+     64,
+     73,
+     0,
+     68,
+     163,
+     0,
+     0
+    ],
+    "test_windows": 570
+   }
+  }
+ },
+ "classes": [
+  "Benign",
+  "PortScan",
+  "BruteForce",
+  "DoS",
+  "DDoS",
+  "WebAttack",
+  "Bot",
+  "Infiltration",
+  "Heartbleed"
+ ]
+}

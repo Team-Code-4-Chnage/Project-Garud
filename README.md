@@ -23,7 +23,7 @@
 
 Traditional network intrusion detection is reactive: it flags malicious behavior after a signature or anomalous payload has already crossed the wire. In a Critical Information Infrastructure (CII) or high-assurance enterprise perimeter, that's often too late — data has already been staged, privileges escalated, persistence established.
 
-Project Garud (built around the NetForecast recurrent telemetry engine) takes a different approach. It trains a world model on sliding windows of network flow telemetry, so it predicts the *next* flow-feature vectors before the corresponding packets arrive, rather than only classifying packets already seen. Those predicted trajectories are mapped onto the 6-stage MITRE ATT&CK kill chain, giving an early read on where a session is heading, not just where it currently sits.
+Project Garud (built around the NetForecast recurrent telemetry engine) takes a different approach. It trains a world model on sliding windows of network flow telemetry, so it predicts the *next* flow-feature vectors before the corresponding packets arrive, rather than only classifying packets already seen. The rollout produces a per-step infiltration probability and stage label for the coming steps. The stage labels are dataset-derived proxies (see the stage table below), and measured early-warning performance is modest; see the research reports in `docs/` before relying on the forecast as lead time.
 
 A few things this system does, beyond plain classification:
 
@@ -79,31 +79,20 @@ We also directly tested generalization to unseen attack tools (`experiments/fami
 
 ---
 
-## MITRE ATT&CK Kill-Chain Mapping
+## Stage Labels and MITRE ATT&CK Interpretation
 
-NetForecast classifies every network flow and forecasts future progression across a 6-stage taxonomy:
+The shipped model predicts one of six **stage labels**. These are proxies built from CIC-IDS2017/2018 attack names, not verified campaign stages: the datasets contain no multi-stage campaign (each attack family occupies its own time block), so the stages do not form a real kill chain and the model was never trained on one attack progressing through them.
 
-```mermaid
-stateDiagram-v2
-    [*] --> Benign: Normal Baseline Traffic
-    Benign --> Reconnaissance: PortScan, Patator, Bot
-    Reconnaissance --> Initial_Access: Web Attacks (SQLi, XSS, Brute Force)
-    Initial_Access --> Lateral_Movement: Infiltration
-    Lateral_Movement --> Command_and_Control: DoS / DDoS
-    Command_and_Control --> Exfiltration: Heartbleed
-    Exfiltration --> [*]: Attack Objective Achieved
-```
+| Stage label | Built from (actual dataset labels) | What that traffic really is |
+|---|---|---|
+| Benign | BENIGN | Normal traffic |
+| Reconnaissance | PortScan, Bot, FTP-Patator, SSH-Patator | Mixed: port scanning, botnet traffic and credential brute force |
+| Initial Access | Web Attack (Brute Force, XSS, SQL Injection) | Web application attacks |
+| Lateral Movement | Infiltration | A few dozen flows; not verified lateral movement |
+| C2 | DoS Hulk, GoldenEye, Slowloris, Slowhttptest, DDoS | Denial of service (Impact), not command and control |
+| Exfiltration | Heartbleed (about 11 real flows) | Memory disclosure exploit; detected by a deterministic signature, not ML |
 
-| MITRE Stage | Target ATT&CK Techniques | Training Data (actual labels mapped in) | Detection Path |
-|---|---|---|---|
-| Benign | N/A (Standard Business Traffic) | CIC-IDS2017 BENIGN | ML stage head |
-| Reconnaissance | T1595 (Active Scanning), T1046 (Network Service Discovery) | CIC-IDS2017 PortScan, Bot, FTP-Patator, SSH-Patator | ML stage head |
-| Initial Access | T1190 (Exploit Public-Facing App), T1110 (Brute Force) | CIC-IDS2017 + CIC-IDS2018 Web Attack (Brute Force, XSS, SQL Injection) | ML stage head |
-| Lateral Movement | T1021 (Remote Services), T1210 (Exploitation of Remote Services) | CIC-IDS2017 + CIC-IDS2018 Infiltration | ML stage head |
-| Command & Control | T1071 (Application Layer Protocol), T1573 (Encrypted Channel) | CIC-IDS2017 DDoS, DoS Hulk, GoldenEye, Slowloris, Slowhttptest | ML stage head |
-| Exfiltration | T1041 (Exfiltration Over C2), T1048 (Exfiltration Over Alt Protocol) | CIC-IDS2017 Heartbleed (only ~11 real flows exist) | Deterministic Heartbleed signature detector (`capture/signatures.py`) |
-
-Note that "Command & Control" here is learned from CIC-IDS2017's DoS/DDoS traffic (the dataset has no dedicated C2-beaconing label), so it recognizes sustained flood/slow-connection patterns rather than low-and-slow beaconing specifically.
+MITRE ATT&CK techniques are **not** predicted by the model. They come from an analyst-written interpretation layer in the backend (`backend/app/mitre.py`, served at `GET /mitre/mapping` and `GET /mitre/lookup/{label}`). Every entry states what the traffic is, the technique and tactic, a rationale and a confidence, and legacy stage labels that mix behaviours are flagged as ambiguous. Examples: DoS and DDoS map to Impact (T1499, T1498), FTP/SSH brute force maps to Credential Access (T1110), port scanning maps to Reconnaissance/Discovery (T1595, T1046). The dashboard reads this mapping from the API; it contains no hard-coded technique IDs. Verify IDs against the current ATT&CK release before external use.
 
 ---
 
@@ -249,6 +238,9 @@ Run the full backend test suite to verify inference, world model rollout, and ex
 # Run all backend tests
 backend/venv/Scripts/python.exe -m pytest backend/tests -v
 
+# V3 harness and MITRE tests
+backend/venv/Scripts/python.exe -m pytest backend/tests/test_worldmodel_v3.py backend/tests/test_mitre.py -v
+
 # Run inference and forecast unit tests specifically
 backend/venv/Scripts/python.exe -m pytest backend/tests/test_inference.py -v
 ```
@@ -393,6 +385,8 @@ python experiments/calibrate_stage_logits.py
 | | `GET` | `/system/cycle/current` | Query the currently active monitoring cycle |
 | | `GET` | `/system/cycles` | List archived cycles |
 | | `GET` | `/system/cycles/{cycle_id}` | One archived cycle's contents |
+| MITRE | `GET` | `/mitre/mapping` | Behaviour and legacy-stage to ATT&CK interpretation with rationale |
+| | `GET` | `/mitre/lookup/{label}` | Interpretation for one behaviour or stage label |
 | Alerts & WS | `GET` | `/alerts` | Query active & historical alerts with triage status |
 | | `GET` | `/alerts/stats` | Aggregate alert statistics |
 | | `POST` | `/alerts/{alert_id}/acknowledge` | Acknowledge an alert |
@@ -456,7 +450,7 @@ Network_Attack_Detection/
 │   │   │   ├── StageDistributionChart.jsx # Sessions per MITRE stage
 │   │   │   └── Badges.jsx           # Shared badges & network wellbeing modal
 │   │   ├── api.js                   # fetch-based API client with optional X-API-Key
-│   │   ├── utils.js                 # Stage colors & shared formatting helpers
+│   │   ├── utils.js                 # Stage colors & shared formatting helpers (MITRE IDs come from the API)
 │   │   └── App.jsx                  # Layout, navigation & WebSocket state
 ├── data/                            # Dataset management & preprocessing
 │   ├── download_cicids.py           # Hugging Face mirror chunked downloader
@@ -484,6 +478,11 @@ Network_Attack_Detection/
 ```
 
 ---
+
+## Research Tracks (not shipped)
+
+- `docs/world_model_v2.md`: window-level state with multi-step training on the old training CSVs.
+- `docs/world_model_v3_report.md`: dataset comparison and a network-state model on CIC-IDS2017 labelled flows with real IP, port, protocol and timestamps, evaluated leave-one-day-out over 5 seeds. Read its results before making forecasting claims: early warning is modest, false alarms are high, and behaviour forecasting did not beat a persistence baseline.
 
 ## Known Limitations & Enterprise Architecture Roadmap
 

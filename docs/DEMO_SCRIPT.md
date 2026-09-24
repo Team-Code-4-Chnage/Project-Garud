@@ -5,7 +5,7 @@
 ---
 
 ## Evaluator Pitch (10-Second Hook)
-> *"Traditional IDS/IPS tools are post-facto: they detect an intrusion only after files are encrypted or data is exfiltrated. Project Garud introduces an **LSTM World Model** that forecasts attack progression across the MITRE ATT&CK kill-chain **before** final compromise occurs, giving SOC analysts actionable lead-time to intervene."*
+> *"Traditional IDS/IPS tools are post-facto: they detect an intrusion only after files are encrypted or data is exfiltrated. Project Garud introduces an **LSTM World Model** that rolls traffic state forward and forecasts per-step risk and stage. The goal is lead time for SOC analysts; measured early-warning performance is modest, so describe it as a forecasting prototype."*
 
 ---
 

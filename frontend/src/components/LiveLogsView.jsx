@@ -1,10 +1,19 @@
-import { useRef, useEffect, useMemo, memo } from 'react';
+import { useRef, useEffect, useMemo, useState, memo } from 'react';
 import { Radio, ShieldCheck } from 'lucide-react';
-import { formatTime, formatProb, isAttackFlow, stageClass, STAGE_TECHNIQUE } from '../utils';
+import { formatTime, formatProb, isAttackFlow, stageClass } from '../utils';
+import { apiFetch } from '../api';
 import { DirBadge, SourceBadge } from './Badges';
 
 function LiveLogsView({ lines = [], connected = false }) {
   const containerRef = useRef(null);
+  // MITRE technique IDs come from the backend (/mitre/mapping); nothing is hard-coded here.
+  const [mitre, setMitre] = useState({});
+  useEffect(() => {
+    apiFetch('/mitre/mapping')
+      .then((m) => setMitre(m.legacy_stages || {}))
+      .catch(() => setMitre({}));
+  }, []);
+  const techniques = (stage) => (mitre[stage]?.techniques || []).map((t) => t.technique_id).join(' / ');
 
   const attackLines = useMemo(() => lines.filter(isAttackFlow), [lines]);
 
@@ -65,9 +74,9 @@ function LiveLogsView({ lines = [], connected = false }) {
             return (
               <div key={i} className={`terminal-row stage-${stageClass(stage)}`}>
                 <span className="ts">{formatTime(line._ts || line.timestamp)}</span>
-                <span className="attack-flag" title={STAGE_TECHNIQUE[stage] || ''}>
+                <span className="attack-flag" title={techniques(stage)}>
                   &#9650; {stage}
-                  {STAGE_TECHNIQUE[stage] && <span className="attack-technique"> {STAGE_TECHNIQUE[stage]}</span>}
+                  {techniques(stage) && <span className="attack-technique"> {techniques(stage)}</span>}
                 </span>
                 <span className="ip" title={`${line.src_ip || '?'}${line.src_port ? `:${line.src_port}` : ''} → ${line.dst_ip || '?'}${line.dst_port ? `:${line.dst_port}` : ''}`}>
                   {line.src_ip || '?'}{line.src_port ? `:${line.src_port}` : ''}

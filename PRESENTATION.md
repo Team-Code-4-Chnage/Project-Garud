@@ -12,7 +12,7 @@ Traditional NIDS and SIEMs are reactive classifiers — they flag attacks after 
 
 NetForecast takes a different approach. Instead of predicting a static label $P(\text{attack} \mid x)$ for the current packet, it learns the transition dynamics of the network itself:
 $$s_{t+1} \sim \mathcal{W}(s_t, s_{t-1}, \dots)$$
-That lets it forecast attacker progression $k$ steps into the future along the MITRE ATT&CK kill chain, giving security teams lead time before compromise completes rather than a notification after it did.
+That lets it roll the model forward $k$ steps and report a per-step infiltration probability and stage label. The aim is lead time before compromise completes; measured early warning is modest (see docs/world_model_v3_report.md), so present it as a forecasting prototype, not a proven early-warning system.
 
 ---
 
@@ -30,7 +30,7 @@ That lets it forecast attacker progression $k$ steps into the future along the M
 
 **Defense interface:**
 - Low-latency WebSocket telemetry stream.
-- React dashboard with MITRE ATT&CK kill-chain progression, Monte Carlo risk timelines, and one-click forensic report exports.
+- React dashboard with per-step stage forecasts (technique IDs served by the backend `/mitre` API), Monte Carlo risk timelines, and one-click forensic report exports.
 
 ---
 
@@ -66,7 +66,7 @@ Any flagged session can be explained on demand, not just scored: SHAP (KernelExp
 
 The demo covers:
 1. Live network capture — real-time packet parsing and feature streaming from physical Wi-Fi/Ethernet adapters.
-2. A multi-stage attack scenario progressing automatically through the kill chain: $\text{Benign} \to \text{Reconnaissance} \to \text{Initial Access} \to \text{Lateral Movement} \to \text{C2} \to \text{Exfiltration}$.
+2. A scripted, simulated multi-stage scenario (demo data, not a real campaign) that steps through: $\text{Benign} \to \text{Reconnaissance} \to \text{Initial Access} \to \text{Lateral Movement} \to \text{C2} \to \text{Exfiltration}$.
 3. Forensic export — one-click download of timestamped CSV/JSON incident reports for compliance and auditing.
 4. Production-facing hardening: SlowAPI rate limiting, optional API key authentication, and containerized deployment via Docker.
 

@@ -38,14 +38,6 @@ export function stageColor(stage) {
   return map[stage] || '#8a7f72';
 }
 
-export const STAGE_TECHNIQUE = {
-  'Reconnaissance': 'T1595 / T1046',
-  'Initial Access': 'T1190 / T1110',
-  'Lateral Movement': 'T1021 / T1210',
-  'C2': 'T1071 / T1573',
-  'Exfiltration': 'T1041 / T1048',
-};
-
 export function isAttackFlow(flow) {
   if (!flow) return false;
   if (typeof flow.is_alert === 'boolean') return flow.is_alert;

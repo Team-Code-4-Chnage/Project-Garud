@@ -21,6 +21,7 @@ from .routes import (
     explain,
     forecast,
     ingest,
+    mitre,
     pcap,
     predict,
     reports,
@@ -170,6 +171,7 @@ app.include_router(alerts.router, tags=["Alerts"])
 app.include_router(ingest.router, tags=["Ingestion"])
 app.include_router(pcap.router, tags=["PCAP Ingestion"])
 app.include_router(reports.router, tags=["Reports"])
+app.include_router(mitre.router, tags=["MITRE"])
 app.include_router(system.router, tags=["System"])
 app.include_router(ws.router, tags=["Live Feed"])
 

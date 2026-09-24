@@ -196,6 +196,10 @@ Early-warning lead time (in flows, because CIC-IDS2017 timestamps are synthetic)
 
 An experimental network-state model with multi-step training targets is documented in `docs/world_model_v2.md`. Under the same early-warning protocol it warned before attack onset in 70% of eligible test sessions versus 54% for this model, and within 12 flows in 38% versus 18%. It is not shipped, it does not improve detection, and false alarms remain high for both models.
 
+### 6.3 V3 network-state study on real network context
+
+`docs/world_model_v3_report.md` repeats the forecasting evaluation on CIC-IDS2017 labelled flows that keep IP, port, protocol and real (minute) timestamps, using leave-one-day-out and 5 seeds. Findings: the model predicts future network state better than persistence at every horizon; on unseen attack families detection is weak (ROC-AUC 0.54 with flow features, 0.62 with network features); 35% to 43% of 20 attack episodes were warned within 20 minutes, with the two feature sets statistically indistinguishable; false alarms were 0.5 (flow) and 1.1 (network) per quiet hour; behaviour forecasting did not beat persistence. This model is not shipped.
+
 ## 7. Explainability & Trust Architecture
 
 1. **Fast Gradient Attribution ($\mathcal{O}(1)$):**
