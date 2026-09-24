@@ -39,7 +39,7 @@
 ### SLIDE 3: Deep World Model Architecture & Stochastic Forecasting
 
 #### Core Neural Network:
-- **Recurrent Engine**: 2-layer stacked LSTM (`hidden_size=128`, inter-layer dropout `0.2`) capturing long-range temporal dependencies across network sessions.
+- **Recurrent Engine**: 2-layer stacked LSTM (`hidden_size=256`, inter-layer dropout `0.25`) capturing long-range temporal dependencies across network sessions.
 - **Multi-Head Joint Objective**:
   1. **Next-State Head**: Predicts expected future telemetry vector $\hat{s}_{t+1} \in \mathbb{R}^{22}$ ($\mathcal{L}_{\text{MSE}}$).
   2. **Infiltration Probability Head**: Predicts likelihood of impending attack breach ($\mathcal{L}_{\text{BCE}}$).
