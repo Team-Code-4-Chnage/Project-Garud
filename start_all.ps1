@@ -12,16 +12,16 @@ $ROOT = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Item -LiteralPath .).Fu
 $PYTHON = "$ROOT\backend\venv\Scripts\python.exe"
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  Network Attack Detection & Forecasting" -ForegroundColor Cyan
+Write-Host "  Project Garud - NetForecast" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # 1. Start Backend (Port 8000)
 $backendPort = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
 if ($backendPort) {
-    Write-Host "[1/3] Backend is already running on http://localhost:8000" -ForegroundColor Green
+    Write-Host "[1/4] Backend is already running on http://localhost:8000" -ForegroundColor Green
 } else {
-    Write-Host "[1/3] Starting Backend API..." -ForegroundColor Yellow
+    Write-Host "[1/4] Starting Backend API..." -ForegroundColor Yellow
     Start-Process powershell -ArgumentList @(
         "-NoExit"
         "-ExecutionPolicy", "Bypass"
@@ -49,9 +49,9 @@ Write-Host ""
 # 2. Start Frontend (Port 5173)
 $frontendPort = Get-NetTCPConnection -LocalPort 5173 -State Listen -ErrorAction SilentlyContinue
 if ($frontendPort) {
-    Write-Host "[2/3] Frontend is already running on http://localhost:5173" -ForegroundColor Green
+    Write-Host "[2/4] Frontend is already running on http://localhost:5173" -ForegroundColor Green
 } else {
-    Write-Host "[2/3] Starting Frontend (Vite)..." -ForegroundColor Yellow
+    Write-Host "[2/4] Starting Frontend (Vite)..." -ForegroundColor Yellow
     Start-Process powershell -ArgumentList @(
         "-NoExit"
         "-ExecutionPolicy", "Bypass"
@@ -63,7 +63,21 @@ if ($frontendPort) {
 }
 Write-Host ""
 
-# 3. Detect Active Network Interface & Npcap
+# 3. Sync backend system mode with -Mode so /ingest's live/simulated gate
+#    (backend/app/routes/ingest.py) actually matches what we're about to launch --
+#    the backend defaults to "live", so without this, the simulator's flows
+#    (tagged source: "simulated") get rejected with HTTP 403 on every single flow.
+$targetMode = if ($Mode -in @("simulator", "sim")) { "simulated" } else { "live" }
+try {
+    $modeResp = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/system/mode" `
+        -ContentType "application/json" -Body (@{ mode = $targetMode } | ConvertTo-Json) -TimeoutSec 5
+    Write-Host "Backend system mode set to '$($modeResp.mode)'." -ForegroundColor Cyan
+} catch {
+    Write-Warning "Could not set backend system mode to '$targetMode': $($_.Exception.Message)"
+}
+Write-Host ""
+
+# 4. Detect Active Network Interface & Npcap
 $activeAdapter = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Select-Object -First 1
 $ifaceName = if ($Interface) { $Interface } elseif ($activeAdapter) { $activeAdapter.Name } else { "auto" }
 $activeIP = if ($activeAdapter) {
@@ -76,9 +90,9 @@ $hasNpcap = (Get-Service -Name npcap -ErrorAction SilentlyContinue) -or
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
-# 4. Start Live Capture or Simulator
+# 5. Start Live Capture or Simulator
 if ($Mode -in @("simulator", "sim")) {
-    Write-Host "[3/3] Starting Traffic Simulator (Demo Mode)..." -ForegroundColor Cyan
+    Write-Host "[4/4] Starting Traffic Simulator (Demo Mode)..." -ForegroundColor Cyan
     Start-Process powershell -ArgumentList @(
         "-NoExit"
         "-ExecutionPolicy", "Bypass"
@@ -86,7 +100,7 @@ if ($Mode -in @("simulator", "sim")) {
         "Set-Location '$ROOT'; & '$PYTHON' demo\traffic_simulator.py --api http://localhost:8000 --sessions 4 --speed 1"
     )
 } else {
-    Write-Host "[3/3] Starting Live Packet Capture..." -ForegroundColor Yellow
+    Write-Host "[4/4] Starting Live Packet Capture..." -ForegroundColor Yellow
     Write-Host "Target Interface : $ifaceName (IP: $activeIP)" -ForegroundColor Cyan
     if (-not $hasNpcap) {
         Write-Host "Packet Driver    : Windows native Raw Sockets (Npcap not detected)" -ForegroundColor DarkYellow
