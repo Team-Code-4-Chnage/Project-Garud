@@ -4,12 +4,12 @@
 
 ---
 
-## 🎯 Evaluator Pitch (10-Second Hook)
+## Evaluator Pitch (10-Second Hook)
 > *"Traditional IDS/IPS tools are post-facto: they detect an intrusion only after files are encrypted or data is exfiltrated. Project Garud introduces an **LSTM World Model** that forecasts attack progression across the MITRE ATT&CK kill-chain **before** final compromise occurs, giving SOC analysts actionable lead-time to intervene."*
 
 ---
 
-## 📋 5-Minute Live Demonstration Flow
+## 5-Minute Live Demonstration Flow
 
 ### Stage 1: The Concept & Problem Framing (1 Min)
 1. **Open Dashboard (`http://localhost:5173`)**
@@ -18,7 +18,7 @@
 2. **Highlight System Health (`SYS_VIEW // [SETTINGS]`)**
    - Click **SETTINGS** in the sidebar.
    - Show the Evaluator the **MODEL_INFO** card:
-     - 2-Layer LSTM with 128 hidden units and 22 standardized CIC-IDS features.
+     - 2-Layer LSTM with 256 hidden units and 22 standardized CIC-IDS features.
      - Monte Carlo dropout uncertainty sampling ($N=20$) and Adaptive EMA thresholding.
    - Note the SHA-256 Model Provenance hash displayed in `/health` confirming artifact integrity.
 
@@ -27,9 +27,9 @@
 ### Stage 2: Telemetry Ingestion & Real vs. Simulation Modes (1 Min)
 1. **Show Source Control in Settings:**
    - Demonstrate the dual operating engine:
-     - **🟢 LIVE ONLY:** Captures genuine packets off network adapters via `capture/live_capture.py` (Scapy / raw socket). In live mode, synthetic feeds to `/ingest` are rejected with HTTP 403 Forbidden.
-     - **🟠 SIMULATION MODE:** Sandbox mode for demonstration and evaluation without a multi-VM lab.
-   - Switch to **SIMULATED** mode and click **▶ START SIMULATOR**.
+     - **LIVE ONLY:** Captures genuine packets off network adapters via `capture/live_capture.py` (Scapy / raw socket). In live mode, synthetic feeds to `/ingest` are rejected with HTTP 403 Forbidden.
+     - **SIMULATION MODE:** Sandbox mode for demonstration and evaluation without a multi-VM lab.
+   - Switch to **SIMULATED** mode and click `START SIMULATOR`.
 2. **Observe Real-Time Streaming:**
    - Navigate to **LIVE_LOGS**.
    - Show incoming flows streaming over WebSocket in real time.
@@ -63,7 +63,7 @@
 2. **Highlight Key Attack Features:**
    - Point out features driving the alert: e.g., elevated `flow_bytes_s`, spike in `syn_flag_cnt`, or abnormal `tcp_win_size`.
 3. **Forensic Dossier Export:**
-   - Click **👁️ VIEW REPORT** or **📄 EXPORT FORENSIC HTML** to display the complete, printable forensic dossier.
+   - Click `VIEW REPORT` or `EXPORT FORENSIC HTML` to display the complete, printable forensic dossier.
 
 ---
 
@@ -80,12 +80,12 @@
 
 ---
 
-## 🛠️ Backup Quick Commands
+## Backup Quick Commands
 
 If running via terminal during live evaluation:
 
 ```powershell
-# 1. Run all backend unit & API integration tests (22 tests)
+# 1. Run all backend unit & API integration tests (35 tests)
 backend\venv\Scripts\python.exe -m pytest backend/tests -v
 
 # 2. Build and verify production frontend bundle

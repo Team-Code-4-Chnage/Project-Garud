@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🏛️ Project Garud — System Architecture
+# Project Garud — System Architecture
 ### Deep World Model Telemetry Engine for Predictive Cyber Defense
 **Smart India Hackathon 2026 — Problem Statement ID 26153 (NTRO) • Team Code 4 Change**
 
@@ -148,10 +148,10 @@ $$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{MSE}}(\hat{s}_{t+1}, s_{t+1}) 
    $$\mathcal{L}_{\text{MSE}} = \frac{1}{22} \sum_{i=1}^{22} (\hat{s}_{t+1, i} - s_{t+1, i})^2$$
 2. **Pos-Weighted Infiltration Loss ($\mathcal{L}_{\text{BCE}}$):**
    $$\mathcal{L}_{\text{BCE}} = -\left[ w_{\text{pos}} \cdot y \log \sigma(\hat{l}) + (1 - y) \log (1 - \sigma(\hat{l})) \right]$$
-   Where $w_{\text{pos}} = \frac{N_{\text{benign}}}{N_{\text{malicious}}} \approx 3.19$ penalizes missed attacks.
-3. **Class-Weighted MITRE Stage Loss ($\mathcal{L}_{\text{CE}}$):**
-   $$\mathcal{L}_{\text{CE}} = - \mathbf{w}_{\text{stage}}[c] \cdot \log \left( \frac{\exp(z_c)}{\sum_j \exp(z_j)} \right)$$
-   Where $\mathbf{w}_{\text{stage}}[c] = \operatorname{clip}\left(\frac{N}{6 \cdot N_c}, 0.2, 50.0\right)$ guarantees strong gradient signal on rare phases like `Lateral Movement` and `Exfiltration`.
+   Where $w_{\text{pos}} = \frac{N_{\text{benign}}}{N_{\text{malicious}}} \approx 2.94$ penalizes missed attacks.
+3. **Class-Weighted Focal Loss for MITRE Stage Head ($\mathcal{L}_{\text{CE}}$):**
+   $$\mathcal{L}_{\text{CE}} = - \mathbf{w}_{\text{stage}}[c] \cdot (1 - p_c)^\gamma \cdot \log(p_c), \quad p_c = \frac{\exp(z_c)}{\sum_j \exp(z_j)}$$
+   With focal parameter $\gamma = 2.0$ (down-weights already-confident predictions instead of just blanket-boosting rare-class logits; `pipeline_fixed.py::FocalLoss`, and `gamma=0` reduces exactly to plain weighted cross-entropy). Class weights $\mathbf{w}_{\text{stage}}[c] = \operatorname{clip}\left(\frac{N}{6 \cdot N_c}, 0.2, 6.0\right)$ — the clip ceiling was tuned down from an initial 50.0, which over-corrected and collapsed Initial Access precision to about 6%, through 15.0 and 8.0, to the current 6.0, which gave the best macro-F1 balance (see `docs/model_card.md` §5 for the full tuning history).
 
 ---
 
@@ -317,8 +317,8 @@ To prevent contaminated training data or false alarms, NetForecast enforces stri
              World Model      allowed in Live"     Demo / Lab
 ```
 
-- **`🟢 LIVE ONLY` Mode (Default):** Strictly accepts genuine packets captured from the network interface via `capture/live_capture.py`. Any synthetic flow tagged `source: "simulated"` is rejected with **`HTTP 403 Forbidden`**.
-- **`🟠 SIMULATED` Mode:** Engaged via **Settings** to enable `demo/traffic_simulator.py` to inject multi-stage attack scenarios without requiring dedicated lab VMs.
+- **`LIVE ONLY` Mode (Default):** Strictly accepts genuine packets captured from the network interface via `capture/live_capture.py`. Any synthetic flow tagged `source: "simulated"` is rejected with `HTTP 403 Forbidden`.
+- **`SIMULATED` Mode:** Engaged via Settings to enable `demo/traffic_simulator.py` to inject multi-stage attack scenarios without requiring dedicated lab VMs.
 
 ---
 

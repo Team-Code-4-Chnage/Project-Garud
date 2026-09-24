@@ -1,10 +1,10 @@
-# 🎯 Project Garud — Attack Simulation & Detection Guide
+# Project Garud — Attack Simulation & Detection Guide
 ### Step-by-Step Practical Playbook for Validating Deep World Model Telemetry
 **Smart India Hackathon 2026 — Problem Statement ID 26153 (NTRO) • Team Code 4 Change**
 
 ---
 
-## 📖 Overview
+## Overview
 
 This document provides a comprehensive, step-by-step guide to simulating **every attack category** that **Project Garud** is trained to forecast and detect. For each attack, this guide explains:
 1. **The Attack Objective & MITRE ATT&CK Mapping**
@@ -14,7 +14,7 @@ This document provides a comprehensive, step-by-step guide to simulating **every
 
 ---
 
-## 🗂️ Table of Attack Scenarios
+## Table of Attack Scenarios
 
 | Attack ID | Attack Name | MITRE Stage | Target ATT&CK Technique | Primary Detection Signals |
 |:---:|:---|:---:|:---|:---|
@@ -464,7 +464,7 @@ $$\text{Benign} \longrightarrow \text{Reconnaissance} \longrightarrow \text{Init
 #### Step 1: Switch Mode to Simulated
 In the NetForecast Dashboard:
 1. Navigate to **SETTINGS** in the navigation bar.
-2. Under `TRAFFIC_SOURCE_MODE`, click **`🟠 SIMULATED`**.
+2. Under `TRAFFIC_SOURCE_MODE`, click `SIMULATED`.
 *(Or via API: `curl -X POST http://localhost:8000/system/mode -H "Content-Type: application/json" -d '{"mode":"simulated"}'`)*
 
 #### Step 2: Launch the Simulator
@@ -480,25 +480,25 @@ Run the simulator from the repository root:
 2. **Forecast View (`/forecast`):**
    - Click on any active attack session.
    - Observe the **Monte Carlo 6-Step Lookahead** chart with shaded 95% confidence bands showing the projected risk trajectory.
-   - Click **`👁️ VIEW REPORT`** to generate an interactive printable forecast dossier.
+   - Click `VIEW REPORT` to generate an interactive printable forecast dossier.
 3. **Explainability View (`/explain`):**
    - Click on the session to view real-time **SHAP** and **Gradient $\times$ Input** attributions.
    - Identify exactly which of the 22 features (e.g. `syn_flag_cnt`, `flow_iat_mean`, `down_up_ratio`) triggered the alert.
-   - Click **`📄 EXPORT HTML`** to save the forensic dossier.
+   - Click `EXPORT HTML` to save the forensic dossier.
 4. **Forensic Reports View (`/reports`):**
    - Open **REPORTS** to view the incident summary.
-   - Click **`👁️ VIEW REPORT`** to open the full forensic dossier formatted in the NetForecast retro-futuristic SOC palette.
-   - Click **`📄 EXPORT FORENSIC HTML`** or **`CSV`** / **`JSON`** for external SIEM integration.
+   - Click `VIEW REPORT` to open the full forensic dossier formatted in the NetForecast retro-futuristic SOC palette.
+   - Click `EXPORT FORENSIC HTML`, `CSV`, or `JSON` for external SIEM integration.
 
 #### Step 4: Return to Live Mode
 When finished testing:
 1. Stop the simulator (`Ctrl+C` in terminal).
-2. In **SETTINGS**, click **`🗑 PURGE ALL SIMULATED DATA`** to clean up the database.
-3. Click **`🟢 LIVE ONLY`** to lock the system back to genuine live network packet capture.
+2. In **SETTINGS**, click `PURGE ALL SIMULATED DATA` to clean up the database.
+3. Click `LIVE ONLY` to lock the system back to genuine live network packet capture.
 
 ---
 
-## 🔬 Summary of Feature Attribution Signatures
+## Summary of Feature Attribution Signatures
 
 | MITRE ATT&CK Stage | Primary Driving Features | Secondary Driving Features | Typical Attacker Intent |
 |---|---|---|---|

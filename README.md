@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🦅 Project Garud
+# Project Garud
 ### Autonomous Network Attack Forecasting & Deep World Model Telemetry Engine
-**SIH 2026 — Problem Statement ID 26153 (National Technical Research Organisation)**  
+**SIH 2026 — Problem Statement ID 26153 (National Technical Research Organisation)**
 **Team: Code 4 Change • Repository: [Team-Code-4-Chnage/Project-Garud](https://github.com/Team-Code-4-Chnage/Project-Garud)**
 
 [![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
@@ -13,65 +13,59 @@
 [![MITRE ATT&CK](https://img.shields.io/badge/MITRE-ATT%26CK-red?style=for-the-badge)](https://attack.mitre.org)
 [![Dataset](https://img.shields.io/badge/Dataset-CIC--IDS2017-orange?style=for-the-badge)](https://www.unb.ca/cic/datasets/ids-2017.html)
 
-<p align="center">
-  <strong>Anticipate attacker progression before compromise is completed.</strong><br>
-  <em>Multi-head recurrent World Model • Autoregressive Monte Carlo rollouts • SHAP & Gradient explainability • Real-time PCAP & live packet ingestion</em>
-</p>
-
-[Quickstart](#-quickstart) • [Architecture](ARCHITECTURE.md) • [Simulation Playbook](SIMULATION.md) • [Presentation Deck](PRESENTATION.md) • [Benchmarks](#-benchmark-performance-on-cic-ids2017) • [API Reference](#-api-endpoints) • [Lab Setup](LAB_SETUP.md)
+[Quickstart](#quickstart) • [Architecture](ARCHITECTURE.md) • [Simulation Playbook](SIMULATION.md) • [Presentation Deck](PRESENTATION.md) • [Benchmarks](#benchmark-performance-on-cic-ids2017--cic-ids2018) • [API Reference](#api-endpoints) • [Lab Setup](LAB_SETUP.md)
 
 </div>
 
 ---
 
-## 📌 Executive Summary
+## Executive Summary
 
-Traditional Network Intrusion Detection Systems (NIDS) are **reactive**: they flag malicious behavior only after a malicious signature or anomalous payload has already crossed the wire. In Critical Information Infrastructure (CII) and high-assurance enterprise perimeters, this detection is often **too late** — data has been staged, privilege escalated, and persistence established.
+Traditional network intrusion detection is reactive: it flags malicious behavior after a signature or anomalous payload has already crossed the wire. In a Critical Information Infrastructure (CII) or high-assurance enterprise perimeter, that's often too late — data has already been staged, privileges escalated, persistence established.
 
-**Project Garud** (powered by the **NetForecast** deep recurrent telemetry engine) introduces a **World Model** for network defense:
-1. **Learns Temporal State Dynamics:** Embeds sliding windows of network flow telemetry into latent space.
-2. **Forecasts Future Network States:** Predicts future flow feature vectors $\hat{s}_{t+1}, \dots, \hat{s}_{t+k}$ before packets arrive.
-3. **Anticipates Attack Progression:** Maps trajectory to the 6-stage **MITRE ATT&CK** kill chain.
-4. **Quantifies Uncertainty:** Uses stochastic **Monte Carlo Rollouts** to deliver confidence intervals to security operators.
-5. **Prevents Alert Fatigue:** Computes a dynamic **Adaptive EMA Threshold** ($\bar{p} + 2\sigma$) tuned to live background traffic.
-6. **Explains Every Decision:** Dual **SHAP** (Shapley Additive exPlanations) and **Gradient $\times$ Input** attributions pinpoint the exact telemetry features driving risk.
-7. **Resolves Process & Network Identity:** Correlates live socket 5-tuples to local PIDs and executable names (`chrome.exe`, `python.exe`, `nmap.exe`) with topological IP classification.
-8. **Preserves Continuous Telemetry Cycles:** Non-destructive state persistence across server hot-reloads and window switches with on-demand cycle archiving.
-9. **Generates Themed Forensic Dossiers:** 1-click in-browser printable incident reports and SIEM exports (HTML, CSV, JSON) formatted in NetForecast's SOC cream & burnt orange design.
+Project Garud (built around the NetForecast recurrent telemetry engine) takes a different approach. It trains a world model on sliding windows of network flow telemetry, so it predicts the *next* flow-feature vectors before the corresponding packets arrive, rather than only classifying packets already seen. Those predicted trajectories are mapped onto the 6-stage MITRE ATT&CK kill chain, giving an early read on where a session is heading, not just where it currently sits.
+
+A few things this system does, beyond plain classification:
+
+- Monte Carlo rollouts (k=6 steps, N=20 samples) give confidence intervals on the forecast instead of a single point estimate.
+- An adaptive EMA threshold (mean + 2 standard deviations, tuned to live background traffic) keeps the alert rate sane instead of firing on every minor fluctuation.
+- Every alert carries an explanation: SHAP (Shapley values) and gradient×input attribution both point to the specific telemetry features that drove the score.
+- Live sockets are resolved back to local PIDs and executable names (`chrome.exe`, `python.exe`, `nmap.exe`), with IPs classified as host/LAN/NAT.
+- Monitoring state survives server hot-reloads and tab switches, with on-demand archiving of a cycle's flows and sessions.
+- Incident reports export as themed HTML, CSV, or JSON for SIEM ingestion or a printable dossier.
 
 ---
 
-## 📊 Benchmark Performance on CIC-IDS2017 + CIC-IDS2018
+## Benchmark Performance on CIC-IDS2017 + CIC-IDS2018
 
-Evaluated on **328,868 real-world flows** — CIC-IDS2017 (all 8 capture days) plus 7,940 real Lateral
-Movement (Infiltration) flows and 928 real Initial Access (Web Attack) flows from **CIC-IDS2018**,
-added because CIC-IDS2017 alone only has ~36 real Lateral Movement examples in its entire public
-release (see `data/augment_lateral_movement.py`, `data/augment_initial_access.py`). A proper **3-way session-level split**
-(1,481 train / 212 validation / 424 test sessions) means checkpoint selection during training uses
-the validation set only — the test set (58,945 windowed sequences) is never touched until the one
-final evaluation below, and its session boundary is computed identically to every prior split in
-this project's history, so these numbers are directly comparable to earlier ones.
+Evaluated on 328,868 real-world flows — CIC-IDS2017 (all 8 capture days) plus 7,940 real Lateral
+Movement (Infiltration) flows and 928 real Initial Access (Web Attack) flows pulled in from
+CIC-IDS2018, added because CIC-IDS2017 alone only has around 36 real Lateral Movement examples in
+its entire public release (see `data/augment_lateral_movement.py`, `data/augment_initial_access.py`).
+A session-level 3-way split (1,481 train / 212 validation / 424 test sessions) means checkpoint
+selection during training only ever looks at the validation set — the test set (58,945 windowed
+sequences) is touched exactly once, for the numbers below, and its session boundary is computed
+identically to every prior split in this project's history, so these numbers are directly
+comparable to earlier ones.
 
 | Model Architecture | F1-Score | Precision | Recall (Detection Rate) | False Positive Rate (FPR) | Latency (Inference, CPU) |
 |---|:---:|:---:|:---:|:---:|:---:|
-| **Logistic Regression** *(Linear Baseline)* | 0.535 | 0.694 | 0.436 | 6.42% | < 1 ms |
-| **Isolation Forest** *(Unsupervised Baseline)* | 0.355 | 0.338 | 0.373 | 24.41% | ~ 8 ms |
-| **NetForecast World Model** *(Proposed, MAX Config)* | **0.862** | **0.859** | **0.865** | **4.75%** | **~ 0.7 ms** (measured, single-window forward pass) |
+| Logistic Regression *(Linear Baseline)* | 0.535 | 0.694 | 0.436 | 6.42% | < 1 ms |
+| Isolation Forest *(Unsupervised Baseline)* | 0.355 | 0.338 | 0.373 | 24.41% | ~ 8 ms |
+| NetForecast World Model *(Proposed, MAX Config)* | **0.862** | **0.859** | **0.865** | **4.75%** | **~ 0.7 ms** (measured, single-window forward pass) |
 
 > [!NOTE]
 > The training pipeline uses a genuine 3-way train/val/test split for checkpoint selection, so these test numbers are honest — checkpoint selection never sees the test set. See `docs/model_card.md` §5 for details.
 
-> [!IMPORTANT]
-> **Key Operational Findings (binary malicious-vs-benign detection):**
-> - **Focal loss** for the MITRE stage head (γ=2, generalizing the earlier class-weighted cross-entropy — see `docs/model_card.md` §5) plus a tuned class-weight clip (6x, down from an initial 50x that over-corrected) and positive-weighted BCE (`pos_weight≈2.94`) give **86.5% recall** at the binary detection level with a **4.75% FPR**, avoiding the alert fatigue of the Isolation Forest baseline (24.41% FPR).
-> - **Leakage-Free Validation:** Strict session-level 3-way train/val/test split. The standard scaler is fitted strictly on training sessions — zero test-set information leaks into the normalization parameters, and checkpoint selection never sees the test set either (see the note above).
->
-> **Per-MITRE-stage capability — read this before quoting the binary numbers above as "detects all attacks":**
-> Benign/Reconnaissance/C2/**Lateral Movement** are all reliably classified (F1 0.80–0.96 calibrated). **Lateral Movement in particular (Precision 98.5%, Recall 86.5%, F1 0.92 on 857 real held-out test flows)** — real CIC-IDS2018 Infiltration data replaced an earlier synthetic-oversampling attempt that a held-out evaluation confirmed did not transfer to real traffic. Initial Access (web attacks) has been substantially improved via real CIC-IDS2018 web-attack data, a retuned class-weight clip, and post-hoc per-class logit-bias calibration (`experiments/calibrate_stage_logits.py`) — precision moved 6.2% → 27.0% → 35.1% (recall 53%) across three tuning passes, roughly a 5.7x improvement overall, though it remains the weakest class. **The ML model does not detect Exfiltration (0% recall)** — CIC-IDS2017 only has ~11 Heartbleed flows in its entire public release (2 in this sample), too little to learn from — but **Exfiltration/Heartbleed is separately covered by a deterministic signature detector** (`capture/signatures.py`) that doesn't rely on ML at all: CVE-2014-0160 has a fixed wire-format signature, verified end-to-end against a crafted malicious packet with zero false positives on legitimate traffic. Full per-stage numbers and root-cause analysis are in [`docs/model_card.md`](docs/model_card.md#6-evaluation--comparative-benchmark). We also directly tested **generalization to unseen attack tools** (`experiments/family_holdout_eval.py`, results in [§9](docs/model_card.md#9-generalization-to-unseen-attack-families)): holding an entire attack family out of training entirely, a held-out DoS variant (slowloris) is still correctly flagged 64% of the time, while a held-out botnet family (Bot) and payload-driven attack (XSS) show no meaningful transfer — an honest, uneven result rather than a cherry-picked win.
+The table above is binary malicious-vs-benign detection, and shouldn't be read as "detects all 6 stages equally well" — per-stage capability varies a lot. Focal loss on the MITRE stage head (gamma=2, generalizing the earlier class-weighted cross-entropy — see `docs/model_card.md` §5) plus a tuned class-weight clip (6x, down from an initial 50x that over-corrected) and positive-weighted BCE (`pos_weight≈2.94`) get 86.5% recall at the binary level with a 4.75% FPR, well below the Isolation Forest baseline's 24.41% FPR. Benign, Reconnaissance, C2, and Lateral Movement are all reliably classified (F1 0.80–0.96, calibrated). Lateral Movement in particular reaches precision 98.5%, recall 86.5%, F1 0.92 on 857 real held-out test flows, after real CIC-IDS2018 Infiltration data replaced an earlier synthetic-oversampling attempt that a held-out evaluation confirmed did not transfer to real traffic.
+
+Initial Access (web attacks) has been through three rounds of tuning — real CIC-IDS2018 web-attack data, a retuned class-weight clip, and post-hoc per-class logit-bias calibration (`experiments/calibrate_stage_logits.py`) — moving precision from 6.2% to 27.0% to 35.1% (recall 53%), roughly a 5.7x improvement overall. It's still the weakest of the six stages. The ML model does not detect Exfiltration on its own (0% recall — CIC-IDS2017 has only around 11 Heartbleed flows in its entire public release, 2 in this sample, too little to learn from), but Exfiltration/Heartbleed is separately covered by a deterministic signature detector (`capture/signatures.py`) that doesn't rely on ML at all: CVE-2014-0160 has a fixed wire-format signature, verified end-to-end against a crafted malicious packet with zero false positives on legitimate traffic. Full per-stage numbers and root-cause analysis are in [`docs/model_card.md`](docs/model_card.md#6-evaluation--comparative-benchmark).
+
+We also directly tested generalization to unseen attack tools (`experiments/family_holdout_eval.py`, results in [§9 of the model card](docs/model_card.md#9-generalization-to-unseen-attack-families)): holding an entire attack family out of training, a held-out DoS variant (slowloris) is still correctly flagged 64% of the time, while a held-out botnet family (Bot) and a payload-driven attack (XSS) show no meaningful transfer. That's an honest, uneven result rather than a cherry-picked win.
 
 ---
 
-## 🎯 MITRE ATT&CK Kill-Chain Mapping
+## MITRE ATT&CK Kill-Chain Mapping
 
 NetForecast classifies every network flow and forecasts future progression across a 6-stage taxonomy:
 
@@ -88,16 +82,16 @@ stateDiagram-v2
 
 | MITRE Stage | Target ATT&CK Techniques | CIC-IDS2017 Mapped Attacks | Key Telemetry Signatures |
 |---|---|---|---|
-| **Benign** | N/A (Standard Business Traffic) | Normal HTTP/S, DNS, SSH | Balanced flow rates, standard TCP flags |
-| **Reconnaissance** | T1595 (Active Scanning), T1046 (Network Service Discovery) | PortScan, Bot, FTP-Patator, SSH-Patator | High SYN/RST flag counts, small packet sizes, rapid IAT |
-| **Initial Access** | T1190 (Exploit Public-Facing App), T1110 (Brute Force) | Web Attack (SQL Injection, XSS, Brute Force) | Asymmetric forward packet size, PSH flags, repeated requests |
-| **Lateral Movement** | T1021 (Remote Services), T1210 (Exploitation of Remote Services) | Infiltration, Internal SMB/RDP scans | Internal IP-to-IP bursts, header length variance spikes |
-| **Command & Control** | T1071 (Application Layer Protocol), T1573 (Encrypted Channel) | DDoS LOIC, DoS Hulk, DoS GoldenEye, Slowloris | Periodic IAT intervals, persistent window size, flood volumes |
-| **Exfiltration** | T1041 (Exfiltration Over C2), T1048 (Exfiltration Over Alt Protocol) | Heartbleed, Data exfiltration egress | Skewed down/up ratio, high backward packet lengths, TCP window changes |
+| Benign | N/A (Standard Business Traffic) | Normal HTTP/S, DNS, SSH | Balanced flow rates, standard TCP flags |
+| Reconnaissance | T1595 (Active Scanning), T1046 (Network Service Discovery) | PortScan, Bot, FTP-Patator, SSH-Patator | High SYN/RST flag counts, small packet sizes, rapid IAT |
+| Initial Access | T1190 (Exploit Public-Facing App), T1110 (Brute Force) | Web Attack (SQL Injection, XSS, Brute Force) | Asymmetric forward packet size, PSH flags, repeated requests |
+| Lateral Movement | T1021 (Remote Services), T1210 (Exploitation of Remote Services) | Infiltration, Internal SMB/RDP scans | Internal IP-to-IP bursts, header length variance spikes |
+| Command & Control | T1071 (Application Layer Protocol), T1573 (Encrypted Channel) | DDoS LOIC, DoS Hulk, DoS GoldenEye, Slowloris | Periodic IAT intervals, persistent window size, flood volumes |
+| Exfiltration | T1041 (Exfiltration Over C2), T1048 (Exfiltration Over Alt Protocol) | Heartbleed, Data exfiltration egress | Skewed down/up ratio, high backward packet lengths, TCP window changes |
 
 ---
 
-## ⚡ System Architecture
+## System Architecture
 
 ```mermaid
 flowchart TB
@@ -148,19 +142,19 @@ flowchart TB
 
 ---
 
-## 🚀 Quickstart
+## Quickstart
 
 ### Prerequisites
-- **Python 3.11 or 3.12**
-- **Node.js 18+ & npm**
-- **Npcap** *(Windows only, required for live packet capture)*
+- Python 3.11 or 3.12
+- Node.js 18+ and npm
+- Npcap (Windows only, required for live packet capture)
 
 ### Option A: One-Click Launch (Windows PowerShell)
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\start_all.ps1
 ```
-*Automatically activates virtual environment, verifies model artifacts, launches FastAPI backend on `:8000`, and Vite frontend on `:5173`.*
+Activates the virtual environment, verifies model artifacts, and launches the FastAPI backend on `:8000` and the Vite frontend on `:5173`.
 
 ---
 
@@ -180,7 +174,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 - Interactive Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
-- Health Check: [http://localhost:8000/health](http://localhost:8000/health)
+- Health check: [http://localhost:8000/health](http://localhost:8000/health)
 
 #### 2. Frontend Dashboard
 ```bash
@@ -189,13 +183,13 @@ cd frontend
 npm install
 npm run dev
 ```
-- Analyst Dashboard: [http://localhost:5173](http://localhost:5173)
+- Analyst dashboard: [http://localhost:5173](http://localhost:5173)
 
 ---
 
 ### Option C: Containerized Deployment (Docker Compose)
 
-Spin up the entire stack (FastAPI backend + Vite/Nginx frontend + shared volume) with a single command:
+Spin up the entire stack (FastAPI backend, Vite/Nginx frontend, shared volume) with one command:
 
 ```bash
 # Build and start all services
@@ -207,12 +201,12 @@ docker compose ps
 # View backend logs
 docker compose logs -f backend
 ```
-- Frontend Dashboard: [http://localhost:5173](http://localhost:5173)
-- FastAPI Backend: [http://localhost:8000](http://localhost:8000)
+- Frontend dashboard: [http://localhost:5173](http://localhost:5173)
+- FastAPI backend: [http://localhost:8000](http://localhost:8000)
 
 ---
 
-## ⚙️ Configuration & Environment Variables
+## Configuration & Environment Variables
 
 Copy `.env.example` to `.env` to customize runtime parameters:
 
@@ -225,13 +219,13 @@ cp .env.example .env
 | `ARTIFACTS_DIR` | `./backend/artifacts` | Path to serialized model weights, scaler, and config |
 | `DB_DIR` | `./backend/data` | SQLite database directory (`forecaster.db`) |
 | `ALERT_THRESHOLD` | `0.5` | Baseline probability threshold for attack alerts |
-| `ADAPTIVE_THRESHOLD` | `1` | Enable dynamic baseline ($\bar{p} + 2\sigma$) thresholding |
-| `API_KEY` | *(None / Empty)* | Optional header authentication (`X-API-Key`). Unset = Demo Mode |
+| `ADAPTIVE_THRESHOLD` | `1` | Enable dynamic baseline (mean + 2 std dev) thresholding |
+| `API_KEY` | *(None / Empty)* | Optional header authentication (`X-API-Key`). Unset = demo mode |
 | `FRONTEND_URL` | `http://localhost:5173` | Allowed CORS origins (comma-separated for multi-origin) |
 
 ---
 
-## 🧪 Running Automated Tests
+## Running Automated Tests
 
 Run the full backend test suite to verify inference, world model rollout, and explainability:
 
@@ -245,29 +239,24 @@ backend/venv/Scripts/python.exe -m pytest backend/tests/test_inference.py -v
 
 ---
 
-## 🎬 How to Demo (SIH 2026 Evaluation Flow)
+## How to Demo (SIH 2026 Evaluation Flow)
 
-Follow this 5-stage workflow for live judge demonstrations:
+A 5-stage workflow for live judge demonstrations:
 
 ```
-[1. Simulator Mode] ──> [2. Observe Forecasting] ──> [3. Switch Live NIC] ──> [4. Purge Simulated] ──> [5. Archive Cycle]
+[1. Simulator Mode] --> [2. Observe Forecasting] --> [3. Switch Live NIC] --> [4. Purge Simulated] --> [5. Archive Cycle]
 ```
 
-1. **Launch in Simulator Mode:**  
-   Execute `powershell -File .\start_all.ps1 -Mode simulator`. This launches both servers and immediately starts `demo/traffic_simulator.py` injecting realistic multi-session attacks across all 6 MITRE stages.
-2. **Demonstrate Forecasting vs. Detection:**  
-   In the SOC Dashboard, show a session progressing through `Reconnaissance` $\to$ `Initial Access`. Highlight the **$k$-Step Monte Carlo Forecast** panel to show the model projecting state vectors into the future and predicting an impending transition to `Lateral Movement` or `C2` *before* the attack packets occur.
-3. **Inspect Dual Explainability:**  
-   Click the **Explain** tab on an active alert. Toggle between **SHAP** (Shapley game-theoretic attributions) and **Gradient $\times$ Input** attributions to demonstrate to judges which flow features (e.g., `down_up_ratio`, `pkt_size_avg`, `rst_flag_cnt`) triggered the risk score.
-4. **Demonstrate Live Mode & Purge:**  
-   Switch the system mode to live via the UI or API (`POST /system/mode`). Click **"Purge Simulated Data"** (`POST /system/purge-simulated`) to wipe synthetic demo flows from the operational database while preserving genuine live traffic.
-5. **Cycle Reset & Archive:**  
-   Show the non-destructive telemetry cycle system: trigger **Archive Cycle** (`POST /system/cycle/start`), which snaps the current state into historical archives (`/system/cycles`) and starts a fresh monitoring session without restarting the server.
+1. **Launch in simulator mode.** Run `powershell -File .\start_all.ps1 -Mode simulator`. This starts both servers and immediately starts `demo/traffic_simulator.py`, injecting realistic multi-session attacks across all 6 MITRE stages.
+2. **Show forecasting vs. detection.** In the SOC dashboard, show a session progressing through Reconnaissance to Initial Access. Highlight the k-step Monte Carlo forecast panel — it projects state vectors forward and predicts an impending transition to Lateral Movement or C2 before the corresponding attack packets occur.
+3. **Inspect dual explainability.** Click the Explain tab on an active alert. Toggle between SHAP (Shapley game-theoretic attributions) and gradient×input attributions to show which flow features (`down_up_ratio`, `pkt_size_avg`, `rst_flag_cnt`, etc.) drove the risk score.
+4. **Show live mode and purge.** Switch the system mode to live via the UI or API (`POST /system/mode`). Click "Purge Simulated Data" (`POST /system/purge-simulated`) to wipe synthetic demo flows from the operational database while keeping genuine live traffic.
+5. **Cycle reset and archive.** Show the non-destructive telemetry cycle system: trigger "Archive Cycle" (`POST /system/cycle/start`), which snapshots the current state into historical archives (`/system/cycles`) and starts a fresh monitoring session without restarting the server.
 
-## 📡 Live Traffic & PCAP Ingestion
+## Live Traffic & PCAP Ingestion
 
 ### A. Upload PCAP / PCAPNG Files
-Drop any standard Wireshark / tcpdump `.pcap` or `.pcapng` file directly into the dashboard UI, or stream via API:
+Drop any standard Wireshark or tcpdump `.pcap` or `.pcapng` file directly into the dashboard UI, or stream via API:
 ```bash
 curl -X POST http://localhost:8000/ingest/pcap \
   -F "file=@sample_attack.pcap" \
@@ -286,7 +275,7 @@ python capture/live_capture.py --interface "Ethernet" --api http://localhost:800
 
 ---
 
-## 🔬 Retraining & Experimentation
+## Retraining & Experimentation
 
 To reproduce the benchmark or train on custom PCAP/flow data:
 
@@ -302,7 +291,7 @@ python data/preprocess_cicids.py --input-dir data/raw_cicids --output real_flows
 #    from. Optional but strongly recommended; skip only if you don't need that stage.
 python data/augment_lateral_movement.py --target real_flows.csv
 
-# 4. Train MAX-Configuration World Model
+# 4. Train MAX-configuration World Model
 python pipeline_fixed.py \
   --data real_flows.csv \
   --out ./backend/artifacts \
@@ -315,59 +304,59 @@ python pipeline_fixed.py \
   --weight-decay 1e-4 \
   --augment-stages "Exfiltration" \
   --augment-sessions-per-stage 300 \
-  --class-weight-max 8.0 \
+  --class-weight-max 6.0 \
   --stage-loss focal \
   --focal-gamma 2.0
 ```
 
 > [!TIP]
-> All artifacts are dynamically serialized into `backend/artifacts/`:
-> - `world_model.pt` — Checkpointed LSTM PyTorch weights (hidden=256)
-> - `scaler.pkl` — Train-split fitted standard scaler
-> - `config.json` — Hyperparameters, feature indices, and git commit provenance
-> - `benchmark_comparison.csv` — Head-to-head metrics against baselines
+> All artifacts are serialized into `backend/artifacts/`:
+> - `world_model.pt` — checkpointed LSTM PyTorch weights (hidden=256)
+> - `scaler.pkl` — train-split fitted standard scaler
+> - `config.json` — hyperparameters, feature indices, calibration bias, and git commit provenance
+> - `benchmark_comparison.csv` — head-to-head metrics against baselines
 
 ---
 
-## 🔌 API Endpoints
+## API Endpoints
 
 > [!NOTE]
-> All HTTP routes share a single global SlowAPI limit of **120 requests/minute per client IP** (`backend/app/main.py`) — there is currently no differentiated per-endpoint throttling.
+> All HTTP routes share a single global SlowAPI limit of 120 requests/minute per client IP (`backend/app/main.py`) — there is currently no differentiated per-endpoint throttling.
 
 | Category | Method | Endpoint | Description |
 |:---:|:---:|---|---|
-| **Health & Info** | `GET` | `/health` | System status, device (CPU/CUDA), active features count |
-| **Forecasting** | `POST` | `/predict` | Single-step state transition & stage prediction from $6 \times 22$ window |
-| | `POST` | `/forecast` | $k$-step Monte Carlo rollout with uncertainty intervals & EMA |
+| Health & Info | `GET` | `/health` | System status, device (CPU/CUDA), active features count |
+| Forecasting | `POST` | `/predict` | Single-step state transition & stage prediction from a 6x22 window |
+| | `POST` | `/forecast` | k-step Monte Carlo rollout with uncertainty intervals & EMA |
 | | `GET` | `/forecast/view/html` | Printable in-browser HTML forecast trajectory dossier |
 | | `GET` | `/forecast/export/html` | Download themed HTML forecast dossier |
 | | `GET` | `/forecast/export/csv` | Download forecast steps as CSV |
 | | `GET` | `/forecast/export/json` | Download forecast steps as JSON |
-| **Explainability** | `POST` | `/explain` | Feature attribution (`method: "shap"` or `method: "gradient"`) |
+| Explainability | `POST` | `/explain` | Feature attribution (`method: "shap"` or `method: "gradient"`) |
 | | `GET` | `/explain/view/html` | Printable in-browser HTML attribution dossier (SHAP/Gradient) |
 | | `GET` | `/explain/export/html` | Download themed HTML explanation dossier |
 | | `GET` | `/explain/export/csv` | Download feature attributions as CSV |
 | | `GET` | `/explain/export/json` | Download feature attributions as JSON |
-| **Forensic Reports** | `GET` | `/reports/view/html` | Printable in-browser HTML incident forensic dossier |
+| Forensic Reports | `GET` | `/reports/view/html` | Printable in-browser HTML incident forensic dossier |
 | | `GET` | `/reports/export/html` | Download themed HTML forensic report |
 | | `GET` | `/reports/export/csv` | Export forensic CSV report for sessions and alerts |
 | | `GET` | `/reports/export/json` | Export full structured JSON telemetry & kill-chain report |
-| **Ingestion** | `POST` | `/ingest` | Ingest single flow telemetry record (gated by mode) |
+| Ingestion | `POST` | `/ingest` | Ingest single flow telemetry record (gated by mode) |
 | | `POST` | `/ingest/csv` | Bulk upload flow log CSV |
 | | `POST` | `/ingest/pcap` | Upload raw `.pcap` file for Scapy flow reconstruction |
-| **System & Cycle** | `GET/POST`| `/system/mode` | Query or toggle between `live` and `simulated` modes |
+| System & Cycle | `GET/POST`| `/system/mode` | Query or toggle between `live` and `simulated` modes |
 | | `POST` | `/system/purge-simulated` | Delete all simulated flows, sessions, and alerts |
 | | `POST` | `/system/cycle/start` | Archive current monitoring cycle and start a fresh cycle |
 | | `GET` | `/system/cycle/current` | Query the currently active monitoring cycle |
 | | `GET` | `/system/cycles` | List historical cycle archives |
-| **Alerts & WS** | `GET` | `/alerts` | Query active & historical alerts with triage status |
+| Alerts & WS | `GET` | `/alerts` | Query active & historical alerts with triage status |
 | | `GET` | `/alerts/stats` | Aggregate alert statistics |
 | | `POST` | `/alerts/{id}/acknowledge` | Acknowledge alert with operator notes |
 | | `WS` | `/ws/live` | WebSocket real-time flow telemetry stream |
 
 ---
 
-## 📂 Repository Structure
+## Repository Structure
 
 ```
 Network_Attack_Detection/
@@ -376,12 +365,12 @@ Network_Attack_Detection/
 │   │   ├── config.py                # Hyperparameters, paths & thresholds
 │   │   ├── database.py              # SQLite + async SQLAlchemy session models
 │   │   ├── inference.py             # World Model forward pass, MC rollout & SHAP
-│   │   ├── ingestion.py             # Sliding window buffer & Adaptive EMA threshold
+│   │   ├── ingestion.py             # Sliding window buffer & adaptive EMA threshold
 │   │   ├── network_identity.py      # IP subnetting & loopback/private-range classification
 │   │   ├── process_resolver.py      # Cross-platform (psutil) socket-to-PID & executable correlation
 │   │   ├── signatures.py            # Re-export of capture/signatures.py (Docker/standalone packaging)
 │   │   ├── main.py                  # App factory, SlowAPI rate limiter & CORS
-│   │   ├── model_loader.py          # Dynamic artifact loader (hidden_size, scaler)
+│   │   ├── model_loader.py          # Dynamic artifact loader (hidden_size, scaler, calibration bias)
 │   │   ├── schemas.py               # Pydantic request/response validation schemas
 │   │   └── routes/                  # Modular endpoint routers
 │   │       ├── alerts.py            # Alert triage & acknowledge
@@ -394,15 +383,15 @@ Network_Attack_Detection/
 │   │       └── ws.py                # Real-time WebSocket event broadcaster
 │   ├── artifacts/                   # Serialized production models & metrics
 │   │   ├── benchmark_comparison.csv # Baseline comparison table
-│   │   ├── config.json              # Model hyperparameters & provenance
+│   │   ├── config.json              # Model hyperparameters, calibration bias & provenance
 │   │   ├── scaler.pkl               # StandardScaler fitted on training set
 │   │   └── world_model.pt           # Checkpointed PyTorch LSTM weights (256 units)
 │   └── tests/
-│       ├── test_inference.py        # 15 model/inference/explainability unit tests
+│       ├── test_inference.py        # Model/inference/explainability/calibration unit tests
 │       ├── test_api_integration.py  # End-to-end API, ingestion & Heartbleed-alert flow tests
 │       ├── test_flow_parity.py      # PCAP vs live-capture feature-extraction parity tests
 │       └── test_signatures.py       # Deterministic Heartbleed (CVE-2014-0160) signature tests
-│       # 34 tests total, 100% pass
+│       # 35 tests total, currently passing
 ├── frontend/                        # React 18 + Vite SOC Dashboard
 │   ├── src/
 │   │   ├── components/              # Reusable UI components
@@ -418,8 +407,12 @@ Network_Attack_Detection/
 │   ├── download_cicids.py           # Hugging Face mirror chunked downloader
 │   ├── preprocess_cicids.py         # 22-feature mapper with stratified sampling
 │   ├── augment_lateral_movement.py  # Real CIC-IDS2018 Infiltration data -> Lateral Movement
+│   ├── augment_initial_access.py    # Real CIC-IDS2018 Web Attack data -> Initial Access
 │   ├── raw_cicids/                  # 8 official CIC-IDS2017 CSV files (844 MB)
-│   └── raw_cicids2018/              # 2 CIC-IDS2018 infiltration-day CSVs (~317 MB)
+│   └── raw_cicids2018/              # CIC-IDS2018 infiltration-day and web-attack-day CSVs
+├── experiments/                     # Side experiments, not part of the shipped model
+│   ├── family_holdout_eval.py       # Unseen-attack-family generalization test
+│   └── calibrate_stage_logits.py    # Post-hoc per-class logit-bias calibration search
 ├── capture/                         # Hardware & network capture tools
 │   ├── live_capture.py              # Scapy-based live sniffer on Ethernet/Wi-Fi
 │   ├── flow_state.py                # Shared 22-feature flow reconstruction (live capture + PCAP)
@@ -428,30 +421,24 @@ Network_Attack_Detection/
 │   └── traffic_simulator.py         # Multi-session kill-chain attack injector
 ├── pipeline_fixed.py                # MAX-configuration training pipeline
 ├── start_all.ps1                    # Unified single-command launcher
-├── ARCHITECTURE.md                  # Comprehensive architectural specification
-├── PRESENTATION.md                  # 5-Slide SIH 2026 pitch deck
+├── ARCHITECTURE.md                  # Architectural specification
+├── PRESENTATION.md                  # SIH 2026 pitch deck
 ├── LAB_SETUP.md                     # Isolated VM lab guide for attack traffic
 └── README.md                        # Project documentation
 ```
 
 ---
 
-## ⚠️ Known Limitations & Enterprise Architecture Roadmap
+## Known Limitations & Enterprise Architecture Roadmap
 
-For national-scale deployment or production CII (Critical Information Infrastructure) environments, the following architectural choices were made for the prototype/demonstration and map directly to production upgrades:
+For national-scale deployment or production CII environments, some architectural choices made for this prototype have a clear production upgrade path:
 
-1. **Embedded Datastore (SQLite + WAL Mode):**  
-   - *Current State:* Asynchronous SQLite (`sqlite+aiosqlite`) is used for the hackathon prototype to provide a self-contained, zero-external-dependency deployment without requiring a local PostgreSQL service.
-   - *Production Roadmap:* In 10Gbps+ enterprise perimeters, the database layer transitions to a distributed time-series datastore such as **TimescaleDB** or **ClickHouse** with Kafka ingestion buffering to handle millions of flows/sec.
-2. **Local Transport Security (HTTP/WS):**  
-   - *Current State:* Plaintext HTTP and WebSocket (`ws://`) are configured for local development and offline evaluator sandbox testing.
-   - *Production Roadmap:* In production perimeters, an Nginx or Traefik reverse proxy handles **TLS 1.3 / mTLS** termination with strict HSTS headers and secure WebSockets (`wss://`).
-3. **Capture Privileges:**  
-   - *Current State:* Windows native raw socket packet capture requires Administrator elevation (`RunAs`).
-   - *Production Roadmap:* In production appliances, packet capture runs as a dedicated Linux system daemon leveraging **eBPF / AF_XDP** or **DPDK** ring buffers with minimal Linux capabilities (`CAP_NET_RAW`, `CAP_NET_ADMIN`).
+1. **Embedded datastore (SQLite + WAL mode).** Currently async SQLite (`sqlite+aiosqlite`) gives a self-contained, zero-external-dependency deployment for the hackathon prototype, without needing a local PostgreSQL service. In a 10Gbps+ enterprise perimeter, the database layer would move to a distributed time-series store such as TimescaleDB or ClickHouse, with Kafka ingestion buffering to handle millions of flows per second.
+2. **Local transport security (HTTP/WS).** Currently plaintext HTTP and WebSocket (`ws://`) for local development and offline evaluator testing. In production, an Nginx or Traefik reverse proxy would handle TLS 1.3 / mTLS termination with strict HSTS headers and secure WebSockets (`wss://`).
+3. **Capture privileges.** Currently Windows native raw socket packet capture requires administrator elevation (`RunAs`). In a production appliance, packet capture would run as a dedicated Linux system daemon using eBPF/AF_XDP or DPDK ring buffers with minimal Linux capabilities (`CAP_NET_RAW`, `CAP_NET_ADMIN`).
 
 ---
 
 <div align="center">
-  <sub>Built for the <strong>Smart India Hackathon (SIH) 2026</strong> • National Technical Research Organisation (NTRO) • Problem Statement ID 26153</sub>
+  <sub>Built for the Smart India Hackathon (SIH) 2026 • National Technical Research Organisation (NTRO) • Problem Statement ID 26153</sub>
 </div>
