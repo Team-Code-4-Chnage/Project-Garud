@@ -34,6 +34,15 @@ dev = [
 ]
 
 
+[tool.pytest.ini_options]
+# Expose repo root so `capture`, `worldmodel_v2`, `worldmodel_v3` are importable
+# both locally (cwd=backend) and in CI (working-directory: backend)
+pythonpath = ["..", "."]
+testpaths = ["tests"]
+markers = [
+  "requires_model: marks tests that need trained .pt artifacts (skipped in CI)",
+]
+
 [tool.pyrefly]
 python-interpreter-path = "backend/venv/Scripts/python.exe"
 search_path = [

@@ -4,6 +4,7 @@ This is your "does it actually work" proof for judges.
 """
 import os
 import sys
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -19,6 +20,9 @@ from app.inference import (
     predict_single,
 )
 from app.model_loader import WorldModel, artifacts
+
+# Skip every test in this module in CI when trained .pt artifacts aren't present.
+pytestmark = pytest.mark.requires_model
 
 
 @pytest.fixture(scope="module", autouse=True)

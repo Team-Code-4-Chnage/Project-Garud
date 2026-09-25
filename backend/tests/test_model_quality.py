@@ -36,6 +36,9 @@ from app.model_loader import artifacts
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "real_stage_samples.csv"
 
+# Skip every test in this module in CI when trained .pt artifacts aren't present.
+pytestmark = pytest.mark.requires_model
+
 
 @pytest.fixture(scope="module", autouse=True)
 def load_model():

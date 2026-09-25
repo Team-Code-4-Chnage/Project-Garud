@@ -27,15 +27,21 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
+          # Install CPU-only PyTorch first to avoid pulling the ~2 GB CUDA wheel
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
           pip install ruff
 
       - name: Lint with ruff
-        run: ruff check app/ --select=E,F,W,I --ignore=E501
+        # Reads select/ignore from pyproject.toml [tool.ruff.lint] — no CLI overrides
+        run: ruff check app/
 
       - name: Run Pytest Test Suite
-        run: |
-          pytest tests/ -v
+        # -m "not requires_model" skips tests that need trained .pt artifact files
+        # PYTHONPATH exposes repo root so capture/, worldmodel_v2/, worldmodel_v3/ are importable
+        run: pytest tests/ -v -m "not requires_model"
+        env:
+          PYTHONPATH: ${{ github.workspace }}
 
   frontend-build:
     name: Frontend Build & Lint
@@ -55,7 +61,6 @@ jobs:
 
       - name: Lint with oxlint
         run: npm run lint
-
 
       - name: Build frontend production bundle
         run: npm run build
