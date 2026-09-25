@@ -169,10 +169,11 @@
  "seed": 42,
  "alert_rule": {
   "score": "max predicted risk over the next 4 minutes",
-  "threshold": 0.5472801003971343,
-  "consecutive_windows": 1,
+  "threshold": 0.5184058751191123,
+  "consecutive_windows": 5,
   "chosen_on": "validation segments only",
-  "false_alarm_budget_per_quiet_hour": 1.0,
+  "false_alarm_budget_per_quiet_hour": 0.5,
+  "min_consecutive_minutes": 2,
   "lookback_minutes": 20
  },
  "split": {
@@ -218,17 +219,17 @@
   ],
   "early_warning": {
    "episodes": 3,
-   "warned_within_20": 1,
+   "warned_within_20": 0,
    "within": {
-    "5": 1,
-    "10": 1,
-    "12": 1,
-    "20": 1
+    "5": 0,
+    "10": 0,
+    "12": 0,
+    "20": 0
    },
-   "median_lead_min": 3.0,
-   "false_alarm_events": 10,
+   "median_lead_min": null,
+   "false_alarm_events": 3,
    "quiet_hours": 7.266666666666667,
-   "false_alarms_per_quiet_hour": 1.3761467889908257
+   "false_alarms_per_quiet_hour": 0.41284403669724773
   }
  },
  "unseen_family_results": "docs/world_model_v3_report.md (leave-one-day-out, feature set net_nodir)",

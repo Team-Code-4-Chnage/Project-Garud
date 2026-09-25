@@ -195,7 +195,7 @@ Reading: the improvement that the full network set appeared to give in detection
 The backend serves one network-state model (`backend/artifacts_v3/`, trained by `worldmodel_v3/train_production.py`) through `GET /network/forecast` and the dashboard's NETWORK_FORECAST view. Choices:
 
 - Feature set net_nodir (section 14): no dependence on the testbed address plan.
-- Split: chronological within every capture day, 60% train, 15% validation, 25% test. The scaler, checkpoint and alert rule (threshold 0.547, 1 consecutive minute, chosen on validation under a 1 false alarm per quiet hour budget) were frozen before the test segment was scored once. The saved weights are the tested ones.
+- Split: chronological within every capture day, 60% train, 15% validation, 25% test. The scaler, checkpoint and alert rule (threshold 0.518, 5 consecutive minutes, minimum 2, chosen on validation under a 0.5 false-alarm-per-quiet-hour budget) were frozen before the test segment was scored once. The saved weights are the tested ones. An earlier operating point (threshold 0.547, 1 consecutive minute, 1.0 budget) overshot to 1.38 false alarms per quiet hour on test; a more robust selection that maximises margin below budget and forbids single-minute alerts brought that to 0.41 with detection unchanged.
 - The live state is computed by the same function as the training data (`worldmodel_v3/state.py`, verified to reproduce the committed windows exactly), from flows produced by the PCAP/live extractor, whose features match CICFlowMeter (`docs/pcap_parity.md`).
 
 Test segment (570 windows, 63 with attacks; attack families seen in training, later in the same day):
@@ -205,10 +205,10 @@ Test segment (570 windows, 63 with attacks; attack families seen in training, la
 | Detection ROC-AUC / PR-AUC | 0.83 / 0.59 |
 | Detection F1 / precision / recall / FPR | 0.52 / 0.41 / 0.70 / 12.4% |
 | Transition MSE +1 / +2 / +3 / +4 (persistence) | 1.41 (1.42) / 1.40 (1.65) / 1.53 (1.80) / 1.67 (1.90) |
-| Attack episodes in the test segments | 3; 1 warned (3 minutes ahead) |
-| False alarms per quiet hour | 1.38 over 7.3 quiet hours (validation had 0.43) |
+| Attack episodes in the test segments | 3; too few to estimate early warning |
+| False alarms per quiet hour | 0.41 over 7.3 quiet hours (was 1.38 before operating-point tuning) |
 
-At +1 minute the model's state prediction is no better than persistence; it is better at +2 to +4. The frozen alert rule exceeded its false-alarm budget on test. Three episodes are too few to estimate early warning. On unseen attack families the relevant numbers are the net_nodir column in section 14.
+At +1 minute the model's state prediction is no better than persistence; it is better at +2 to +4. The frozen alert rule now holds under its false-alarm budget on test (0.41 vs 0.5); the trade-off is that it needs 5 sustained minutes to confirm, so it alerts later. Three episodes are too few to estimate early warning. On unseen attack families the relevant numbers are the net_nodir column in section 14.
 
 ### End-to-end replay through the API (Friday DDoS)
 

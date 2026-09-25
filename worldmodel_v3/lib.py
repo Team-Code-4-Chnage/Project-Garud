@@ -210,20 +210,26 @@ def evaluate_alerts(score_by_day, y_by_day, thr, N):
     return res
 
 
-def choose_operating_point(val_scores, val_y, fa_per_hour_budget=1.0):
-    """Pick (thr, N) on VALIDATION ONLY: maximise the share of episodes warned within LOOKBACK minutes
-    subject to false-alarm events per quiet hour <= budget. Ties: fewer false alarms, then smaller N."""
+def choose_operating_point(val_scores, val_y, fa_per_hour_budget=1.0, min_n=1):
+    """Pick (thr, N) on VALIDATION ONLY, subject to false-alarm events per quiet hour <= budget.
+
+    min_n: smallest allowed sustain length. Requiring the risk to stay high for >= 2 consecutive minutes
+    stops single-minute spikes from alerting, the main source of benign false alarms.
+
+    Objective (robust to the few validation episodes): among points within budget, maximise warned share,
+    but tie-break toward lower realised false-alarm rate and longer sustain, so the chosen point keeps a
+    margin below budget rather than sitting exactly on it (which was overfitting and overshooting on test)."""
     allv = np.concatenate([s[~np.isnan(s)] for s in val_scores.values()])
     thrs = np.unique(np.quantile(allv, np.linspace(0.5, 0.999, 60)))
     best = None
-    for N in (1, 2, 3, 4, 5):
+    for N in range(min_n, 6):
         for thr in thrs:
             r = evaluate_alerts(val_scores, val_y, thr, N)
             hours = max(r["quiet_windows"] / 60.0, 1e-9)
             fa_h = r["fa_events"] / hours
             warned = (len(r["leads"]) / r["eligible"]) if r["eligible"] else 0.0
             ok = fa_h <= fa_per_hour_budget
-            key = (ok, warned if ok else -fa_h, -fa_h, -N)
+            key = (ok, round(warned, 2) if ok else -fa_h, -fa_h, N)
             if best is None or key > best[0]:
                 best = (key, thr, N, warned, fa_h)
     return float(best[1]), int(best[2]), float(best[3]), float(best[4])

@@ -46,6 +46,10 @@ def segment_scores(model, segs, mean, std):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="backend/artifacts_v3")
+    ap.add_argument("--fa-budget", type=float, default=0.5,
+                    help="false-alarm events per quiet hour allowed when choosing the operating point on validation")
+    ap.add_argument("--min-n", type=int, default=2,
+                    help="minimum consecutive minutes above threshold required to alert")
     args = ap.parse_args()
     days, cols = load(FEATURE_SET)
     tr_seg, va_seg, te_seg = (segment_seqs(days, k) for k in ("train", "val", "test"))
@@ -57,7 +61,7 @@ def main():
     model = train(tr, va, len(cols), SEED)
 
     vs, vy = segment_scores(model, va_seg, mean, std)
-    thr, N, val_warn, val_fa = choose_operating_point(vs, vy)
+    thr, N, val_warn, val_fa = choose_operating_point(vs, vy, fa_per_hour_budget=args.fa_budget, min_n=args.min_n)
     print(f"operating point (validation): threshold {thr:.4f}, N {N}, val warned {val_warn:.2f}, val FA/h {val_fa:.2f}")
 
     ts, ty = segment_scores(model, te_seg, mean, std)
@@ -92,8 +96,8 @@ def main():
         state_interval_seconds=60, transform="log1p(max(x,0)) then standardize", mean=mean.tolist(), std=std.tolist(),
         hidden=128, layers=2, dropout=0.3, behaviours=BEHAVIOURS, step_weights=STEP_W, seed=SEED,
         alert_rule=dict(score="max predicted risk over the next 4 minutes", threshold=thr, consecutive_windows=N,
-                        chosen_on="validation segments only", false_alarm_budget_per_quiet_hour=1.0,
-                        lookback_minutes=LOOKBACK),
+                        chosen_on="validation segments only", false_alarm_budget_per_quiet_hour=args.fa_budget,
+                        min_consecutive_minutes=args.min_n, lookback_minutes=LOOKBACK),
         split=dict(kind="chronological within each capture day", cut=list(CUT),
                    note="test = last 25% of each day; attack families seen in training"),
         test_results=test,

@@ -1,146 +1,92 @@
-# Isolated Lab Setup — Real Attack Traffic Generation
+# Isolated Lab — Real Attack Dataset Collection
 
-> **CAUTION**: Every command in this guide targets ONLY your own VMs on an isolated
-> network you own. Never point any of these tools at networks, hosts, or services
-> you don't own or have explicit written authorization to test.
+**Every command here targets only your own VMs on an isolated host-only network you own.** Never point any
+tool at a host, service, or network you do not own or have written authorization to test. The automation in
+`lab/` refuses, in code, to run a scenario whose target is outside the configured lab subnet.
 
----
+## Why
 
-## What This Does
+NetForecast forecasts from features extracted from real packets. CIC-IDS2017/2018 has broad attack coverage
+but no single multi-stage campaign, so it cannot show attack **progression** (Reconnaissance → Initial Access
+→ Lateral Movement → C2 → Exfiltration). A small isolated lab produces that progression, with a ground-truth
+timeline, so the network-state and forecasting pipeline can be validated on a real chain. All captures are
+labelled lab data and kept separate from the CIC datasets.
 
-Your model detects attacks by analyzing **flow-level features** extracted from real
-packets. To demo it properly, you need real attack traffic flowing through your network
-so the capture pipeline (`capture/live_capture.py`) can extract features and your model
-can classify them.
+The collection host (the machine that runs the VMs and capture) can be separate from the machine that trains
+the model: the lab scripts are standard-library only and their only output is `dataset/run_xxx/`, which you
+copy to the training machine.
 
-This guide walks through generating traffic for each MITRE ATT&CK stage:
-
-| Stage | What generates it | Tools |
-|---|---|---|
-| **Benign** | Normal browsing, file transfers | curl, wget, browser |
-| **Reconnaissance** | Port scanning, service probing | nmap, hping3 |
-| **Initial Access** | Brute-force login attempts | hydra, medusa |
-| **Lateral Movement** | Internal spreading, credential reuse | psexec, smbclient, ssh |
-| **C2** | Regular beaconing to external server | curl loop, custom script |
-| **Exfiltration** | Large outbound data transfers | scp, curl, nc |
-
----
-
-## Step 1: VM Network Setup (VirtualBox)
+## Lab topology (VirtualBox host-only, no internet route)
 
 ```
-Host-Only Network (192.168.56.0/24)
-
-   Attacker VM           Target VM
-   Kali Linux            Metasploitable2
-   192.168.56.10         192.168.56.20
-
-   Your Windows Host (runs the dashboard + captures traffic)
-   192.168.56.1
+Host-only network 192.168.56.0/24  (no NAT, no bridged adapter -> no internet)
+  attacker   kali-lab          192.168.56.10   (runs the scenario tools over SSH)
+  victim     target-victim     192.168.56.20   (e.g. Metasploitable2 / a vulnerable web app)
+  peer       target-peer       192.168.56.21   (second victim, for lateral movement / exfil)
+  lab host   (this machine)    192.168.56.1     (captures on vboxnet0, runs lab/*.py)
 ```
 
-1. **Create Host-Only network**: VirtualBox → File → Host Network Manager → Create
-   - Adapter IP: 192.168.56.1, mask: 255.255.255.0
+1. VirtualBox → Tools → Network → Host-only Networks → Create; set 192.168.56.1/24, DHCP off. **Do not add a
+   NAT or bridged adapter to any lab VM.**
+2. Import the VMs, attach each to that host-only network, assign the IPs above.
+3. Take a snapshot named `clean` on every VM after first boot and configuration.
+4. On the lab host install VirtualBox (`VBoxManage`), Wireshark (`dumpcap`), and an SSH client — all on PATH.
+5. Set up key-based SSH from the lab host into the attacker VM, and install the scenario tools there
+   (`nmap`, `hydra`, `curl`, `smbclient`, `sshpass`, `snmp`, `apache2-utils`; Kali has most preinstalled).
+6. **Verify isolation from the attacker VM:** `ping 192.168.56.20` succeeds; `ping 8.8.8.8` fails.
 
-2. **Attacker VM** — Kali Linux: https://www.kali.org/get-kali/#kali-virtual-machines
-   - Import OVA, set network to "Host-Only Adapter", assign IP 192.168.56.10
+## Automated collection
 
-3. **Target VM** — Metasploitable 2 (intentionally vulnerable):
-   - https://sourceforge.net/projects/metasploitable/files/Metasploitable2/
-   - Import, set to Host-Only, default creds: msfadmin/msfadmin
-
-4. **Verify isolation**:
-   ```bash
-   ping 192.168.56.20   # Should succeed
-   ping 8.8.8.8         # Should FAIL (no internet = isolated)
-   ```
-
----
-
-## Step 2: Install Npcap on Windows
-
-Download from https://npcap.com/#download
-Check "Install in WinPcap API-compatible Mode" during install.
-
----
-
-## Step 3: Start Detection Pipeline (3 terminals)
-
-Terminal 1 — Backend:
-```powershell
-cd backend
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Terminal 2 — Live Capture (Run as Administrator):
-```powershell
-python capture/live_capture.py --list-interfaces
-python capture/live_capture.py --interface "VirtualBox Host-Only Ethernet Adapter" --api http://localhost:8000
-```
-
-Terminal 3 — Frontend:
-```powershell
-cd frontend && npm run dev
-```
-
----
-
-## Step 4: Generate Real Attack Traffic (on Kali VM)
-
-### 4.1 — Benign Traffic (Background)
 ```bash
-for i in $(seq 1 20); do curl -s http://192.168.56.20/ > /dev/null; sleep 2; done
+cp lab/lab_config.example.json lab/lab_config.json      # then edit VM names, IPs, interface, snapshots
+python lab/collect_dataset.py --config lab/lab_config.json --dry-run   # validate config + tools, run nothing
+python lab/reset_lab.py       --config lab/lab_config.json             # power off + restore clean snapshots
+python lab/collect_dataset.py --config lab/lab_config.json --out dataset
 ```
 
-### 4.2 — Reconnaissance (Port Scanning)
+Per run the harness (`lab/collect_dataset.py`): restores every VM to its `clean` snapshot and boots it, waits
+until each is reachable, starts `dumpcap`, then runs the scenarios in order with a quiet gap between them,
+recording each scenario's exact UTC start and stop, stops the capture, writes the run folder, and reverts the
+VMs. It stops early and powers the VMs off if capture fails, a VM is unreachable, or two runs fail. It stops
+when `runs` valid runs have been collected.
+
+```
+dataset/run_001/
+  traffic.pcap     raw capture, never modified
+  timeline.json    each scenario's id, label, target, UTC start/end, command
+  metadata.json    run id, seed, subnet, interface, host, attacker/target IPs, times
+```
+
+Then, on either machine (needs scapy):
+
 ```bash
-nmap -sS -T4 -p 1-1000 192.168.56.20
-nmap -sV -p 21,22,23,25,80,139,445,3306,5432 192.168.56.20
-nmap -O 192.168.56.20
-nmap -A -T4 192.168.56.20
+python lab/extract_flows.py --dataset dataset
 ```
 
-### 4.3 — Initial Access (Brute Force)
-```bash
-hydra -l msfadmin -P /usr/share/wordlists/rockyou.txt -t 4 -f 192.168.56.20 ssh
-hydra -l msfadmin -P /usr/share/wordlists/rockyou.txt -t 4 -f 192.168.56.20 ftp
-```
+This writes `flows.csv` in each run with the 22 model features (from `capture/flow_table.py`, the same
+extractor as PCAP upload and live capture, matched to CICFlowMeter in `docs/pcap_parity.md`), plus IPs, ports,
+protocol, start time, and the **label taken from the timeline window** the flow's start time falls in (flows
+outside every scenario window are `Benign`). Labels come from the timeline, never from inspecting packets.
 
-### 4.4 — Lateral Movement
-```bash
-smbclient -L //192.168.56.20 -N
-sshpass -p 'msfadmin' ssh -o StrictHostKeyChecking=no msfadmin@192.168.56.20 \
-    "whoami; id; uname -a; cat /etc/passwd; ls -la /home/"
-```
+## Scenarios (edit in `lab_config.json`)
 
-### 4.5 — Command & Control (Beaconing)
-```bash
-for i in $(seq 1 30); do
-    curl -s -o /dev/null http://192.168.56.20/
-    sleep 10  # Regular interval = beaconing signature
-done
-```
+Each is a standard tool run over SSH on the attacker VM against a lab IP; review every command before running.
+The default sequence covers reconnaissance, credential testing, web interaction, discovery, lateral movement,
+periodic C2-like beaconing, collection, exfiltration of a dummy archive, and a bounded load test, plus benign
+web traffic. Adjust targets, durations, and tools to your VMs. Because CIC-IDS2017's flag features are quirks
+of its flow tool (see `docs/pcap_parity.md`), the extractor reproduces those quirks so lab flows are directly
+comparable to the training data.
 
-### 4.6 — Exfiltration (Data Theft)
-```bash
-dd if=/dev/urandom of=/tmp/stolen_data.bin bs=1M count=50 2>/dev/null
-sshpass -p 'msfadmin' scp /tmp/stolen_data.bin msfadmin@192.168.56.20:/tmp/
-rm /tmp/stolen_data.bin
-```
+## Manual alternative (no automation)
 
----
+Run the detection pipeline (backend, `capture/live_capture.py` as admin on the host-only adapter, frontend),
+then run the same tools by hand from the attacker VM against `192.168.56.x`. Or replay a CIC-IDS2017 pcap:
+`python capture/live_capture.py --pcap path/to/capture.pcap --api http://localhost:8000 --speed 0.001`.
 
-## Alternative: Replay CIC-IDS2017 PCAPs
+## Safety checklist
 
-```powershell
-python capture/live_capture.py --pcap "path/to/Friday-WorkingHours.pcap" --api http://localhost:8000 --speed 0.001
-```
-
----
-
-## Safety Checklist
-
-- VMs are on Host-Only network with NO internet access
-- Target VM is intentionally vulnerable (Metasploitable)
-- All commands target only 192.168.56.x (your own IPs)
-- Not connected to any production or shared network
+- VMs are on a host-only network with **no** NAT/bridged adapter; `ping 8.8.8.8` from a VM fails.
+- Targets are intentionally vulnerable VMs you created; every command addresses only `192.168.56.x`.
+- `collect_dataset.py` refuses any scenario whose target is outside `lab_subnet` or is not a configured VM.
+- VMs are reverted to a clean snapshot after every run; the raw pcap is kept unmodified.
+- Nothing in `lab/` scans, exploits, beacons to, or transfers data with any host outside the lab.
