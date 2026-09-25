@@ -33,8 +33,8 @@ from .database import AlertDB, FlowRecordDB, SessionDB
 from .inference import predict_single
 from .live import broadcast
 from .model_loader import artifacts
-from .network_state import tracker as network_tracker
 from .network_identity import classify_ip_identity
+from .network_state import tracker as network_tracker
 from .process_resolver import resolve_process
 from .schemas import FlowRecord
 
