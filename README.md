@@ -387,6 +387,9 @@ python experiments/calibrate_stage_logits.py
 | | `GET` | `/system/cycle/current` | Query the currently active monitoring cycle |
 | | `GET` | `/system/cycles` | List archived cycles |
 | | `GET` | `/system/cycles/{cycle_id}` | One archived cycle's contents |
+| Network state | `GET` | `/network/sources` | Traffic sources with recorded flows |
+| | `GET` | `/network/forecast?source=` | Per-minute network state, sustained-alert status and the 4-minute world-model forecast |
+| | `POST` | `/network/reset` | Clear recorded flows (one source or all) |
 | MITRE | `GET` | `/mitre/mapping` | Behaviour and legacy-stage to ATT&CK interpretation with rationale |
 | | `GET` | `/mitre/lookup/{label}` | Interpretation for one behaviour or stage label |
 | Alerts & WS | `GET` | `/alerts` | Query active & historical alerts with triage status |
@@ -481,10 +484,16 @@ Network_Attack_Detection/
 
 ---
 
-## Research Tracks (not shipped)
+## Network-State World Model (served)
+
+Next to the per-flow model, the backend runs a network-state world model: every minute, all flows of a source (PCAP upload, CSV upload, live capture) are aggregated into one 45-feature network state (flow statistics plus unique hosts and ports, protocol mix, port entropy, per-source scan signatures), and an LSTM trained with multi-step targets rolls the last 6 minutes forward 4 minutes. It reports the predicted state, the risk and behaviour class for each future minute, a gradient explanation, and a sustained-alert decision whose threshold was frozen on validation data. The dashboard shows it under NETWORK_FORECAST, together with its measured reliability.
+
+Measured on the held-out last 25% of each CIC-IDS2017 day: detection ROC-AUC 0.83, 1.38 false alarms per quiet hour, and state prediction better than persistence at +2 to +4 minutes but not at +1. On attack families never seen in training it is close to chance (ROC-AUC 0.56). Full evaluation: [docs/world_model_v3_report.md](docs/world_model_v3_report.md), sections 14 and 15.
+
+## Research Tracks
 
 - `docs/world_model_v2.md`: window-level state with multi-step training on the old training CSVs.
-- `docs/world_model_v3_report.md`: dataset comparison and a network-state model on CIC-IDS2017 labelled flows with real IP, port, protocol and timestamps, evaluated leave-one-day-out over 5 seeds. Read its results before making forecasting claims: early warning is modest, false alarms are high, and behaviour forecasting did not beat a persistence baseline.
+- `docs/world_model_v3_report.md`: dataset comparison, the network-state study (leave-one-day-out, 5 seeds), the direction-feature ablation and the served model. Read its results before making forecasting claims: early warning is modest, false alarms are high, and behaviour forecasting did not beat a persistence baseline.
 
 ## Known Limitations & Enterprise Architecture Roadmap
 

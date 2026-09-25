@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Activity, AlertTriangle, Upload, Eye,
   MonitorDot, Settings, BarChart3, Terminal,
-  Wifi, Laptop, RotateCcw, HeartPulse,
+  Wifi, Laptop, RotateCcw, HeartPulse, Network,
 } from 'lucide-react';
 import { apiFetch, apiPost, createWebSocket } from './api';
 import { formatTime, isAttackFlow } from './utils';
 import { WellbeingModal } from './components/Badges';
 import Dashboard from './components/Dashboard';
 import ForecastView from './components/ForecastView';
+import NetworkForecastView from './components/NetworkForecastView';
 import { AlertsView } from './components/AlertPanel';
 import LiveLogsView from './components/LiveLogsView';
 import ExplainView from './components/ExplainView';
@@ -209,6 +210,9 @@ export default function App() {
           <button className={`nav-item ${view === 'forecast' ? 'active' : ''}`} onClick={() => setView('forecast')}>
             <Activity size={15}/> FORECAST
           </button>
+          <button className={`nav-item ${view === 'network' ? 'active' : ''}`} onClick={() => setView('network')}>
+            <Network size={15}/> NETWORK_FORECAST
+          </button>
         </div>
 
         <div className="nav-section">
@@ -302,6 +306,7 @@ export default function App() {
           />
         )}
         {view === 'forecast' && <ForecastView session={selectedSession} onBack={() => setView('dashboard')} featureList={featureList}/>}
+        {view === 'network' && <NetworkForecastView/>}
         {view === 'alerts' && <AlertsView/>}
         {view === 'live_logs' && <LiveLogsView lines={liveFlows} connected={wsConnected}/>}
         {view === 'explain' && <ExplainView featureList={featureList}/>}

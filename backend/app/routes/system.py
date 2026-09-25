@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import DB_DIR
 from ..database import AlertDB, FlowRecordDB, SessionDB, get_db
 from ..network_identity import get_host_identity
+from ..network_state import tracker as network_tracker
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/system", tags=["System"])
@@ -173,6 +174,7 @@ async def purge_simulated_data(db: AsyncSession = Depends(get_db)):
 
     stmt_flows = delete(FlowRecordDB).where(FlowRecordDB.source == "simulated")
     del_f = await db.execute(stmt_flows)
+    network_tracker.reset("simulated")
     deleted_flows = del_f.rowcount or 0
 
     stmt_sessions = delete(SessionDB).where(SessionDB.source == "simulated")

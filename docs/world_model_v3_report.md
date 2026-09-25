@@ -1,6 +1,6 @@
 # World Model V3: Dataset Upgrade, Network State and Evaluation Report
 
-Status: experimental research track. Nothing here is wired into the shipped API or model (V1). The results are a mixed picture and do not support a claim that NetForecast is SIH-complete. Every number below was measured by code in this repository; raw outputs are in `experiments/v3_lodo.json`, `experiments/v3_behaviour.json`, and the aggregation is `experiments/summarize_v3.py`.
+Status: the network-state model described in section 15 is served by the backend next to the V1 flow model; the rest of this document is the research that led to it. The results are a mixed picture and do not support a claim that NetForecast is SIH-complete. Every number below was measured by code in this repository; raw outputs are in `experiments/v3_lodo.json`, `experiments/v3_behaviour.json`, and the aggregation is `experiments/summarize_v3.py`.
 
 ## 1. Candidate dataset comparison
 
@@ -130,7 +130,7 @@ A persistence baseline cannot warn: it only repeats the current label, so on a q
 | ROC-AUC | 0.54 +/- 0.04 | 0.62 +/- 0.02 | 0.48 / 0.60 | |
 | PR-AUC | 0.33 | 0.50 | | |
 
-On unseen attack families, detection is weak. The flow-only model is close to chance (ROC-AUC 0.54). Network context clearly helps here (F1 0.26 to 0.48, ROC-AUC 0.54 to 0.62), the one improvement in this study that exceeds seed variation. Persistence beats both because attacks last many minutes; that says persistence is a strong baseline, not that either model is good. Do not compare these numbers to the 0.86 F1 of V1, which was measured on held-out sessions from the same days with the attack families in training.
+On unseen attack families, detection is weak. The flow-only model is close to chance (ROC-AUC 0.54). The 54-feature network set scores higher (F1 0.26 to 0.48, ROC-AUC 0.54 to 0.62), but section 14 shows most of that gain comes from direction features that encode the testbed layout (attacks come from outside the firewall); without them F1 is 0.30 and ROC-AUC 0.56. Persistence beats both because attacks last many minutes; that says persistence is a strong baseline, not that either model is good. Do not compare these numbers to the 0.86 F1 of V1, which was measured on held-out sessions from the same days with the attack families in training.
 
 ### Future-state transition error (scaled space, pooled over 4 held-out days)
 
@@ -159,7 +159,7 @@ Cause: the late-in-day test segments contain families with almost no training su
 
 | Question | Result |
 |---|---|
-| Detection on unseen families | Net features > flow features; both far below the persistence baseline; ROC-AUC 0.62 at best |
+| Detection on unseen families | Near chance for every feature set once the direction artefact is removed (ROC-AUC 0.54 to 0.56); the 0.62 of the full network set is mostly that artefact (section 14) |
 | Transition modelling | Model beats persistence on all horizons |
 | Early warning | About 35% to 43% of 20 episodes within 20 minutes; feature sets indistinguishable |
 | False alarms | Flow 0.5 per quiet hour, net 1.1 per quiet hour; net set alarms in about three quarters of quiet hours |
@@ -172,17 +172,69 @@ Cause: the late-in-day test segments contain families with almost no training su
 - External dataset test: not run.
 - Attack-family holdout with the same-family generalization control (train and test on the same family, different time): not run.
 - Holding out Monday as a benign-only test day: not run.
-- V3 is not integrated into the API or dashboard.
+- The served model (section 15) was not evaluated on unseen attack families beyond the leave-one-day-out study of its feature set.
 - One quirk to keep in mind: timestamps have no time zone marker and one-minute resolution, so lead times are accurate only to about a minute.
 
-## 13. Reproduce
+## 14. Direction-feature ablation
+
+The CIC-IDS2017 testbed puts every attacker outside the firewall: 99.8% of malicious flows are inbound (external source, internal destination) against 16% of benign flows (counted over all labelled flows). Eight features depend on the internal/external split (`n_uniq_internal_src/dst`, `n_inb/outb/intl_flow_ratio`, `n_inbound/outbound_bytes`, `n_in_out_byte_ratio`) and one on single-host concentration (`n_top_src_share`; every attack comes from one address). They were removed ("net_nodir", 45 features) and the leave-one-day-out study re-run with the same 5 seeds (`experiments/v3_lodo_nodir.json`).
+
+| Metric (mean over 5 seeds) | flow (25) | net_nodir (45) | net (54) |
+|---|---|---|---|
+| Detection F1, unseen days | 0.26 | 0.30 | 0.48 |
+| Detection ROC-AUC | 0.54 | 0.56 | 0.62 |
+| Warned within 20 min | 35% | 34% | 43% |
+| Warned within 5 min | 29% | 17% | 24% |
+| False alarms per quiet hour | 0.47 | 0.88 | 1.13 |
+| Transition MSE +1 / persistence | 1.058 / 1.369 | 0.983 / 1.221 | 0.955 / 1.197 |
+
+Reading: the improvement that the full network set appeared to give in detection and early warning is largely the direction artefact, which would not carry over to a network with a different layout (and the internal/external split is hard-coded to the testbed's 192.168.0.0/16). Without it, network context adds little over flow statistics on unseen attack families. The earlier statement in section 11 that network context "clearly helps" is withdrawn.
+
+## 15. Served model
+
+The backend serves one network-state model (`backend/artifacts_v3/`, trained by `worldmodel_v3/train_production.py`) through `GET /network/forecast` and the dashboard's NETWORK_FORECAST view. Choices:
+
+- Feature set net_nodir (section 14): no dependence on the testbed address plan.
+- Split: chronological within every capture day, 60% train, 15% validation, 25% test. The scaler, checkpoint and alert rule (threshold 0.547, 1 consecutive minute, chosen on validation under a 1 false alarm per quiet hour budget) were frozen before the test segment was scored once. The saved weights are the tested ones.
+- The live state is computed by the same function as the training data (`worldmodel_v3/state.py`, verified to reproduce the committed windows exactly), from flows produced by the PCAP/live extractor, whose features match CICFlowMeter (`docs/pcap_parity.md`).
+
+Test segment (570 windows, 63 with attacks; attack families seen in training, later in the same day):
+
+| Metric | Value |
+|---|---|
+| Detection ROC-AUC / PR-AUC | 0.83 / 0.59 |
+| Detection F1 / precision / recall / FPR | 0.52 / 0.41 / 0.70 / 12.4% |
+| Transition MSE +1 / +2 / +3 / +4 (persistence) | 1.41 (1.42) / 1.40 (1.65) / 1.53 (1.80) / 1.67 (1.90) |
+| Attack episodes in the test segments | 3; 1 warned (3 minutes ahead) |
+| False alarms per quiet hour | 1.38 over 7.3 quiet hours (validation had 0.43) |
+
+At +1 minute the model's state prediction is no better than persistence; it is better at +2 to +4. The frozen alert rule exceeded its false-alarm budget on test. Three episodes are too few to estimate early warning. On unseen attack families the relevant numbers are the net_nodir column in section 14.
+
+### End-to-end replay through the API (Friday DDoS)
+
+`experiments/scenario_replay.py` pushed the 89,907 official flows of Friday 2017-07-07 18:35 to 19:05 UTC through `POST /ingest/csv` (one upload per minute, temporary database), then read `GET /network/forecast`. The flows use the training feature definitions, which the PCAP extractor reproduces (`docs/pcap_parity.md`); a raw capture of this window is several GB. DDoS appears only in Friday's test segment, so the served model never trained on DDoS (it did train on Wednesday's DoS).
+
+| Minutes (UTC) | Traffic | Risk over next 4 min | Sustained alert |
+|---|---|---|---|
+| 18:35 to 18:39 | benign | not scored (fewer than 6 minutes) | no |
+| 18:40 to 18:55 | benign, 103 to 1,386 flows/min | 0.24 to 0.49 (threshold 0.547) | no |
+| 18:56 | DDoS starts, 2,438 of 3,671 flows | 0.29 | no |
+| 18:57 to 19:04 | DDoS, about 6,500 attack flows/min | 0.70 to 0.86 | yes, every minute |
+
+No false alarm in 16 scored benign minutes; alert one minute after onset; the forecast called the behaviour DoS (the closest trained family). There was no warning before onset: this replay shows fast detection of an unseen family, not early warning.
+
+## 16. Reproduce
 
 ```
 python data/fetch_cic2017_labelled.py --out data/cic2017_labelled
 python data/build_network_windows.py --labels-dir data/cic2017_labelled     # needs pandas and pyarrow
 python -m worldmodel_v3.run_lodo --out experiments/v3_lodo.json
 python -m worldmodel_v3.run_behaviour --out experiments/v3_behaviour.json
+python -m worldmodel_v3.run_lodo --feature-sets net_nodir --out experiments/v3_lodo_nodir.json
 python experiments/summarize_v3.py
+python -m worldmodel_v3.train_production --out backend/artifacts_v3
+python experiments/scenario_replay.py export --labels <Friday DDoS and PortScan parquet files> --start "2017-07-07 18:35" --end "2017-07-07 19:05" --out fri.csv
+python experiments/scenario_replay.py replay --csv fri.csv
 python -m pytest backend/tests/test_worldmodel_v3.py backend/tests/test_mitre.py
 ```
 

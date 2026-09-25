@@ -50,7 +50,7 @@ export default function ForecastView({ session, onBack, featureList }) {
         const windowFlows = allFlows.slice(0, WINDOW_SIZE).reverse();
         const window = windowFlows.map(f => featOrder.map(k => f.features?.[k] ?? 0));
         const [fc, exp] = await Promise.all([
-          apiPost('/forecast', { window, k_steps: 6, n_mc_samples: 20, needs_scaling: true }),
+          apiPost('/forecast', { window, k_steps: 4, n_mc_samples: 20, needs_scaling: true }),
           apiPost('/explain', { window, top_k: 10, needs_scaling: true }),
         ]);
         if (!active) return;
@@ -199,7 +199,7 @@ export default function ForecastView({ session, onBack, featureList }) {
       <div className="panel mb-4">
         <div className="panel-header">
           <span className="panel-title">KILL_CHAIN_PROGRESS</span>
-          <span className="panel-meta">MITRE ATT&CK Stage Tracker</span>
+          <span className="panel-meta">Stage labels are dataset proxies, not verified campaign stages</span>
         </div>
         <div className="panel-body">
           <KillChain currentStage={session.latest_stage} forecastStages={forecastStages}/>

@@ -81,6 +81,15 @@ async def ingest_csv(
 
             flow_data["src_ip"] = row.get("src_ip") or row.get("Src IP") or row.get("Source IP")
             flow_data["dst_ip"] = row.get("dst_ip") or row.get("Dst IP") or row.get("Destination IP")
+            # optional context used by the network-state model (unique ports, protocol mix)
+            for key, names in (("src_port", ("src_port", "Source Port")), ("dst_port", ("dst_port", "Destination Port"))):
+                raw = next((row.get(n) for n in names if row.get(n) not in (None, "")), None)
+                if raw is not None:
+                    flow_data[key] = int(float(raw))
+            proto = row.get("protocol") or row.get("Protocol")
+            if proto:
+                flow_data["protocol"] = {"6": "TCP", "17": "UDP", "1": "ICMP"}.get(str(proto).split(".")[0], str(proto))
+            flow_data["source"] = "csv_upload"
 
             ts_raw = row.get("timestamp") or row.get("Timestamp")
             if ts_raw:

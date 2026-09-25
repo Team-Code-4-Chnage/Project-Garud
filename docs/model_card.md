@@ -198,7 +198,7 @@ An experimental network-state model with multi-step training targets is document
 
 ### 6.3 V3 network-state study on real network context
 
-`docs/world_model_v3_report.md` repeats the forecasting evaluation on CIC-IDS2017 labelled flows that keep IP, port, protocol and real (minute) timestamps, using leave-one-day-out and 5 seeds. Findings: the model predicts future network state better than persistence at every horizon; on unseen attack families detection is weak (ROC-AUC 0.54 with flow features, 0.62 with network features); 35% to 43% of 20 attack episodes were warned within 20 minutes, with the two feature sets statistically indistinguishable; false alarms were 0.5 (flow) and 1.1 (network) per quiet hour; behaviour forecasting did not beat persistence. This model is not shipped.
+`docs/world_model_v3_report.md` repeats the forecasting evaluation on CIC-IDS2017 labelled flows that keep IP, port, protocol and real (minute) timestamps, using leave-one-day-out and 5 seeds. Findings: the model predicts future network state better than persistence at every horizon; on unseen attack families detection is weak (ROC-AUC 0.54 with flow features; 0.62 with network features, mostly from a direction artefact, and 0.56 without it); 35% to 43% of 20 attack episodes were warned within 20 minutes, with the two feature sets statistically indistinguishable; false alarms were 0.5 (flow) and 1.1 (network) per quiet hour; behaviour forecasting did not beat persistence. The network-state model is now served by the backend (feature set without direction features); its results and the ablation that removed those features are in sections 14 and 15 of that report.
 
 ## 7. Explainability & Trust Architecture
 

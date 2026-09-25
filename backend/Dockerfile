@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 # Build context is the repository root: the backend imports the shared packet/flow code in capture/
 COPY backend/ .
 COPY capture/ ./capture/
+COPY worldmodel_v2/ ./worldmodel_v2/
+COPY worldmodel_v3/ ./worldmodel_v3/
 
 EXPOSE 8000
 

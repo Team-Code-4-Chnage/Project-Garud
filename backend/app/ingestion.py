@@ -33,6 +33,7 @@ from .database import AlertDB, FlowRecordDB, SessionDB
 from .inference import predict_single
 from .live import broadcast
 from .model_loader import artifacts
+from .network_state import tracker as network_tracker
 from .network_identity import classify_ip_identity
 from .process_resolver import resolve_process
 from .schemas import FlowRecord
@@ -182,6 +183,7 @@ async def ingest_single_flow(
 
     session_key = derive_session_key(flow.src_ip, flow.dst_ip, flow.timestamp)
     source = getattr(flow, "source", None) or "api"
+    network_tracker.add(flow, source)  # per-minute network state for the network world model
 
     src_identity = classify_ip_identity(flow.src_ip)
     dst_identity = classify_ip_identity(flow.dst_ip)

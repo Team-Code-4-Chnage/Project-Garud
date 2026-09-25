@@ -2,6 +2,8 @@
 *
 !backend/
 !capture/
+!worldmodel_v2/
+!worldmodel_v3/
 backend/venv/
 backend/data/
 backend/artifacts_v2/
