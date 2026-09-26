@@ -1,4 +1,4 @@
-"""Network-state world model service: state building, forecast payload, sustained alert and API."""
+"""Network-state world model service: combined network-wide state, forecast payload, sustained alert, API."""
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -36,7 +36,7 @@ def test_states_are_per_minute_and_fill_quiet_minutes(tracker):
     for m in (0, 1, 3):  # minute 2 has no traffic
         for i in range(5):
             tracker.add(flow(m, i), "csv_upload")
-    st = tracker.states("csv_upload")
+    st = tracker.states()
     assert len(st) == 4 and list(st["n_flows"]) == [5, 5, 0, 5]
 
 
@@ -44,7 +44,7 @@ def test_warming_up_before_six_minutes(tracker):
     for m in range(3):
         tracker.add(flow(m, 0), "csv_upload")
         tracker.add(flow(m, 1), "csv_upload")
-    r = tracker.analyze("csv_upload")
+    r = tracker.analyze()
     assert r["status"] == "warming_up" and r["minutes_needed"] == 6
 
 
@@ -53,8 +53,9 @@ def test_forecast_payload(tracker):
         n = 4 if m < 9 else 40  # a burst of new connections to many ports in the last minutes
         for i in range(n):
             tracker.add(flow(m, i, dport=80 if m < 9 else 1000 + i), "csv_upload")
-    r = tracker.analyze("csv_upload")
+    r = tracker.analyze()
     assert r["status"] == "ok"
+    assert "source" not in r  # one combined forecast, never scoped to a single source or IP
     assert len(r["minutes"]) == 12 and len(r["risk_score"]) == 12 and len(r["alert"]) == 12
     assert r["risk_score"][:5] == [None] * 5 and all(0 <= v <= 1 for v in r["risk_score"][5:])
     assert [s["step"] for s in r["forecast"]] == [1, 2, 3, 4]
@@ -71,7 +72,7 @@ def test_sustained_rule_matches_config(tracker):
     for mi in range(10):
         for i in range(3):
             tracker.add(flow(mi, i), "csv_upload")
-    r = tracker.analyze("csv_upload")
+    r = tracker.analyze()
     scores = np.array([np.nan if v is None else v for v in r["risk_score"]])
     run, expected = 0, []
     for v in scores:
@@ -80,12 +81,23 @@ def test_sustained_rule_matches_config(tracker):
     assert r["alert"] == expected
 
 
-def test_sources_are_kept_apart(tracker):
-    tracker.add(flow(0, 0), "csv_upload")
-    tracker.add(flow(0, 1), "pcap_upload")
-    assert {s["source"] for s in tracker.sources()} == {"csv_upload", "pcap_upload"}
+def test_forecast_combines_every_source(tracker):
+    for i in range(6):
+        tracker.add(flow(0, i, src="10.0.0.5"), "csv_upload")
+        tracker.add(flow(0, i + 6, src="10.0.0.6"), "pcap_upload")
+        tracker.add(flow(0, i + 12, src="10.0.0.7"), "live_capture")
+    combined_only = tracker.states()
+    assert combined_only["n_flows"].iloc[0] == 18  # every source's flows landed in the one state
+
+
+def test_reset_by_source_leaves_other_sources_combined(tracker):
+    for i in range(3):
+        tracker.add(flow(0, i), "csv_upload")
+        tracker.add(flow(0, i + 3), "pcap_upload")
+    assert tracker.summary()["flows"] == 6
     tracker.reset("csv_upload")
-    assert {s["source"] for s in tracker.sources()} == {"pcap_upload"}
+    s = tracker.summary()
+    assert s["flows"] == 3 and s["sources"] == {"pcap_upload": 3}
 
 
 def test_api_endpoints_after_pcap_upload():
@@ -100,7 +112,7 @@ def test_api_endpoints_after_pcap_upload():
         with open(fix, "rb") as fh:
             assert client.post("/ingest/pcap", files={"file": ("f.pcap", fh, "application/octet-stream")}).status_code == 200
         srcs = client.get("/network/sources").json()
-        assert srcs[0]["source"] == "pcap_upload" and srcs[0]["flows"] == 24
-        r = client.get("/network/forecast", params={"source": "pcap_upload"}).json()
+        assert srcs["flows"] == 24 and srcs["sources"] == {"pcap_upload": 24}
+        r = client.get("/network/forecast").json()
         assert r["status"] in ("warming_up", "ok")  # the fixture spans about 2 minutes
         assert client.post("/network/reset").json() == {"reset": "all"}

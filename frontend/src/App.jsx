@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -18,10 +18,9 @@ import {
   Shield,
 } from "lucide-react";
 import { apiFetch, apiPost, createWebSocket } from "./api";
-import { formatTime, isAttackFlow } from "./utils";
+import { formatTime, isAttackFlow, flowKey } from "./utils";
 import { WellbeingModal } from "./components/Badges";
 import Dashboard from "./components/Dashboard";
-import ForecastView from "./components/ForecastView";
 import NetworkForecastView from "./components/NetworkForecastView";
 import { AlertsView } from "./components/AlertPanel";
 import LiveLogsView from "./components/LiveLogsView";
@@ -35,7 +34,6 @@ export default function App() {
   const [view, setView] = useState("dashboard");
   const [health, setHealth] = useState(null);
   const [alertCount, setAlertCount] = useState(0);
-  const [selectedSession, setSelectedSession] = useState(null);
   const [clock, setClock] = useState(new Date());
   const [featureList, setFeatureList] = useState(null);
   const [systemMode, setSystemMode] = useState("live");
@@ -43,6 +41,7 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [liveFlows, setLiveFlows] = useState([]);
+  const seenFlowKeysRef = useRef(new Set());
   const attackFlows = useMemo(
     () => liveFlows.filter(isAttackFlow),
     [liveFlows],
@@ -72,9 +71,13 @@ export default function App() {
       try {
         const data = JSON.parse(evt.data);
         if (data.type === "pong") return;
+        const key = flowKey(data);
+        if (seenFlowKeysRef.current.has(key)) return;
         setLiveFlows((prev) => {
           const next = [{ ...data, _ts: new Date().toISOString() }, ...prev];
-          return next.length > 500 ? next.slice(0, 500) : next;
+          const trimmed = next.length > 500 ? next.slice(0, 500) : next;
+          seenFlowKeysRef.current = new Set(trimmed.map(flowKey));
+          return trimmed;
         });
         if (data.alert) {
           setAlertCount((c) => c + 1);
@@ -94,6 +97,7 @@ export default function App() {
 
   const handleClearLiveLogs = useCallback(() => {
     setLiveFlows([]);
+    seenFlowKeysRef.current = new Set();
     sessionStorage.setItem("garud_logs_cleared_at", new Date().toISOString());
   }, []);
 
@@ -103,6 +107,7 @@ export default function App() {
       const recent = await apiFetch("/flows/recent?limit=100");
       if (Array.isArray(recent) && recent.length > 0) {
         setLiveFlows(recent);
+        seenFlowKeysRef.current = new Set(recent.map(flowKey));
       }
     } catch (e) {
       console.error("Failed to reload recent flows:", e);
@@ -118,15 +123,15 @@ export default function App() {
       .then((recent) => {
         if (Array.isArray(recent) && recent.length > 0) {
           setLiveFlows((prev) => {
-            if (prev.length === 0) return recent;
-            const existingKeys = new Set(
-              prev.map((p) => p.id || `${p.session_key}-${p.timestamp}`),
-            );
-            const toAdd = recent.filter(
-              (r) =>
-                !existingKeys.has(r.id || `${r.session_key}-${r.timestamp}`),
-            );
-            return [...prev, ...toAdd];
+            if (prev.length === 0) {
+              seenFlowKeysRef.current = new Set(recent.map(flowKey));
+              return recent;
+            }
+            const existingKeys = new Set(prev.map(flowKey));
+            const toAdd = recent.filter((r) => !existingKeys.has(flowKey(r)));
+            const merged = [...prev, ...toAdd];
+            seenFlowKeysRef.current = new Set(merged.map(flowKey));
+            return merged;
           });
         }
       })
@@ -263,16 +268,10 @@ export default function App() {
     }
   };
 
-  const onSelectSession = (session) => {
-    setSelectedSession(session);
-    setView("forecast");
-  };
-
   const viewLabels = {
     dashboard: "Dashboard",
     live_logs: "Live Event Stream",
     alerts: "Incident Alerts",
-    forecast: "Attack Progression Forecast",
     network: "Macro Network Topology",
     explain: "Explainable AI (XAI)",
     reports: "Forensic Audit Reports",
@@ -343,12 +342,6 @@ export default function App() {
           >
             <AlertTriangle size={15} /> Incident Alerts
             {alertCount > 0 && <span className="nav-badge">{alertCount}</span>}
-          </button>
-          <button
-            className={`nav-item ${view === "forecast" ? "active" : ""}`}
-            onClick={() => handleNavClick("forecast")}
-          >
-            <Activity size={15} /> Attack Forecast
           </button>
           <button
             className={`nav-item ${view === "network" ? "active" : ""}`}
@@ -506,22 +499,14 @@ export default function App() {
       <main className="main-content">
         {view === "dashboard" && (
           <Dashboard
-            onSelectSession={onSelectSession}
             featureList={featureList}
             systemMode={systemMode}
             liveFlows={attackFlows}
             wsConnected={wsConnected}
           />
         )}
-        {view === "forecast" && (
-          <ForecastView
-            session={selectedSession}
-            onBack={() => setView("dashboard")}
-            featureList={featureList}
-          />
-        )}
         {view === "network" && (
-          <NetworkForecastView hostIdentity={hostIdentity} />
+          <NetworkForecastView />
         )}
         {view === "alerts" && <AlertsView />}
         {view === "live_logs" && (
