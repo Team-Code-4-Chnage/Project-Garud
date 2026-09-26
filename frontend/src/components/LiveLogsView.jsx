@@ -17,7 +17,12 @@ import { formatTime, formatProb, isAttackFlow, stageClass } from "../utils";
 import { apiFetch } from "../api";
 import { DirBadge, SourceBadge, IdentityBadge } from "./Badges";
 
-function LiveLogsView({ lines = [], connected = false }) {
+function LiveLogsView({
+  lines = [],
+  connected = false,
+  onClear,
+  onReloadRecent,
+}) {
   const containerRef = useRef(null);
   const [mitre, setMitre] = useState({});
   const [isPaused, setIsPaused] = useState(false);
@@ -205,11 +210,27 @@ function LiveLogsView({ lines = [], connected = false }) {
 
           <button
             className="btn btn-sm btn-outline"
-            onClick={() => setClearedBefore(lines.length)}
-            title="Clear display view"
+            onClick={() => {
+              setClearedBefore(0);
+              if (onClear) onClear();
+            }}
+            title="Clear display view and session stream buffer"
           >
             <Trash2 size={11} /> CLEAR
           </button>
+
+          {onReloadRecent && (
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={() => {
+                setClearedBefore(0);
+                onReloadRecent();
+              }}
+              title="Reload recent 100 flows from database"
+            >
+              <RefreshCw size={11} /> RELOAD RECENT
+            </button>
+          )}
         </div>
       </div>
 

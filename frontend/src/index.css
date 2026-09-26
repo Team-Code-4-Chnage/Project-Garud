@@ -198,6 +198,10 @@
   }
 }
 
+.spin-animation {
+  animation: spin 0.8s linear infinite;
+}
+
 *,
 *::before,
 *::after {

@@ -208,41 +208,77 @@ def generate_flow(stage: str) -> dict:
     return flow
 
 
-def run_attack_scenario(api_url: str, speed: float, session_count: int):
+def run_attack_scenario(api_url: str, speed: float, session_count: int, scenario: str = "full_kill_chain"):
     """
     Run a multi-session attack scenario:
-    - Some sessions stay benign (background traffic)
-    - Some sessions progress through the kill chain
+    - Generates traffic according to selected scenario preset
+    - Walks through relevant MITRE ATT&CK stages
     """
-    print(f"\n{'='*60}")
-    print("  Network Attack Traffic Simulator")
-    print(f"  Target: {api_url}")
-    print(f"  Sessions: {session_count}")
-    print(f"  Speed: {speed}s between flows")
-    print(f"{'='*60}\n")
+    print(f"\n{'='*70}", flush=True)
+    print("  PROJECT GARUD — Network Attack Traffic Simulator", flush=True)
+    print(f"  Target API: {api_url}", flush=True)
+    print(f"  Preset Scenario: {scenario.upper()}", flush=True)
+    print(f"  Concurrent Sessions: {session_count}", flush=True)
+    print(f"  Cadence Speed: {speed}s between flow batches", flush=True)
+    print(f"{'='*70}\n", flush=True)
 
     sessions = []
     for i in range(session_count):
         src = random.choice(SRC_IPS)
         dst = random.choice(DST_IPS)
-        if i < session_count // 2:
+
+        if scenario == "benign_baseline":
+            stages = ["Benign"] * random.randint(20, 40)
+            label = "BENIGN"
+        elif scenario == "recon_sweep":
             stages = (
-                ["Benign"] * random.randint(3, 6) +
-                ["Reconnaissance"] * random.randint(3, 5) +
-                ["Initial Access"] * random.randint(2, 4) +
-                ["Lateral Movement"] * random.randint(2, 3) +
-                ["C2"] * random.randint(2, 4) +
-                ["Exfiltration"] * random.randint(2, 3)
+                ["Benign"] * random.randint(2, 4) +
+                ["Reconnaissance"] * random.randint(12, 20)
             )
-        else:
-            stages = ["Benign"] * random.randint(15, 30)
+            label = "RECON"
+        elif scenario == "brute_force":
+            stages = (
+                ["Benign"] * random.randint(2, 3) +
+                ["Reconnaissance"] * random.randint(2, 3) +
+                ["Initial Access"] * random.randint(12, 22)
+            )
+            label = "BRUTE"
+        elif scenario == "lateral_spread":
+            stages = (
+                ["Benign"] * random.randint(2, 3) +
+                ["Reconnaissance"] * random.randint(2, 3) +
+                ["Initial Access"] * random.randint(2, 3) +
+                ["Lateral Movement"] * random.randint(10, 18)
+            )
+            label = "LATERAL"
+        elif scenario == "exfiltration":
+            stages = (
+                ["Benign"] * random.randint(2, 3) +
+                ["C2"] * random.randint(2, 3) +
+                ["Exfiltration"] * random.randint(12, 20)
+            )
+            label = "EXFIL"
+        else:  # full_kill_chain
+            if i < max(1, session_count // 2):
+                stages = (
+                    ["Benign"] * random.randint(3, 5) +
+                    ["Reconnaissance"] * random.randint(3, 5) +
+                    ["Initial Access"] * random.randint(2, 4) +
+                    ["Lateral Movement"] * random.randint(2, 3) +
+                    ["C2"] * random.randint(2, 4) +
+                    ["Exfiltration"] * random.randint(2, 3)
+                )
+                label = "KILLCHAIN"
+            else:
+                stages = ["Benign"] * random.randint(15, 30)
+                label = "BENIGN"
 
         sessions.append({
             "src_ip": src,
             "dst_ip": dst,
             "stages": stages,
             "current_step": 0,
-            "label": "ATTACK" if i < session_count // 2 else "BENIGN",
+            "label": label,
         })
 
     max_steps = max(len(s["stages"]) for s in sessions)
@@ -275,13 +311,13 @@ def run_attack_scenario(api_url: str, speed: float, session_count: int):
                         pred = result.get("prediction")
                         alert = result.get("alert")
 
-                        status = f"[{session['label']:>6}] {session['src_ip']:>15} → {session['dst_ip']:>15} | "
+                        status = f"[{session['label']:>9}] {session['src_ip']:>15} → {session['dst_ip']:>15} | "
                         status += f"Stage: {stage:<18} | "
 
                         if pred:
                             prob = pred["infiltration_probability"]
                             pred_stage = pred["predicted_stage"]
-                            status += f"P(infiltration)={prob:.3f} | Predicted: {pred_stage}"
+                            status += f"P(inf)={prob:.3f} | Pred: {pred_stage}"
                             if alert:
                                 total_alerts += 1
                                 status += f" | 🚨 ALERT: {alert['severity'].upper()}"
@@ -289,28 +325,28 @@ def run_attack_scenario(api_url: str, speed: float, session_count: int):
                             buf_size = result.get("buffer_size", "?")
                             status += f"Buffering ({buf_size}/{6})"
 
-                        print(status)
+                        print(status, flush=True)
                     else:
-                        print(f"  ERROR: HTTP {resp.status_code} — {resp.text[:100]}")
+                        print(f"  ERROR: HTTP {resp.status_code} — {resp.text[:100]}", flush=True)
 
                 except requests.exceptions.ConnectionError:
-                    print(f"  ERROR: Cannot connect to {api_url} — is the backend running?")
+                    print(f"  ERROR: Cannot connect to {api_url} — is the backend running?", flush=True)
                     sys.exit(1)
                 except requests.exceptions.Timeout:
-                    print("  WARNING: Request timed out")
+                    print("  WARNING: Ingestion request timed out", flush=True)
 
                 session["current_step"] += 1
 
             time.sleep(speed)
 
     except KeyboardInterrupt:
-        print("\n\nSimulation stopped by user.")
+        print("\n\nSimulation stopped by operator.", flush=True)
 
-    print(f"\n{'='*60}")
-    print("  Simulation complete")
-    print(f"  Total flows sent: {total_sent}")
-    print(f"  Total alerts triggered: {total_alerts}")
-    print(f"{'='*60}\n")
+    print(f"\n{'='*70}", flush=True)
+    print("  Simulation batch complete", flush=True)
+    print(f"  Total telemetry flows sent: {total_sent}", flush=True)
+    print(f"  Total alerts triggered: {total_alerts}", flush=True)
+    print(f"{'='*70}\n", flush=True)
 
 
 def main():
@@ -329,22 +365,27 @@ def main():
         "--sessions", type=int, default=4,
         help="Number of concurrent sessions (default: 4)"
     )
+    parser.add_argument(
+        "--scenario", default="full_kill_chain",
+        choices=["full_kill_chain", "recon_sweep", "brute_force", "lateral_spread", "exfiltration", "benign_baseline"],
+        help="Attack scenario preset to execute"
+    )
     args = parser.parse_args()
 
     try:
         resp = requests.get(f"{args.api}/health", timeout=5)
         health = resp.json()
         if not health.get("model_loaded"):
-            print("WARNING: Backend reports model is NOT loaded!")
-            print(f"Health: {json.dumps(health, indent=2)}")
+            print("WARNING: Backend reports model is NOT loaded!", flush=True)
+            print(f"Health: {json.dumps(health, indent=2)}", flush=True)
             sys.exit(1)
-        print(f"Backend healthy: model loaded on {health.get('device', 'unknown')}")
+        print(f"Backend healthy: model loaded on {health.get('device', 'unknown')}", flush=True)
     except requests.exceptions.ConnectionError:
-        print(f"ERROR: Cannot connect to backend at {args.api}")
-        print("Start the backend first: cd backend && uvicorn app.main:app --reload")
+        print(f"ERROR: Cannot connect to backend at {args.api}", flush=True)
+        print("Start the backend first: cd backend && uvicorn app.main:app --reload", flush=True)
         sys.exit(1)
 
-    run_attack_scenario(args.api, args.speed, args.sessions)
+    run_attack_scenario(args.api, args.speed, args.sessions, args.scenario)
 
 
 if __name__ == "__main__":

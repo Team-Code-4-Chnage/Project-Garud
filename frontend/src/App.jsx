@@ -92,7 +92,28 @@ export default function App() {
     };
   }, []);
 
+  const handleClearLiveLogs = useCallback(() => {
+    setLiveFlows([]);
+    sessionStorage.setItem("garud_logs_cleared_at", new Date().toISOString());
+  }, []);
+
+  const handleReloadRecentLogs = useCallback(async () => {
+    try {
+      sessionStorage.removeItem("garud_logs_cleared_at");
+      const recent = await apiFetch("/flows/recent?limit=100");
+      if (Array.isArray(recent) && recent.length > 0) {
+        setLiveFlows(recent);
+      }
+    } catch (e) {
+      console.error("Failed to reload recent flows:", e);
+    }
+  }, []);
+
   useEffect(() => {
+    // If the operator explicitly cleared logs in this session, keep it cleared
+    const clearedAt = sessionStorage.getItem("garud_logs_cleared_at");
+    if (clearedAt) return;
+
     apiFetch("/flows/recent?limit=100")
       .then((recent) => {
         if (Array.isArray(recent) && recent.length > 0) {
@@ -504,7 +525,12 @@ export default function App() {
         )}
         {view === "alerts" && <AlertsView />}
         {view === "live_logs" && (
-          <LiveLogsView lines={liveFlows} connected={wsConnected} />
+          <LiveLogsView
+            lines={liveFlows}
+            connected={wsConnected}
+            onClear={handleClearLiveLogs}
+            onReloadRecent={handleReloadRecentLogs}
+          />
         )}
         {view === "explain" && <ExplainView featureList={featureList} />}
         {view === "reports" && <ReportsView />}

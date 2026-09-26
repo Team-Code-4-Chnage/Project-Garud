@@ -93,25 +93,47 @@ async def set_system_mode(req: ModeUpdateRequest):
     }
 
 
+class SimulatorStartRequest(BaseModel):
+    speed: float = 1.0
+    sessions: int = 4
+    scenario: str = "full_kill_chain"
+    auto_switch_mode: bool = True
+
+
 @router.post("/simulator/start")
-async def start_simulator(speed: float = 1.0, sessions: int = 4):
+async def start_simulator(
+    req: Optional[SimulatorStartRequest] = None,
+    speed: Optional[float] = None,
+    sessions: Optional[int] = None,
+    scenario: Optional[str] = None,
+):
     """
     Launch traffic simulator subprocess.
-    Only permitted when system mode is 'simulated'.
+    Auto-switches operating mode to 'simulated' if requested.
     """
+    req_speed = (req.speed if req else None) or speed or 1.0
+    req_sessions = (req.sessions if req else None) or sessions or 4
+    req_scenario = (req.scenario if req else None) or scenario or "full_kill_chain"
+    auto_switch = req.auto_switch_mode if req else True
+
     if SystemState.mode != "simulated":
-        raise HTTPException(
-            status_code=403,
-            detail=(
-                "Simulator cannot be started in LIVE mode. "
-                "Switch mode to 'Simulated' in Settings first."
-            ),
-        )
+        if auto_switch:
+            SystemState.mode = "simulated"
+            logger.info("Auto-switched system operating mode to SIMULATED for traffic simulator.")
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Simulator cannot be started in LIVE mode. "
+                    "Switch mode to 'Simulated' in Settings first."
+                ),
+            )
 
     if SystemState.is_simulator_running():
         return {
             "status": "already_running",
             "pid": SystemState.simulator_proc.pid if SystemState.simulator_proc else None,
+            "mode": SystemState.mode,
         }
 
     backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -124,32 +146,83 @@ async def start_simulator(speed: float = 1.0, sessions: int = 4):
             detail=f"Traffic simulator script not found at {sim_script}",
         )
 
+    # Prefer virtual environment python binary if available
+    venv_python = os.path.join(backend_dir, "venv", "Scripts", "python.exe")
+    python_exe = venv_python if os.path.exists(venv_python) else sys.executable
+
+    log_path = os.path.join(DB_DIR, "simulator.log")
+    os.makedirs(DB_DIR, exist_ok=True)
+
+    with open(log_path, "w", encoding="utf-8") as f:
+        f.write(f"[{datetime.now(timezone.utc).isoformat()}] Project Garud Cyber Attack Traffic Simulator\n")
+        f.write(f"Scenario Preset: {req_scenario} | Sessions: {req_sessions} | Speed: {req_speed}s\n")
+        f.write("=" * 70 + "\n\n")
+
     cmd = [
-        sys.executable,
+        python_exe,
+        "-u",  # Unbuffered output
         sim_script,
-        "--api", "http://localhost:8000",
-        "--sessions", str(sessions),
-        "--speed", str(speed),
+        "--api", "http://127.0.0.1:8000",
+        "--sessions", str(req_sessions),
+        "--speed", str(req_speed),
+        "--scenario", req_scenario,
     ]
 
     try:
+        log_fp = open(log_path, "a", encoding="utf-8", buffering=1)
         proc = subprocess.Popen(
             cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=log_fp,
+            stderr=subprocess.STDOUT,
         )
         SystemState.simulator_proc = proc
-        logger.info("Traffic simulator launched (PID %d)", proc.pid)
-        return {"status": "started", "pid": proc.pid}
+        logger.info("Traffic simulator launched (PID %d) with scenario '%s'", proc.pid, req_scenario)
+        return {
+            "status": "started",
+            "pid": proc.pid,
+            "mode": SystemState.mode,
+            "scenario": req_scenario,
+            "speed": req_speed,
+            "sessions": req_sessions,
+        }
     except Exception as e:
         logger.error("Failed to launch traffic simulator: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to start simulator: {e}")
+
+
+@router.get("/simulator/status")
+async def get_simulator_status():
+    """Get real-time simulator status and stream latest terminal log lines."""
+    running = SystemState.is_simulator_running()
+    logs = ""
+    log_path = os.path.join(DB_DIR, "simulator.log")
+    if os.path.exists(log_path):
+        try:
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+                logs = "".join(lines[-200:])
+        except Exception as e:
+            logs = f"Error reading simulator logs: {e}"
+
+    return {
+        "running": running,
+        "mode": SystemState.mode,
+        "pid": SystemState.simulator_proc.pid if running and SystemState.simulator_proc else None,
+        "logs": logs,
+    }
 
 
 @router.post("/simulator/stop")
 async def stop_simulator():
     """Stop the running traffic simulator."""
     was_running = SystemState.stop_simulator()
+    log_path = os.path.join(DB_DIR, "simulator.log")
+    if os.path.exists(log_path):
+        try:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"\n[{datetime.now(timezone.utc).isoformat()}] Simulation stopped by operator.\n")
+        except Exception:
+            pass
     return {"status": "stopped", "was_running": was_running}
 
 
