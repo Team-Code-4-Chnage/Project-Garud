@@ -7,24 +7,18 @@ import {
   AlertTriangle,
   ArrowDownLeft,
   ArrowUpRight,
-  Layers,
   X,
 } from "lucide-react";
 import { apiFetch } from "../api";
 import SessionTable from "./SessionTable";
 
-export default function Dashboard({
-  systemMode,
-  liveFlows = [],
-  wsConnected = false,
-}) {
+export default function Dashboard({ systemMode }) {
   const [sessions, setSessions] = useState([]);
   const [stats, setStats] = useState({});
   const [alertStats, setAlertStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [simBannerDismissed, setSimBannerDismissed] = useState(false);
   const [sortBy, setSortBy] = useState("last_seen");
-  const [dashboardTab, setDashboardTab] = useState("sessions");
 
   const ACTIVE_WINDOW_SECONDS = 300;
 
@@ -257,40 +251,17 @@ export default function Dashboard({
         )}
       </div>
 
-      {/* Sub-toolbar with View Tabs and Mode Status */}
+      {/* Mode Status */}
       <div
         style={{
           display: "flex",
-          justifyContent: "space-between",
+          justifyContent: "flex-end",
           alignItems: "center",
           marginBottom: "var(--sp-3)",
           flexWrap: "wrap",
           gap: "var(--sp-2)",
         }}
       >
-        <div className="tab-group">
-          <button
-            className={`tab-btn ${dashboardTab === "sessions" ? "active" : ""}`}
-            onClick={() => setDashboardTab("sessions")}
-          >
-            <Layers
-              size={13}
-              style={{ marginRight: 6, verticalAlign: "text-top" }}
-            />
-            Active Sessions ({sessions.length})
-          </button>
-          <button
-            className={`tab-btn ${dashboardTab === "live_flows" ? "active" : ""}`}
-            onClick={() => setDashboardTab("live_flows")}
-          >
-            <ShieldAlert
-              size={13}
-              style={{ marginRight: 6, verticalAlign: "text-top" }}
-            />
-            Detected Threat Flows ({liveFlows.length})
-          </button>
-        </div>
-
         <div
           style={{
             display: "inline-flex",
@@ -331,9 +302,6 @@ export default function Dashboard({
         loading={loading}
         sortBy={sortBy}
         setSortBy={setSortBy}
-        dashboardTab={dashboardTab}
-        liveFlows={liveFlows}
-        wsConnected={wsConnected}
       />
     </>
   );

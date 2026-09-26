@@ -1,13 +1,5 @@
 import { useState, useMemo, memo } from "react";
-import {
-  Database,
-  Radio,
-  ShieldCheck,
-  Search,
-  ArrowUpDown,
-  ArrowDown,
-  Activity,
-} from "lucide-react";
+import { Database, Search, ArrowUpDown, ArrowDown } from "lucide-react";
 import {
   DirBadge,
   IdentityBadge,
@@ -16,23 +8,13 @@ import {
   CompromiseIndicator,
   KillChainCompact,
 } from "./Badges";
-import {
-  stageClass,
-  severityClass,
-  formatTime,
-  formatProb,
-  stageIndex,
-  flowKey,
-} from "../utils";
+import { stageClass, severityClass, formatTime, formatProb, stageIndex } from "../utils";
 
 function SessionTable({
   sessions = [],
   loading = false,
   sortBy = "last_seen",
   setSortBy,
-  dashboardTab = "sessions",
-  liveFlows = [],
-  wsConnected = false,
 }) {
   const [filterText, setFilterText] = useState("");
 
@@ -48,18 +30,6 @@ function SessionTable({
         (s.latest_stage && s.latest_stage.toLowerCase().includes(q)),
     );
   }, [sessions, filterText]);
-
-  const filteredFlows = useMemo(() => {
-    if (!filterText.trim()) return liveFlows;
-    const q = filterText.toLowerCase();
-    return liveFlows.filter(
-      (f) =>
-        (f.src_ip && f.src_ip.toLowerCase().includes(q)) ||
-        (f.dst_ip && f.dst_ip.toLowerCase().includes(q)) ||
-        (f.app_name && f.app_name.toLowerCase().includes(q)) ||
-        (f.predicted_stage && f.predicted_stage.toLowerCase().includes(q)),
-    );
-  }, [liveFlows, filterText]);
 
   const renderSortIcon = (field) => {
     if (sortBy === field) {
@@ -82,212 +52,6 @@ function SessionTable({
     );
   };
 
-  if (dashboardTab === "live_flows") {
-    return (
-      <div className="data-table-wrap">
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "var(--sp-2) var(--sp-4)",
-            background: "var(--bg-elevated)",
-            borderBottom: "1px solid var(--border)",
-            gap: "var(--sp-3)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              color: "var(--text-secondary)",
-              fontSize: "0.78rem",
-            }}
-          >
-            <Activity size={14} color="var(--c-gold)" />
-            <span>Live Attack Detections ({filteredFlows.length})</span>
-          </div>
-
-          <div style={{ position: "relative", width: "220px" }}>
-            <Search
-              size={13}
-              style={{
-                position: "absolute",
-                left: 8,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "var(--text-muted)",
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Search IP, app, stage..."
-              value={filterText}
-              onChange={(e) => setFilterText(e.target.value)}
-              style={{
-                width: "100%",
-                background: "var(--bg-dark)",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-sm)",
-                padding: "4px 8px 4px 26px",
-                color: "var(--text-primary)",
-                fontFamily: "var(--font-mono)",
-                fontSize: "0.75rem",
-                outline: "none",
-              }}
-            />
-          </div>
-        </div>
-
-        {filteredFlows.length === 0 ? (
-          <div className="empty-state">
-            {wsConnected ? (
-              <>
-                <ShieldCheck size={36} color="var(--severity-low)" />
-                <p
-                  style={{
-                    marginTop: "8px",
-                    color: "var(--severity-low)",
-                    fontWeight: 700,
-                  }}
-                >
-                  Telemetry Stream Clear — No Active Threats
-                </p>
-                <span className="mono text-sm text-muted">
-                  Real-time detector actively analyzing incoming flow vectors.
-                </span>
-              </>
-            ) : (
-              <>
-                <Radio size={36} color="var(--text-muted)" />
-                <p style={{ marginTop: "8px" }}>
-                  Waiting for detector stream connection...
-                </p>
-                <span className="mono text-sm text-muted">
-                  WebSocket connection is currently establishing.
-                </span>
-              </>
-            )}
-          </div>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Application</th>
-                <th>Direction</th>
-                <th>Source → Destination</th>
-                <th>Protocol</th>
-                <th>Packets (Tx / Rx)</th>
-                <th>Infiltration Risk</th>
-                <th>Attack Stage</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredFlows.map((f) => {
-                const prob = f.infiltration_prob;
-                const isAlert = (prob || 0) > 0.5;
-                return (
-                  <tr
-                    key={flowKey(f)}
-                    style={{
-                      background: isAlert ? "rgba(201,74,69,0.08)" : undefined,
-                    }}
-                  >
-                    <td
-                      className="mono text-sm"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      {formatTime(f.timestamp || f._ts)}
-                    </td>
-                    <td>
-                      <AppBadge
-                        appName={f.app_name}
-                        processName={f.process_name}
-                        iconType={f.app_icon}
-                      />
-                    </td>
-                    <td>
-                      <DirBadge dir={f.direction} />
-                    </td>
-                    <td>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                      >
-                        <div className="ip-symmetric-cell">
-                          <span className="ip-digits">
-                            {f.src_ip || "?"}
-                            {f.src_port ? `:${f.src_port}` : ""}
-                          </span>
-                          <IdentityBadge identity={f.src_identity} />
-                        </div>
-                        <span
-                          style={{ color: "var(--c-gold)", fontWeight: 700 }}
-                        >
-                          &rarr;
-                        </span>
-                        <div className="ip-symmetric-cell">
-                          <span className="ip-digits">
-                            {f.dst_ip || "?"}
-                            {f.dst_port ? `:${f.dst_port}` : ""}
-                          </span>
-                          <IdentityBadge identity={f.dst_identity} />
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span
-                        className="mono text-sm"
-                        style={{ color: "var(--text-secondary)" }}
-                      >
-                        {f.protocol || "TCP"}
-                      </span>
-                    </td>
-                    <td>
-                      <PacketStat
-                        fwdPkts={f.tot_fwd_pkts}
-                        bwdPkts={f.tot_bwd_pkts}
-                        bytesPerSec={f.flow_bytes_s}
-                        proto={f.protocol}
-                      />
-                    </td>
-                    <td>
-                      <div className="risk-cell">
-                        <div className={`risk-bar ${severityClass(prob)}`} />
-                        <span
-                          style={{
-                            fontWeight: 700,
-                            color:
-                              (prob || 0) > 0.5
-                                ? "var(--c-red)"
-                                : "var(--text-primary)",
-                          }}
-                        >
-                          {formatProb(prob)}
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <span
-                        className={`stage-badge ${stageClass(f.predicted_stage || "Benign")}`}
-                      >
-                        {f.predicted_stage || "Benign"}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="data-table-wrap">

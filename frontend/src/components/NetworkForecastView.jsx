@@ -108,7 +108,7 @@ function NetworkForecastView() {
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <Network size={16} color="var(--c-gold)" />
-        <span className="panel-title">Macro Network World Model</span>
+        <span className="panel-title">Attack Forecast &bull; Network World Model</span>
       </div>
       <span
         className="mono text-xs text-muted"

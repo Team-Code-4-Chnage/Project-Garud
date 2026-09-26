@@ -90,6 +90,19 @@ def test_forecast_combines_every_source(tracker):
     assert combined_only["n_flows"].iloc[0] == 18  # every source's flows landed in the one state
 
 
+def test_summary_survives_mixed_naive_and_aware_timestamps(tracker):
+    naive = FlowRecord(**{k: 1.0 for k in FLOW_FEATURES}, src_ip="10.0.0.1", dst_ip="10.0.0.9",
+                       src_port=1, dst_port=80, protocol="TCP",
+                       timestamp=datetime(2024, 1, 1, 10, 0), source="csv_upload")
+    aware = FlowRecord(**{k: 1.0 for k in FLOW_FEATURES}, src_ip="10.0.0.2", dst_ip="10.0.0.9",
+                       src_port=2, dst_port=80, protocol="TCP",
+                       timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc), source="pcap_upload")
+    tracker.add(naive, "csv_upload")
+    tracker.add(aware, "pcap_upload")
+    s = tracker.summary()  # must not raise TypeError comparing naive vs aware datetimes
+    assert s["flows"] == 2 and s["sources"] == {"csv_upload": 1, "pcap_upload": 1}
+
+
 def test_reset_by_source_leaves_other_sources_combined(tracker):
     for i in range(3):
         tracker.add(flow(0, i), "csv_upload")
