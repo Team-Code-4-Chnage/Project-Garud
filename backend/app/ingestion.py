@@ -275,6 +275,8 @@ async def ingest_single_flow(
             session_key=session_key,
             src_ip=flow.src_ip,
             dst_ip=flow.dst_ip,
+            src_port=getattr(flow, "src_port", None),
+            dst_port=getattr(flow, "dst_port", None),
             flow_count=1,
             first_seen=now,
             last_seen=now,
@@ -292,6 +294,12 @@ async def ingest_single_flow(
     else:
         session.flow_count += 1
         session.last_seen = now
+        # a session can span several ports over its life (e.g. a browser opening new connections to
+        # the same host); track the most recently used one, since that reflects current activity
+        if getattr(flow, "src_port", None):
+            session.src_port = flow.src_port
+        if getattr(flow, "dst_port", None):
+            session.dst_port = flow.dst_port
         session.tot_fwd_pkts = (session.tot_fwd_pkts or 0.0) + fwd_pkts
         session.tot_bwd_pkts = (session.tot_bwd_pkts or 0.0) + bwd_pkts
         if process_name and not session.process_name:

@@ -21,6 +21,7 @@ import { apiFetch, apiPost, createWebSocket } from "./api";
 import { formatTime, flowKey } from "./utils";
 import { WellbeingModal } from "./components/Badges";
 import Dashboard from "./components/Dashboard";
+import ForecastView from "./components/ForecastView";
 import NetworkForecastView from "./components/NetworkForecastView";
 import { AlertsView } from "./components/AlertPanel";
 import LiveLogsView from "./components/LiveLogsView";
@@ -39,6 +40,7 @@ export default function App() {
   const [systemMode, setSystemMode] = useState("live");
   const [simulatorRunning, setSimulatorRunning] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [selectedSession, setSelectedSession] = useState(null);
 
   const [liveFlows, setLiveFlows] = useState([]);
   const seenFlowKeysRef = useRef(new Set());
@@ -49,6 +51,12 @@ export default function App() {
 
   const handleNavClick = (newView) => {
     setView(newView);
+    setMobileMenuOpen(false);
+  };
+
+  const onSelectSession = (session) => {
+    setSelectedSession(session);
+    setView("forecast");
     setMobileMenuOpen(false);
   };
 
@@ -268,7 +276,8 @@ export default function App() {
     dashboard: "Dashboard",
     live_logs: "Live Event Stream",
     alerts: "Incident Alerts",
-    network: "Attack Forecast",
+    forecast: "Attack Forecast",
+    network: "Network Forecast",
     explain: "Explainable AI (XAI)",
     reports: "Forensic Audit Reports",
     ingest: "Telemetry Ingestion",
@@ -340,10 +349,16 @@ export default function App() {
             {alertCount > 0 && <span className="nav-badge">{alertCount}</span>}
           </button>
           <button
+            className={`nav-item ${view === "forecast" ? "active" : ""}`}
+            onClick={() => handleNavClick("forecast")}
+          >
+            <Activity size={15} /> Attack Forecast
+          </button>
+          <button
             className={`nav-item ${view === "network" ? "active" : ""}`}
             onClick={() => handleNavClick("network")}
           >
-            <Network size={15} /> Attack Forecast
+            <Network size={15} /> Network Forecast
           </button>
         </div>
 
@@ -487,13 +502,29 @@ export default function App() {
             {alertCount > 0 ? `Alerts: ${alertCount}` : "Alerts: 0"}
           </div>
           <span className="header-clock">
-            {clock.toISOString().slice(0, 19).replace("T", " ")} UTC
+            {clock.toLocaleString([], {
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })}
           </span>
         </div>
       </header>
 
       <main className="main-content">
-        {view === "dashboard" && <Dashboard systemMode={systemMode} />}
+        {view === "dashboard" && (
+          <Dashboard systemMode={systemMode} onSelectSession={onSelectSession} />
+        )}
+        {view === "forecast" && (
+          <ForecastView
+            session={selectedSession}
+            onBack={() => setView("dashboard")}
+            featureList={featureList}
+          />
+        )}
         {view === "network" && (
           <NetworkForecastView />
         )}

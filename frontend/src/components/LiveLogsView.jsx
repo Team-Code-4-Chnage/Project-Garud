@@ -353,7 +353,7 @@ function LiveLogsView({
       {/* Column Headers */}
       {visibleLines.length > 0 && (
         <div className="terminal-row terminal-row-header">
-          <span>Time (UTC)</span>
+          <span>Time</span>
           <span>Stage & Technique</span>
           <span>Source &rarr; Destination</span>
           <span>Application</span>
