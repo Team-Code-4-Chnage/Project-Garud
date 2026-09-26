@@ -60,3 +60,9 @@ ALLOWED_ORIGINS = list({
 })
 
 SESSION_TIME_BUCKET_SECONDS = 300
+
+# A session for one (src_ip, dst_ip) pair continues as long as flows keep arriving within this many
+# seconds of the last one seen; only a gap longer than this starts a new session_key. Continuous
+# traffic (a long-lived app connection) must not be split into multiple "sessions" just because it
+# crossed a fixed wall-clock boundary.
+SESSION_IDLE_TIMEOUT_SECONDS = 300
