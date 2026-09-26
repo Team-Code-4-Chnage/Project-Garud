@@ -1257,6 +1257,63 @@ a:hover {
   font-size: 0.85rem;
 }
 
+/* Tactical Cybersecurity Empty State */
+.empty-state {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  padding: 48px 24px !important;
+  min-height: 280px;
+  width: 100%;
+  color: var(--text-muted);
+}
+
+.empty-state .empty-icon-shield {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(88, 166, 104, 0.12);
+  border: 1px solid rgba(88, 166, 104, 0.35);
+  box-shadow: 0 0 25px rgba(88, 166, 104, 0.2);
+  margin-bottom: 16px;
+}
+
+.empty-state .empty-title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--severity-low);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.empty-state .empty-subtitle {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  max-width: 500px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.empty-state .empty-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
 /* Upload Ingest Zone */
 .upload-zone {
   border: 2px dashed var(--border);

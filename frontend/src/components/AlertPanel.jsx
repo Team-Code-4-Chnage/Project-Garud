@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   CheckCheck,
   ArrowRight,
+  Trash2,
 } from "lucide-react";
 import { apiFetch, apiPost } from "../api";
 import { stageClass, formatTime, formatProb } from "../utils";
@@ -48,16 +49,8 @@ export default function AlertPanel() {
   const refresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      // Build query string
-      const q = new URLSearchParams();
-      if (severityFilter !== "all") q.append("severity", severityFilter);
-      if (statusFilter === "unack") q.append("acknowledged", "false");
-      if (statusFilter === "ack") q.append("acknowledged", "true");
-      if (stageFilter !== "all") q.append("stage", stageFilter);
-      if (searchQuery.trim()) q.append("search", searchQuery.trim());
-      q.append("limit", "200");
-
-      const res = await apiFetch(`/alerts?${q.toString()}`);
+      // Fetch full alert ledger (up to 500) so all client-side filters respond in 0ms
+      const res = await apiFetch("/alerts?limit=500");
       setAlerts(Array.isArray(res) ? res : []);
       fetchStats();
     } catch (e) {
@@ -66,7 +59,7 @@ export default function AlertPanel() {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [severityFilter, statusFilter, stageFilter, searchQuery, fetchStats]);
+  }, [fetchStats]);
 
   useEffect(() => {
     refresh();
@@ -74,8 +67,43 @@ export default function AlertPanel() {
     return () => clearInterval(iv);
   }, [refresh]);
 
+  // Compute live category and severity counts from current alerts in memory
+  const counts = useMemo(() => {
+    const c = {
+      total: alerts.length,
+      unack: 0,
+      ack: 0,
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      recon: 0,
+      initial: 0,
+      lateral: 0,
+      c2: 0,
+      exfil: 0,
+    };
+    alerts.forEach((a) => {
+      if (a.acknowledged) c.ack++;
+      else c.unack++;
+      const sev = (a.severity || "").toLowerCase();
+      if (sev === "critical") c.critical++;
+      else if (sev === "high") c.high++;
+      else if (sev === "medium") c.medium++;
+      else if (sev === "low") c.low++;
+
+      const stg = (a.predicted_stage || "").toLowerCase();
+      if (stg.includes("recon")) c.recon++;
+      else if (stg.includes("initial")) c.initial++;
+      else if (stg.includes("lateral")) c.lateral++;
+      else if (stg.includes("c2")) c.c2++;
+      else if (stg.includes("exfil")) c.exfil++;
+    });
+    return c;
+  }, [alerts]);
+
   const acknowledge = async (id) => {
-    // Optimistic UI update
+    // Instant optimistic UI update
     setAlerts((prev) =>
       prev.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)),
     );
@@ -95,17 +123,16 @@ export default function AlertPanel() {
   };
 
   const handleAcknowledgeAll = async () => {
-    if (stats.unacknowledged === 0) return;
+    if (counts.unack === 0) return;
     if (
       !window.confirm(
-        `Acknowledge all ${stats.unacknowledged} pending incident alert(s)?`,
+        `Acknowledge all ${counts.unack} pending incident alert(s)?`,
       )
     ) {
       return;
     }
 
     setIsAcknowledgingAll(true);
-    // Optimistic UI update
     setAlerts((prev) => prev.map((a) => ({ ...a, acknowledged: true })));
     setStats((prev) => ({
       ...prev,
@@ -128,6 +155,17 @@ export default function AlertPanel() {
     }
   };
 
+  const handleClearAll = async () => {
+    if (!window.confirm("Purge all incident alerts from database?")) return;
+    try {
+      await apiPost("/alerts/clear", {});
+      setAlerts([]);
+      fetchStats();
+    } catch (e) {
+      console.error("Failed to clear alerts:", e);
+    }
+  };
+
   const handleResetFilters = () => {
     setSeverityFilter("all");
     setStatusFilter("all");
@@ -135,7 +173,7 @@ export default function AlertPanel() {
     setSearchQuery("");
   };
 
-  // Client-side quick filter refinement
+  // Instant zero-latency responsive filtering in memory
   const filteredAlerts = useMemo(() => {
     let list = alerts;
     if (severityFilter !== "all") {
@@ -179,11 +217,11 @@ export default function AlertPanel() {
 
   return (
     <div className="alerts-container">
-      {/* Overview Stat Cards Bar */}
+      {/* Overview Metric Cards Bar */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
           gap: "var(--sp-3)",
           marginBottom: "var(--sp-4)",
         }}
@@ -194,7 +232,7 @@ export default function AlertPanel() {
             className="stat-card-value mono"
             style={{ fontSize: "1.6rem", color: "var(--text-primary)" }}
           >
-            {stats.total}
+            {counts.total}
           </div>
           <div className="stat-card-sub" style={{ fontSize: "0.72rem" }}>
             Audit log records captured
@@ -205,16 +243,13 @@ export default function AlertPanel() {
           <div
             className="stat-card-label"
             style={{
-              color:
-                stats.unacknowledged > 0
-                  ? "var(--c-red)"
-                  : "var(--severity-low)",
+              color: counts.unack > 0 ? "var(--c-red)" : "var(--severity-low)",
               display: "flex",
               alignItems: "center",
               gap: 5,
             }}
           >
-            {stats.unacknowledged > 0 && (
+            {counts.unack > 0 && (
               <span
                 className="live-pulse-blip"
                 style={{
@@ -231,16 +266,13 @@ export default function AlertPanel() {
             className="stat-card-value mono"
             style={{
               fontSize: "1.6rem",
-              color:
-                stats.unacknowledged > 0
-                  ? "var(--c-red)"
-                  : "var(--severity-low)",
+              color: counts.unack > 0 ? "var(--c-red)" : "var(--severity-low)",
             }}
           >
-            {stats.unacknowledged}
+            {counts.unack}
           </div>
           <div className="stat-card-sub" style={{ fontSize: "0.72rem" }}>
-            {stats.unacknowledged > 0
+            {counts.unack > 0
               ? "Actionable incidents requiring acknowledgment"
               : "Perimeter nominal — all clear"}
           </div>
@@ -248,19 +280,16 @@ export default function AlertPanel() {
 
         <div className="card" style={{ padding: "12px 16px" }}>
           <div className="stat-card-label" style={{ color: "var(--c-red)" }}>
-            CRITICAL UNACKNOWLEDGED
+            CRITICAL SEVERITY
           </div>
           <div
             className="stat-card-value mono"
             style={{
               fontSize: "1.6rem",
-              color:
-                stats.critical_unacknowledged > 0
-                  ? "var(--c-red)"
-                  : "var(--text-muted)",
+              color: counts.critical > 0 ? "var(--c-red)" : "var(--text-muted)",
             }}
           >
-            {stats.critical_unacknowledged}
+            {counts.critical}
           </div>
           <div className="stat-card-sub" style={{ fontSize: "0.72rem" }}>
             High-urgency breach indicators
@@ -278,7 +307,7 @@ export default function AlertPanel() {
             className="stat-card-value mono"
             style={{ fontSize: "1.6rem", color: "var(--severity-low)" }}
           >
-            {stats.acknowledged}
+            {counts.ack}
           </div>
           <div className="stat-card-sub" style={{ fontSize: "0.72rem" }}>
             Analyst confirmed & triaged
@@ -306,7 +335,7 @@ export default function AlertPanel() {
             gap: 10,
           }}
         >
-          {/* Search Box */}
+          {/* Instant Search Box */}
           <div style={{ position: "relative", minWidth: 260, flex: 1 }}>
             <Search
               size={13}
@@ -337,8 +366,15 @@ export default function AlertPanel() {
             />
           </div>
 
-          {/* Action Buttons */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {/* Action Toolbar */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+            }}
+          >
             <button
               className="btn btn-sm btn-outline"
               onClick={refresh}
@@ -353,7 +389,7 @@ export default function AlertPanel() {
               REFRESH
             </button>
 
-            {stats.unacknowledged > 0 && (
+            {counts.unack > 0 && (
               <button
                 className="btn btn-sm btn-primary"
                 onClick={handleAcknowledgeAll}
@@ -369,7 +405,19 @@ export default function AlertPanel() {
                 }}
               >
                 <CheckCheck size={13} />
-                ACKNOWLEDGE ALL ({stats.unacknowledged})
+                ACKNOWLEDGE ALL ({counts.unack})
+              </button>
+            )}
+
+            {counts.total > 0 && (
+              <button
+                className="btn btn-sm btn-outline"
+                onClick={handleClearAll}
+                title="Clear all alerts from database"
+                style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+              >
+                <Trash2 size={11} />
+                CLEAR ALL
               </button>
             )}
           </div>
@@ -400,14 +448,14 @@ export default function AlertPanel() {
             </span>
             <div className="tab-group" style={{ margin: 0 }}>
               {[
-                { id: "all", label: "ALL", count: stats.total },
+                { id: "all", label: "ALL", count: counts.total },
                 {
                   id: "unack",
                   label: "PENDING",
-                  count: stats.unacknowledged,
-                  highlight: stats.unacknowledged > 0,
+                  count: counts.unack,
+                  highlight: counts.unack > 0,
                 },
-                { id: "ack", label: "ACKNOWLEDGED", count: stats.acknowledged },
+                { id: "ack", label: "ACKNOWLEDGED", count: counts.ack },
               ].map((f) => (
                 <button
                   key={f.id}
@@ -441,30 +489,30 @@ export default function AlertPanel() {
             </span>
             <div className="tab-group" style={{ margin: 0 }}>
               {[
-                { id: "all", label: "ALL" },
+                { id: "all", label: "ALL", count: counts.total },
                 {
                   id: "critical",
                   label: "CRITICAL",
                   color: "var(--c-red)",
-                  count: stats.critical_total,
+                  count: counts.critical,
                 },
                 {
                   id: "high",
                   label: "HIGH",
                   color: "#E67E22",
-                  count: stats.high_total,
+                  count: counts.high,
                 },
                 {
                   id: "medium",
                   label: "MEDIUM",
                   color: "var(--c-gold)",
-                  count: stats.medium_total,
+                  count: counts.medium,
                 },
                 {
                   id: "low",
                   label: "LOW",
                   color: "var(--severity-low)",
-                  count: stats.low_total,
+                  count: counts.low,
                 },
               ].map((f) => (
                 <button
@@ -478,16 +526,13 @@ export default function AlertPanel() {
                       f.color && severityFilter !== f.id ? f.color : undefined,
                   }}
                 >
-                  {f.label}
-                  {typeof f.count === "number" && f.count > 0
-                    ? ` (${f.count})`
-                    : ""}
+                  {f.label} ({f.count})
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Stage Filter */}
+          {/* MITRE Stage Filter */}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span
               style={{
@@ -501,11 +546,11 @@ export default function AlertPanel() {
             <div className="tab-group" style={{ margin: 0 }}>
               {[
                 { id: "all", label: "ALL" },
-                { id: "recon", label: "RECON" },
-                { id: "initial", label: "INITIAL" },
-                { id: "lateral", label: "LATERAL" },
-                { id: "c2", label: "C2" },
-                { id: "exfil", label: "EXFIL" },
+                { id: "recon", label: `RECON (${counts.recon})` },
+                { id: "initial", label: `INITIAL (${counts.initial})` },
+                { id: "lateral", label: `LATERAL (${counts.lateral})` },
+                { id: "c2", label: `C2 (${counts.c2})` },
+                { id: "exfil", label: `EXFIL (${counts.exfil})` },
               ].map((f) => (
                 <button
                   key={f.id}
@@ -540,46 +585,61 @@ export default function AlertPanel() {
         </div>
       </div>
 
-      {/* Incidents Table */}
+      {/* Incidents Table Wrap */}
       <div className="data-table-wrap">
         {loading ? (
           <div className="empty-state">
             <div className="loading-spinner" />
-            <p>Loading security incident alerts...</p>
+            <p
+              style={{
+                marginTop: 12,
+                fontFamily: "var(--font-mono)",
+                fontSize: "0.85rem",
+              }}
+            >
+              Loading security incident telemetry...
+            </p>
           </div>
         ) : filteredAlerts.length === 0 ? (
           <div className="empty-state">
-            <Shield size={36} color="var(--severity-low)" />
-            <p
-              style={{
-                marginTop: "10px",
-                color: "var(--severity-low)",
-                fontWeight: 700,
-                fontSize: "1rem",
-              }}
-            >
-              Perimeter Clear &bull; No Incidents Match Criteria
-            </p>
-            <span
-              className="mono text-sm text-muted"
-              style={{ maxWidth: 450, textAlign: "center", marginTop: 4 }}
-            >
+            <div className="empty-icon-shield">
+              <Shield size={32} color="var(--severity-low)" strokeWidth={2.2} />
+            </div>
+            <div className="empty-title">
+              <span
+                className="live-pulse-blip"
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: "var(--severity-low)",
+                }}
+              />
+              PERIMETER SECURE &bull; ZERO ACTIVE THREAT BREACHES
+            </div>
+            <div className="empty-subtitle">
               {alerts.length === 0
-                ? "Zero critical threshold breaches recorded in database audit ledger."
-                : "No incidents match your current filter settings. Click 'Reset Filters' to view all telemetry alerts."}
-            </span>
-            {(severityFilter !== "all" ||
-              statusFilter !== "all" ||
-              stageFilter !== "all" ||
-              searchQuery.trim()) && (
-              <button
-                className="btn btn-sm btn-outline"
-                onClick={handleResetFilters}
-                style={{ marginTop: 12 }}
-              >
-                Reset All Filters
-              </button>
-            )}
+                ? "All network ingress and egress telemetry flows are operating within authorized baseline thresholds. No high-risk security incidents or MITRE ATT&CK patterns detected."
+                : "No security incident alerts match your active filter settings. Reset filters to inspect all recorded events."}
+            </div>
+            <div className="empty-actions">
+              {(severityFilter !== "all" ||
+                statusFilter !== "all" ||
+                stageFilter !== "all" ||
+                searchQuery.trim()) && (
+                <button
+                  className="btn btn-sm btn-outline"
+                  onClick={handleResetFilters}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                  }}
+                >
+                  <RotateCcw size={11} /> RESET ACTIVE FILTERS
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <table className="data-table">

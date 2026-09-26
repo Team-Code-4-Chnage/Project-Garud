@@ -128,3 +128,12 @@ async def alert_stats(db: AsyncSession = Depends(get_db)):
         "low_total": low_total,
     }
 
+
+@router.post("/alerts/clear")
+async def clear_all_alerts(db: AsyncSession = Depends(get_db)):
+    """Purge all alerts from the database."""
+    from sqlalchemy import delete
+    await db.execute(delete(AlertDB))
+    await db.commit()
+    return {"status": "cleared"}
+
