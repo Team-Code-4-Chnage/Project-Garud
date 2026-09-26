@@ -25,6 +25,7 @@ from .config import (
     ADAPTIVE_THRESHOLD_ENABLED,
     DEFAULT_THRESHOLD,
     FLOW_FEATURES,
+    SESSION_IDLE_TIMEOUT_SECONDS,
     SESSION_TIME_BUCKET_SECONDS,
     STAGES,
     WINDOW_SIZE,
@@ -100,8 +101,9 @@ def classify_direction(src_ip: Optional[str], dst_ip: Optional[str]) -> str:
 def derive_session_key(src_ip: Optional[str], dst_ip: Optional[str],
                        timestamp: Optional[datetime] = None) -> str:
     """
-    Group flows into sessions by (src_ip, dst_ip, time_bucket).
-    Falls back to a counter-based key if IPs aren't provided.
+    Mint a fresh session key for (src_ip, dst_ip) starting at timestamp's time bucket.
+    Used to start a new session; an ONGOING conversation is kept under its existing key by
+    resolve_session_key() below, regardless of which bucket the current flow falls in.
     """
     src = src_ip or "unknown"
     dst = dst_ip or "unknown"
@@ -110,6 +112,41 @@ def derive_session_key(src_ip: Optional[str], dst_ip: Optional[str],
     else:
         bucket = int(datetime.now(timezone.utc).timestamp()) // SESSION_TIME_BUCKET_SECONDS
     return f"{src}->{dst}@{bucket}"
+
+
+def _as_utc(dt: datetime) -> datetime:
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
+async def resolve_session_key(db: AsyncSession, src_ip: Optional[str], dst_ip: Optional[str],
+                              timestamp: Optional[datetime] = None) -> str:
+    """
+    A session for one (src_ip, dst_ip) pair is one continuous conversation: as long as flows keep
+    arriving within SESSION_IDLE_TIMEOUT_SECONDS of the previous one, they belong to the SAME
+    session_key, no matter how many fixed time buckets that spans. Only a real gap starts a new
+    session. Without this, any app with a connection open longer than one bucket (e.g. Chrome or
+    Spotify streaming for more than a few minutes) would appear as several duplicate "sessions" in
+    the tracked-sessions view, and the model's sliding window for that conversation would be reset
+    and lose its temporal context every time the bucket rolled over.
+
+    Continuation is judged on wall-clock arrival time (matching how SessionDB.last_seen is stamped
+    below), not on the flow's own timestamp: a batch replay of old historical flows arriving within
+    the same few real seconds is one session, even though their embedded timestamps span hours.
+    """
+    now = datetime.now(timezone.utc)
+    if src_ip and dst_ip:
+        result = await db.execute(
+            select(SessionDB.session_key, SessionDB.last_seen)
+            .where(SessionDB.src_ip == src_ip, SessionDB.dst_ip == dst_ip)
+            .order_by(SessionDB.last_seen.desc())
+            .limit(1)
+        )
+        row = result.first()
+        if row is not None:
+            key, last_seen = row
+            if (now - _as_utc(last_seen)).total_seconds() <= SESSION_IDLE_TIMEOUT_SECONDS:
+                return key
+    return derive_session_key(src_ip, dst_ip, timestamp)
 
 
 def _severity_from_prob(prob: float) -> str:
@@ -181,7 +218,7 @@ async def ingest_single_flow(
     if random.random() < 0.01:
         evict_stale_buffers()
 
-    session_key = derive_session_key(flow.src_ip, flow.dst_ip, flow.timestamp)
+    session_key = await resolve_session_key(db, flow.src_ip, flow.dst_ip, flow.timestamp)
     source = getattr(flow, "source", None) or "api"
     network_tracker.add(flow, source)  # per-minute network state for the network world model
 
