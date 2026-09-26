@@ -1,16 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Shield,
-  Check,
   AlertTriangle,
-  ShieldAlert,
   CheckCircle2,
-  BellRing,
-  Filter,
   Search,
   RotateCcw,
-  SlidersHorizontal,
-  CheckCheck,
   ArrowRight,
   Trash2,
 } from "lucide-react";
@@ -20,15 +14,6 @@ import { IdentityBadge } from "./Badges";
 
 export default function AlertPanel() {
   const [alerts, setAlerts] = useState([]);
-  const [stats, setStats] = useState({
-    total: 0,
-    unacknowledged: 0,
-    acknowledged: 0,
-    critical_unacknowledged: 0,
-    high_unacknowledged: 0,
-    medium_unacknowledged: 0,
-    low_unacknowledged: 0,
-  });
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -37,14 +22,6 @@ export default function AlertPanel() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isAcknowledgingAll, setIsAcknowledgingAll] = useState(false);
-
-  const fetchStats = useCallback(async () => {
-    try {
-      const s = await apiFetch("/alerts/stats");
-      if (s) setStats(s);
-    } catch {}
-  }, []);
 
   const refresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -52,14 +29,13 @@ export default function AlertPanel() {
       // Fetch full alert ledger (up to 500) so all client-side filters respond in 0ms
       const res = await apiFetch("/alerts?limit=500");
       setAlerts(Array.isArray(res) ? res : []);
-      fetchStats();
     } catch (e) {
       console.error("Failed to load alerts:", e);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [fetchStats]);
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -102,65 +78,11 @@ export default function AlertPanel() {
     return c;
   }, [alerts]);
 
-  const acknowledge = async (id) => {
-    // Instant optimistic UI update
-    setAlerts((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)),
-    );
-    setStats((prev) => ({
-      ...prev,
-      unacknowledged: Math.max(0, prev.unacknowledged - 1),
-      acknowledged: prev.acknowledged + 1,
-    }));
-
-    try {
-      await apiPost(`/alerts/${id}/acknowledge`, {});
-      fetchStats();
-    } catch (e) {
-      console.error("Failed to acknowledge alert:", e);
-      refresh();
-    }
-  };
-
-  const handleAcknowledgeAll = async () => {
-    if (counts.unack === 0) return;
-    if (
-      !window.confirm(
-        `Acknowledge all ${counts.unack} pending incident alert(s)?`,
-      )
-    ) {
-      return;
-    }
-
-    setIsAcknowledgingAll(true);
-    setAlerts((prev) => prev.map((a) => ({ ...a, acknowledged: true })));
-    setStats((prev) => ({
-      ...prev,
-      acknowledged: prev.total,
-      unacknowledged: 0,
-      critical_unacknowledged: 0,
-      high_unacknowledged: 0,
-      medium_unacknowledged: 0,
-      low_unacknowledged: 0,
-    }));
-
-    try {
-      await apiPost("/alerts/acknowledge-all", {});
-      fetchStats();
-    } catch (e) {
-      console.error("Failed to bulk acknowledge alerts:", e);
-      refresh();
-    } finally {
-      setIsAcknowledgingAll(false);
-    }
-  };
-
   const handleClearAll = async () => {
     if (!window.confirm("Purge all incident alerts from database?")) return;
     try {
       await apiPost("/alerts/clear", {});
       setAlerts([]);
-      fetchStats();
     } catch (e) {
       console.error("Failed to clear alerts:", e);
     }
@@ -388,26 +310,6 @@ export default function AlertPanel() {
               />
               REFRESH
             </button>
-
-            {counts.unack > 0 && (
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={handleAcknowledgeAll}
-                disabled={isAcknowledgingAll}
-                title="Mark all pending alerts as acknowledged"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                  background: "var(--c-gold)",
-                  color: "#1A1610",
-                  fontWeight: 700,
-                }}
-              >
-                <CheckCheck size={13} />
-                ACKNOWLEDGE ALL ({counts.unack})
-              </button>
-            )}
 
             {counts.total > 0 && (
               <button
@@ -810,7 +712,7 @@ export default function AlertPanel() {
                       {formatTime(a.created_at)}
                     </td>
 
-                    {/* Status & Action */}
+                    {/* Status */}
                     <td style={{ textAlign: "right" }}>
                       {a.acknowledged ? (
                         <span
@@ -831,20 +733,23 @@ export default function AlertPanel() {
                           <CheckCircle2 size={11} /> Triaged
                         </span>
                       ) : (
-                        <button
-                          className="btn btn-sm btn-primary"
-                          onClick={() => acknowledge(a.id)}
-                          title="Mark incident as acknowledged by security analyst"
+                        <span
                           style={{
                             display: "inline-flex",
                             alignItems: "center",
                             gap: 4,
-                            padding: "3px 8px",
+                            color: "var(--c-red)",
                             fontSize: "0.72rem",
+                            fontWeight: 700,
+                            background: "rgba(201, 74, 69, 0.1)",
+                            padding: "3px 8px",
+                            borderRadius: "var(--radius-sm)",
+                            border: "1px solid rgba(201, 74, 69, 0.3)",
+                            fontFamily: "var(--font-mono)",
                           }}
                         >
-                          <Check size={11} /> Acknowledge
-                        </button>
+                          <AlertTriangle size={11} /> Pending
+                        </span>
                       )}
                     </td>
                   </tr>

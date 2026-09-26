@@ -32,6 +32,10 @@ export const DEFAULT_FEAT_ORDER = [
   "retransmit_cnt",
 ];
 
+export function flowKey(f) {
+  return f.id ?? `${f.session_key || `${f.src_ip}-${f.dst_ip}`}-${f.timestamp || f._ts}`;
+}
+
 export function stageIndex(stage) {
   const i = STAGES.indexOf(stage);
   return i >= 0 ? i : 0;

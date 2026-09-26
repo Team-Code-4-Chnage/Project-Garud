@@ -8,15 +8,12 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Layers,
-  Radio,
-  CheckCircle2,
   X,
 } from "lucide-react";
 import { apiFetch } from "../api";
 import SessionTable from "./SessionTable";
 
 export default function Dashboard({
-  onSelectSession,
   systemMode,
   liveFlows = [],
   wsConnected = false,
@@ -332,7 +329,6 @@ export default function Dashboard({
       <SessionTable
         sessions={sessions}
         loading={loading}
-        onSelectSession={onSelectSession}
         sortBy={sortBy}
         setSortBy={setSortBy}
         dashboardTab={dashboardTab}

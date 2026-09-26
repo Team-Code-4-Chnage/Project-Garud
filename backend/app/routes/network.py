@@ -1,7 +1,11 @@
-"""Network-state world model routes (per-minute network state, 4-minute forecast, sustained alert)."""
+"""Network-state world model routes (per-minute network-wide state, 4-minute forecast, sustained alert).
+
+There is exactly one forecast, combining every recorded flow regardless of source or IP. `/network/sources`
+is informational only (flow counts by ingestion source); it never selects or filters what is forecast.
+"""
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 
 from ..network_state import tracker
 
@@ -10,19 +14,14 @@ router = APIRouter(prefix="/network", tags=["Network State"])
 
 @router.get("/sources")
 async def sources():
-    """Traffic sources with recorded flows, most recent first."""
-    return tracker.sources()
+    """Total recorded flows and a breakdown by ingestion source, for information only."""
+    return tracker.summary()
 
 
 @router.get("/forecast")
-async def forecast(source: Optional[str] = Query(None, description="defaults to the most recently active source")):
-    """Per-minute network state and risk history, sustained-alert status, and the t+1..t+4 forecast."""
-    if source is None:
-        srcs = tracker.sources()
-        if not srcs:
-            return {"status": "no_data"}
-        source = srcs[0]["source"]
-    result = tracker.analyze(source)
+async def forecast():
+    """Combined network-wide state history, sustained-alert status, and the t+1..t+4 forecast."""
+    result = tracker.analyze()
     if result.get("status") == "model_unavailable":
         raise HTTPException(status_code=503, detail=result.get("detail"))
     return result

@@ -3,11 +3,9 @@ import {
   Database,
   Radio,
   ShieldCheck,
-  TrendingUp,
   Search,
   ArrowUpDown,
   ArrowDown,
-  ArrowUp,
   Activity,
 } from "lucide-react";
 import {
@@ -24,12 +22,12 @@ import {
   formatTime,
   formatProb,
   stageIndex,
+  flowKey,
 } from "../utils";
 
 function SessionTable({
   sessions = [],
   loading = false,
-  onSelectSession,
   sortBy = "last_seen",
   setSortBy,
   dashboardTab = "sessions",
@@ -184,16 +182,15 @@ function SessionTable({
                 <th>Packets (Tx / Rx)</th>
                 <th>Infiltration Risk</th>
                 <th>Attack Stage</th>
-                <th style={{ textAlign: "right" }}>Forecast Action</th>
               </tr>
             </thead>
             <tbody>
-              {filteredFlows.map((f, i) => {
+              {filteredFlows.map((f) => {
                 const prob = f.infiltration_prob;
                 const isAlert = (prob || 0) > 0.5;
                 return (
                   <tr
-                    key={i}
+                    key={flowKey(f)}
                     style={{
                       background: isAlert ? "rgba(201,74,69,0.08)" : undefined,
                     }}
@@ -229,7 +226,11 @@ function SessionTable({
                           </span>
                           <IdentityBadge identity={f.src_identity} />
                         </div>
-                        <span style={{ color: "var(--c-gold)", fontWeight: 700 }}>&rarr;</span>
+                        <span
+                          style={{ color: "var(--c-gold)", fontWeight: 700 }}
+                        >
+                          &rarr;
+                        </span>
                         <div className="ip-symmetric-cell">
                           <span className="ip-digits">
                             {f.dst_ip || "?"}
@@ -277,22 +278,6 @@ function SessionTable({
                       >
                         {f.predicted_stage || "Benign"}
                       </span>
-                    </td>
-                    <td style={{ textAlign: "right" }}>
-                      <button
-                        className="btn btn-sm btn-primary"
-                        onClick={() =>
-                          onSelectSession?.({
-                            session_key: f.session_key,
-                            src_ip: f.src_ip,
-                            dst_ip: f.dst_ip,
-                            latest_stage: f.predicted_stage || "Benign",
-                            latest_risk_score: f.infiltration_prob || 0.0,
-                          })
-                        }
-                      >
-                        <TrendingUp size={11} /> Forecast
-                      </button>
                     </td>
                   </tr>
                 );
@@ -405,7 +390,6 @@ function SessionTable({
               >
                 Last Seen {renderSortIcon("last_seen")}
               </th>
-              <th style={{ textAlign: "right" }}>Forecast Action</th>
             </tr>
           </thead>
           <tbody>
@@ -416,7 +400,6 @@ function SessionTable({
               return (
                 <tr
                   key={s.session_key}
-                  onClick={() => onSelectSession?.(s)}
                   style={{
                     background: isCompromised
                       ? `linear-gradient(90deg, rgba(201, 74, 69, 0.1), transparent)`
@@ -501,17 +484,6 @@ function SessionTable({
                     style={{ color: "var(--text-muted)" }}
                   >
                     {formatTime(s.last_seen)}
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    <button
-                      className="btn btn-sm btn-primary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectSession?.(s);
-                      }}
-                    >
-                      <TrendingUp size={11} /> Forecast
-                    </button>
                   </td>
                 </tr>
               );
