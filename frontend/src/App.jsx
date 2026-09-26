@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -18,7 +18,7 @@ import {
   Shield,
 } from "lucide-react";
 import { apiFetch, apiPost, createWebSocket } from "./api";
-import { formatTime, isAttackFlow, flowKey } from "./utils";
+import { formatTime, flowKey } from "./utils";
 import { WellbeingModal } from "./components/Badges";
 import Dashboard from "./components/Dashboard";
 import NetworkForecastView from "./components/NetworkForecastView";
@@ -42,10 +42,6 @@ export default function App() {
 
   const [liveFlows, setLiveFlows] = useState([]);
   const seenFlowKeysRef = useRef(new Set());
-  const attackFlows = useMemo(
-    () => liveFlows.filter(isAttackFlow),
-    [liveFlows],
-  );
   const [wsConnected, setWsConnected] = useState(false);
   const [hostIdentity, setHostIdentity] = useState(null);
   const [currentCycle, setCurrentCycle] = useState(null);
@@ -272,7 +268,7 @@ export default function App() {
     dashboard: "Dashboard",
     live_logs: "Live Event Stream",
     alerts: "Incident Alerts",
-    network: "Macro Network Topology",
+    network: "Attack Forecast",
     explain: "Explainable AI (XAI)",
     reports: "Forensic Audit Reports",
     ingest: "Telemetry Ingestion",
@@ -347,7 +343,7 @@ export default function App() {
             className={`nav-item ${view === "network" ? "active" : ""}`}
             onClick={() => handleNavClick("network")}
           >
-            <Network size={15} /> Macro World Model
+            <Network size={15} /> Attack Forecast
           </button>
         </div>
 
@@ -497,14 +493,7 @@ export default function App() {
       </header>
 
       <main className="main-content">
-        {view === "dashboard" && (
-          <Dashboard
-            featureList={featureList}
-            systemMode={systemMode}
-            liveFlows={attackFlows}
-            wsConnected={wsConnected}
-          />
-        )}
+        {view === "dashboard" && <Dashboard systemMode={systemMode} />}
         {view === "network" && (
           <NetworkForecastView />
         )}

@@ -93,10 +93,16 @@ class NetworkStateTracker:
         return self._model
 
     def add(self, flow, source):
+        # Different ingestion paths hand back naive or UTC-aware datetimes (e.g. a CSV timestamp column
+        # with no offset vs a PCAP/live capture timestamp). Every stored row must be tz-aware, or
+        # min()/max() and pandas datetime ops below fail as soon as two sources are combined.
+        ts = flow.timestamp or datetime.now(timezone.utc)
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
         row = {f: float(getattr(flow, f)) for f in FLOW_FEATURES}
         row.update(src_ip=flow.src_ip or "0.0.0.0", dst_ip=flow.dst_ip or "0.0.0.0",
                    src_port=flow.src_port or 0, dst_port=flow.dst_port or 0, protocol=flow.protocol or "TCP",
-                   timestamp=flow.timestamp or datetime.now(timezone.utc), _source=source or "api")
+                   timestamp=ts, _source=source or "api")
         with self._lock:
             self._flows.append(row)
 
