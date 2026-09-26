@@ -190,3 +190,47 @@ async def stage_distribution(db: AsyncSession = Depends(get_db)):
     result = await db.execute(stmt)
     rows = result.all()
     return [{"stage": row[0], "count": row[1]} for row in rows]
+
+
+@router.get("/flows/recent")
+async def get_recent_flows(
+    limit: int = Query(100, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the most recent flow records across all sessions for live feed bootstrapping."""
+    stmt = (
+        select(FlowRecordDB)
+        .order_by(desc(FlowRecordDB.timestamp), desc(FlowRecordDB.id))
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    flows = result.scalars().all()
+    return [
+        {
+            "id": f.id,
+            "session_key": f.session_key,
+            "src_ip": f.src_ip,
+            "dst_ip": f.dst_ip,
+            "src_port": f.src_port,
+            "dst_port": f.dst_port,
+            "protocol": f.protocol or "TCP",
+            "direction": f.direction,
+            "source": f.source,
+            "process_name": f.process_name,
+            "app_name": f.app_name,
+            "src_identity": f.src_identity,
+            "dst_identity": f.dst_identity,
+            "tot_fwd_pkts": f.tot_fwd_pkts or 0,
+            "tot_bwd_pkts": f.tot_bwd_pkts or 0,
+            "flow_bytes_s": f.flow_bytes_s or 0.0,
+            "flow_pkts_s": f.flow_pkts_s or 0.0,
+            "flow_duration": f.flow_duration or 0.0,
+            "infiltration_prob": f.infiltration_prob,
+            "predicted_stage": f.predicted_stage,
+            "is_alert": (f.infiltration_prob or 0.0) > 0.5 or (bool(f.predicted_stage) and f.predicted_stage != "Benign"),
+            "timestamp": f.timestamp.isoformat() if f.timestamp else None,
+            "_ts": f.timestamp.isoformat() if f.timestamp else None,
+        }
+        for f in flows
+    ]
+

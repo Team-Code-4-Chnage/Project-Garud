@@ -29,7 +29,7 @@ function StageDistributionChart({ stageDist: propDist }) {
   return (
     <div className="panel">
       <div className="panel-header">
-        <span className="panel-title">MITRE_STAGE_DISTRIBUTION</span>
+        <span className="panel-title">MITRE ATT&CK Stage Distribution</span>
       </div>
       <div className="panel-body">
         {loading ? (
