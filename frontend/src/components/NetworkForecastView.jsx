@@ -31,7 +31,15 @@ const STATE_LABELS = {
   f_total_bytes: "Bytes / min",
 };
 
-const hhmm = (iso) => (iso ? iso.slice(11, 16) : "");
+// The backend timestamps every minute in UTC but omits the offset ("2026-09-27T10:24:00", no "Z").
+// A bare Date-time string with no offset is parsed as LOCAL time per the ECMA-262 spec, which would
+// silently misread these as wall-clock-local when they are actually UTC. Mark them as UTC explicitly,
+// then let toLocaleTimeString convert to the viewer's real local time zone.
+const hhmm = (iso) => {
+  if (!iso) return "";
+  const asUtc = /[Zz]|[+-]\d\d:\d\d$/.test(iso) ? iso : `${iso}Z`;
+  return new Date(asUtc).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
 const fmt = (v) =>
   v == null
     ? "-"
@@ -203,7 +211,7 @@ function NetworkForecastView() {
           >
             WINDOW:{" "}
             <strong style={{ color: "var(--c-gold)" }}>
-              {hhmm(cur.minute)} UTC
+              {hhmm(cur.minute)}
             </strong>{" "}
             &middot; RISK OVER NEXT 4 MIN:{" "}
             <strong

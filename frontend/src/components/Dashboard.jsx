@@ -12,7 +12,7 @@ import {
 import { apiFetch } from "../api";
 import SessionTable from "./SessionTable";
 
-export default function Dashboard({ systemMode }) {
+export default function Dashboard({ systemMode, onSelectSession }) {
   const [sessions, setSessions] = useState([]);
   const [stats, setStats] = useState({});
   const [alertStats, setAlertStats] = useState({});
@@ -302,6 +302,7 @@ export default function Dashboard({ systemMode }) {
         loading={loading}
         sortBy={sortBy}
         setSortBy={setSortBy}
+        onSelectSession={onSelectSession}
       />
     </>
   );

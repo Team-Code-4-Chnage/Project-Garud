@@ -1,5 +1,5 @@
 import { useState, useMemo, memo } from "react";
-import { Database, Search, ArrowUpDown, ArrowDown, ChevronRight, ChevronDown, Layers } from "lucide-react";
+import { Database, Search, ArrowUpDown, ArrowDown, ChevronRight, ChevronDown, Layers, TrendingUp } from "lucide-react";
 import {
   DirBadge,
   IdentityBadge,
@@ -67,11 +67,16 @@ function groupSessions(sessions) {
   });
 }
 
+function portOf(s) {
+  return s.dst_port ? `:${s.dst_port}` : "";
+}
+
 function SessionTable({
   sessions = [],
   loading = false,
   sortBy = "last_seen",
   setSortBy,
+  onSelectSession,
 }) {
   const [filterText, setFilterText] = useState("");
   const [groupByApp, setGroupByApp] = useState(true);
@@ -246,6 +251,7 @@ function SessionTable({
               >
                 Last Seen {renderSortIcon("last_seen")}
               </th>
+              <th style={{ textAlign: "right" }}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -257,6 +263,7 @@ function SessionTable({
                 (s.latest_risk_score || 0) > 0.5;
               const rowKey = isGroup ? row.key : row.session_key;
               const isOpen = isGroup && expanded.has(row.key);
+              const forecastTarget = isGroup ? (row.count === 1 ? row.rows[0] : null) : row;
               const mainRow = (
                 <tr
                   key={rowKey}
@@ -304,10 +311,15 @@ function SessionTable({
                   </td>
                   <td>
                     {isGroup && row.count > 1 ? (
-                      <span className="mono text-sm text-muted">{row.count} destinations</span>
+                      <span className="mono text-sm text-muted">
+                        {row.count} destinations{isOpen ? "" : " (expand to see ports)"}
+                      </span>
                     ) : (
                       <div className="ip-symmetric-cell">
-                        <span className="ip-digits">{s.dst_ip || "—"}</span>
+                        <span className="ip-digits">
+                          {s.dst_ip || "—"}
+                          {portOf(s)}
+                        </span>
                         <IdentityBadge identity={s.dst_identity} />
                       </div>
                     )}
@@ -323,7 +335,10 @@ function SessionTable({
                     {s.flow_count}
                   </td>
                   <td>
-                    <div className="risk-cell">
+                    <div
+                      className="risk-cell"
+                      title={isGroup && row.count > 1 ? "Highest risk among this app's active destinations" : undefined}
+                    >
                       <div
                         className={`risk-bar ${severityClass(s.latest_risk_score)}`}
                       />
@@ -337,7 +352,6 @@ function SessionTable({
                         }}
                       >
                         {formatProb(s.latest_risk_score)}
-                        {isGroup && row.count > 1 ? " (peak)" : ""}
                       </span>
                     </div>
                   </td>
@@ -371,6 +385,21 @@ function SessionTable({
                   >
                     {formatTime(s.last_seen)}
                   </td>
+                  <td style={{ textAlign: "right" }}>
+                    {forecastTarget ? (
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectSession?.(forecastTarget);
+                        }}
+                      >
+                        <TrendingUp size={11} /> Forecast
+                      </button>
+                    ) : (
+                      <span className="mono text-xs text-muted">expand to forecast</span>
+                    )}
+                  </td>
                 </tr>
               );
               if (!isOpen) return mainRow;
@@ -391,7 +420,10 @@ function SessionTable({
                       </td>
                       <td>
                         <div className="ip-symmetric-cell">
-                          <span className="ip-digits">{d.dst_ip || "—"}</span>
+                          <span className="ip-digits">
+                            {d.dst_ip || "—"}
+                            {portOf(d)}
+                          </span>
                           <IdentityBadge identity={d.dst_identity} />
                         </div>
                       </td>
@@ -422,6 +454,14 @@ function SessionTable({
                       </td>
                       <td className="mono text-sm" style={{ color: "var(--text-muted)" }}>
                         {formatTime(d.last_seen)}
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={() => onSelectSession?.(d)}
+                        >
+                          <TrendingUp size={11} /> Forecast
+                        </button>
                       </td>
                     </tr>
                   ))}

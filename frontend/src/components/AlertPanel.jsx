@@ -552,7 +552,7 @@ export default function AlertPanel() {
                 <th style={{ width: "160px" }}>MITRE ATT&CK Stage</th>
                 <th style={{ width: "120px" }}>Infiltration Risk</th>
                 <th>Recommended Mitigation Playbook</th>
-                <th style={{ width: "140px" }}>Incident Time (UTC)</th>
+                <th style={{ width: "140px" }}>Incident Time</th>
                 <th style={{ width: "130px", textAlign: "right" }}>
                   Status / Action
                 </th>

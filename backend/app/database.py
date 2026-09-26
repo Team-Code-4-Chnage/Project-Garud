@@ -86,6 +86,8 @@ class SessionDB(Base):
     session_key = Column(String(128), unique=True, index=True, nullable=False)
     src_ip = Column(String(45), nullable=True, index=True)
     dst_ip = Column(String(45), nullable=True, index=True)
+    src_port = Column(Integer, nullable=True)
+    dst_port = Column(Integer, nullable=True)
     flow_count = Column(Integer, default=0)
     latest_risk_score = Column(Float, default=0.0)
     latest_stage = Column(String(32), default="Benign")

@@ -200,6 +200,10 @@ An experimental network-state model with multi-step training targets is document
 
 `docs/world_model_v3_report.md` repeats the forecasting evaluation on CIC-IDS2017 labelled flows that keep IP, port, protocol and real (minute) timestamps, using leave-one-day-out and 5 seeds. Findings: the model predicts future network state better than persistence at every horizon; on unseen attack families detection is weak (ROC-AUC 0.54 with flow features; 0.62 with network features, mostly from a direction artefact, and 0.56 without it); 35% to 43% of 20 attack episodes were warned within 20 minutes, with the two feature sets statistically indistinguishable; false alarms were 0.5 (flow) and 1.1 (network) per quiet hour; behaviour forecasting did not beat persistence. The network-state model is now served by the backend (feature set without direction features); its results and the ablation that removed those features are in sections 14 and 15 of that report.
 
+### 6.4 Threshold tuning: explored, not deployed
+
+`experiments/tune_infiltration_threshold.py` searches for the F1-maximising decision threshold on validation only, then reports it once on the untouched test split (honest, no test-set tuning). Result: 0.6973 (vs the shipped 0.5) raises de-duplicated F1 from 0.838 to 0.847 and all-windows F1 from 0.862 to 0.868 — moving along the same ROC curve (AUC unchanged at 0.948/0.955), not improving the model. The cost: recall drops from 0.830 to 0.796 (de-duplicated), and at this threshold a genuine held-out Reconnaissance session that the shipped 0.5 threshold correctly alerts on is missed (caught by `backend/tests/test_model_quality.py`'s `TestForecastEscalation`). A small F1 gain bought by missing a real attack is not a genuine improvement for a forecasting system, so this threshold was **not deployed**; `DEFAULT_THRESHOLD` stays at 0.5.
+
 ## 7. Explainability & Trust Architecture
 
 1. **Fast Gradient Attribution ($\mathcal{O}(1)$):**

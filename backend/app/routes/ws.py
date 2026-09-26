@@ -83,6 +83,8 @@ async def get_sessions(
             "session_key": s.session_key,
             "src_ip": s.src_ip,
             "dst_ip": s.dst_ip,
+            "src_port": s.src_port,
+            "dst_port": s.dst_port,
             "flow_count": s.flow_count,
             "latest_risk_score": s.latest_risk_score,
             "latest_stage": s.latest_stage,

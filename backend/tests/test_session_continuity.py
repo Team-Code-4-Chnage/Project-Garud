@@ -121,3 +121,27 @@ def test_api_keeps_one_session_row_across_a_bucket_rollover():
         matching = [s for s in sessions if s["src_ip"] == src and s["dst_ip"] == dst]
         assert len(matching) == 1
         assert matching[0]["flow_count"] == 2
+
+
+def test_session_reports_the_most_recent_port():
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    src, dst = "203.0.113.21", "198.51.100.21"
+    with TestClient(app) as client:
+        first = flow(src, dst).model_dump(mode="json")
+        first["dst_port"] = 443
+        r1 = client.post("/ingest", json=first)
+        assert r1.status_code == 200
+
+        second = flow(src, dst).model_dump(mode="json")
+        second["dst_port"] = 8443
+        r2 = client.post("/ingest", json=second)
+        assert r2.status_code == 200
+        assert r2.json()["session_key"] == r1.json()["session_key"]
+
+        sessions = client.get("/sessions", params={"limit": 200}).json()
+        matching = [s for s in sessions if s["src_ip"] == src and s["dst_ip"] == dst]
+        assert len(matching) == 1
+        assert matching[0]["dst_port"] == 8443
