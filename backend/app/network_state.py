@@ -329,9 +329,13 @@ class NetworkStateTracker:
                 step_risk = raw_step_risk
 
             step_probs = probs[k].copy()
-            if latest_emp_threat >= m.thr and latest_emp_beh in m.behaviours:
+            if step_risk < m.thr and latest_emp_threat < 0.35:
+                benign_idx = m.behaviours.index("Benign")
+                step_probs = np.zeros_like(step_probs)
+                step_probs[benign_idx] = 1.0
+            elif latest_emp_threat >= m.thr and latest_emp_beh in m.behaviours:
                 beh_idx = m.behaviours.index(latest_emp_beh)
-                blend_w = min(0.80, (latest_emp_threat - 0.40) * 1.5)
+                blend_w = min(0.85, (latest_emp_threat - 0.35) * 1.5)
                 step_probs = (1.0 - blend_w) * step_probs
                 step_probs[beh_idx] += blend_w
                 step_probs /= step_probs.sum()
@@ -372,7 +376,10 @@ class NetworkStateTracker:
             attack_state_label = "Defense Telemetry Nominal"
             attack_stage = "Benign"
 
-        top_beh_name = latest_emp_beh if latest_emp_beh != "Benign" else (steps[0]["behaviours"][0]["behaviour"] if steps else "Benign")
+        if latest_risk < m.thr and latest_emp_threat < 0.35:
+            top_beh_name = "Benign"
+        else:
+            top_beh_name = latest_emp_beh if latest_emp_beh != "Benign" else (steps[0]["behaviours"][0]["behaviour"] if steps else "Benign")
 
         return dict(
             status="ok", minutes=minutes, state=display,
