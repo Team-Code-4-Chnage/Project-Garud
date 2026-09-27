@@ -15,8 +15,8 @@ import {
   Network,
   Menu,
   X,
-  Shield,
 } from "lucide-react";
+import EagleIcon from "./components/EagleIcon";
 import { apiFetch, apiPost, createWebSocket } from "./api";
 import { formatTime, flowKey } from "./utils";
 import { WellbeingModal } from "./components/Badges";
@@ -307,7 +307,7 @@ export default function App() {
               marginBottom: 4,
             }}
           >
-            <Shield size={18} color="var(--c-gold)" />
+            <EagleIcon size={22} color="var(--c-gold)" />
             <h1>PROJECT GARUD</h1>
           </div>
           <span>GOVERNMENT OF INDIA &bull; PS26153</span>
@@ -408,10 +408,16 @@ export default function App() {
           >
             {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
-          <span className="header-breadcrumb">
-            SYSTEM VIEW &rsaquo;{" "}
-            <span className="view-name">
-              {viewLabels[view] || view.toUpperCase()}
+          <span
+            className="header-breadcrumb"
+            style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+          >
+            <EagleIcon size={16} color="var(--c-gold)" />
+            <span>
+              SYSTEM VIEW &rsaquo;{" "}
+              <span className="view-name">
+                {viewLabels[view] || view.toUpperCase()}
+              </span>
             </span>
           </span>
         </div>
@@ -546,7 +552,7 @@ export default function App() {
 
       <footer className="footer">
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Shield size={12} color="var(--c-gold)" />
+          <EagleIcon size={14} color="var(--c-gold)" />
           <span>
             Project Garud v1.0 &bull; SIH 2026 PS26153 (Team Code 4 Change)
           </span>
