@@ -1,5 +1,13 @@
 import { useState, useMemo, memo } from "react";
-import { Database, Search, ArrowUpDown, ArrowDown, ChevronRight, ChevronDown, Layers, TrendingUp } from "lucide-react";
+import {
+  Database,
+  Search,
+  ArrowUpDown,
+  ArrowDown,
+  ChevronRight,
+  ChevronDown,
+  Layers,
+} from "lucide-react";
 import {
   DirBadge,
   IdentityBadge,
@@ -8,7 +16,13 @@ import {
   CompromiseIndicator,
   KillChainCompact,
 } from "./Badges";
-import { stageClass, severityClass, formatTime, formatProb, stageIndex } from "../utils";
+import {
+  stageClass,
+  severityClass,
+  formatTime,
+  formatProb,
+  stageIndex,
+} from "../utils";
 
 // backend/app/process_resolver.py emits these placeholder labels when it cannot resolve a real
 // process (see resolve_process): app_name "General Traffic" or "Port {n} ({proto})", process_name
@@ -16,7 +30,9 @@ import { stageClass, severityClass, formatTime, formatProb, stageIndex } from ".
 // frequently reuse the same ephemeral port -- so these must never be grouped together, only real,
 // resolved app/process names.
 function isResolvedAppName(name) {
-  return Boolean(name) && name !== "General Traffic" && !/^Port \d+ \(/.test(name);
+  return (
+    Boolean(name) && name !== "General Traffic" && !/^Port \d+ \(/.test(name)
+  );
 }
 function isResolvedProcessName(name) {
   return Boolean(name) && name !== "Unknown" && !/^Port \d+$/.test(name);
@@ -45,7 +61,9 @@ function groupSessions(sessions) {
     return {
       key,
       count: rows.length,
-      rows: [...rows].sort((a, b) => (b.latest_risk_score || 0) - (a.latest_risk_score || 0)),
+      rows: [...rows].sort(
+        (a, b) => (b.latest_risk_score || 0) - (a.latest_risk_score || 0),
+      ),
       app_name: best.app_name,
       process_name: best.process_name,
       direction: best.direction,
@@ -56,13 +74,19 @@ function groupSessions(sessions) {
       latest_risk_score: Math.max(...rows.map((r) => r.latest_risk_score || 0)),
       latest_stage: best.latest_stage,
       max_stage_reached: rows.reduce(
-        (m, r) => (stageIndex(r.max_stage_reached || r.latest_stage) > stageIndex(m) ? (r.max_stage_reached || r.latest_stage) : m),
+        (m, r) =>
+          stageIndex(r.max_stage_reached || r.latest_stage) > stageIndex(m)
+            ? r.max_stage_reached || r.latest_stage
+            : m,
         best.max_stage_reached || best.latest_stage,
       ),
       flow_count: rows.reduce((sum, r) => sum + (r.flow_count || 0), 0),
       tot_fwd_pkts: rows.reduce((sum, r) => sum + (r.tot_fwd_pkts || 0), 0),
       tot_bwd_pkts: rows.reduce((sum, r) => sum + (r.tot_bwd_pkts || 0), 0),
-      last_seen: rows.reduce((m, r) => ((r.last_seen || "") > m ? r.last_seen : m), best.last_seen || ""),
+      last_seen: rows.reduce(
+        (m, r) => ((r.last_seen || "") > m ? r.last_seen : m),
+        best.last_seen || "",
+      ),
     };
   });
 }
@@ -130,7 +154,6 @@ function SessionTable({
     );
   };
 
-
   return (
     <div className="data-table-wrap">
       <div
@@ -156,11 +179,16 @@ function SessionTable({
           <Database size={14} color="var(--c-gold)" />
           <span>
             Tracked Network Sessions ({filteredSessions.length}
-            {groupByApp && groups.length !== filteredSessions.length ? ` in ${groups.length} apps` : ""})
+            {groupByApp && groups.length !== filteredSessions.length
+              ? ` in ${groups.length} apps`
+              : ""}
+            )
           </span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
+        <div
+          style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}
+        >
           <button
             className="btn btn-sm btn-outline"
             onClick={() => setGroupByApp((g) => !g)}
@@ -169,40 +197,45 @@ function SessionTable({
                 ? "Showing one row per application; each app may have several active destinations. Click to list every individual session instead."
                 : "Showing every individual (app, destination) session separately. Click to collapse each application back into one row."
             }
-            style={{ display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              whiteSpace: "nowrap",
+            }}
           >
             <Layers size={11} />
             {groupByApp ? "Grouped by app" : "All sessions"}
           </button>
 
           <div style={{ position: "relative", width: "220px" }}>
-          <Search
-            size={13}
-            style={{
-              position: "absolute",
-              left: 8,
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "var(--text-muted)",
-            }}
-          />
-          <input
-            type="text"
-            placeholder="Search IP, app, stage..."
-            value={filterText}
-            onChange={(e) => setFilterText(e.target.value)}
-            style={{
-              width: "100%",
-              background: "var(--bg-dark)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-              padding: "4px 8px 4px 26px",
-              color: "var(--text-primary)",
-              fontFamily: "var(--font-mono)",
-              fontSize: "0.75rem",
-              outline: "none",
-            }}
-          />
+            <Search
+              size={13}
+              style={{
+                position: "absolute",
+                left: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--text-muted)",
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Search IP, app, stage..."
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              style={{
+                width: "100%",
+                background: "var(--bg-dark)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: "4px 8px 4px 26px",
+                color: "var(--text-primary)",
+                fontFamily: "var(--font-mono)",
+                fontSize: "0.75rem",
+                outline: "none",
+              }}
+            />
           </div>
         </div>
       </div>
@@ -246,12 +279,11 @@ function SessionTable({
               <th>Attack Stage</th>
               <th>MITRE Kill Chain</th>
               <th
-                style={{ cursor: "pointer" }}
+                style={{ cursor: "pointer", textAlign: "right" }}
                 onClick={() => setSortBy?.("last_seen")}
               >
                 Last Seen {renderSortIcon("last_seen")}
               </th>
-              <th style={{ textAlign: "right" }}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -263,11 +295,14 @@ function SessionTable({
                 (s.latest_risk_score || 0) > 0.5;
               const rowKey = isGroup ? row.key : row.session_key;
               const isOpen = isGroup && expanded.has(row.key);
-              const forecastTarget = isGroup ? (row.count === 1 ? row.rows[0] : null) : row;
               const mainRow = (
                 <tr
                   key={rowKey}
-                  onClick={isGroup && row.count > 1 ? () => toggleExpanded(row.key) : undefined}
+                  onClick={
+                    isGroup && row.count > 1
+                      ? () => toggleExpanded(row.key)
+                      : undefined
+                  }
                   style={{
                     cursor: isGroup && row.count > 1 ? "pointer" : undefined,
                     background: isCompromised
@@ -276,10 +311,20 @@ function SessionTable({
                   }}
                 >
                   <td>
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                      {isGroup && row.count > 1 && (
-                        isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />
-                      )}
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      {isGroup &&
+                        row.count > 1 &&
+                        (isOpen ? (
+                          <ChevronDown size={12} />
+                        ) : (
+                          <ChevronRight size={12} />
+                        ))}
                       <AppBadge
                         appName={s.app_name}
                         processName={s.process_name}
@@ -312,7 +357,8 @@ function SessionTable({
                   <td>
                     {isGroup && row.count > 1 ? (
                       <span className="mono text-sm text-muted">
-                        {row.count} destinations{isOpen ? "" : " (expand to see ports)"}
+                        {row.count} destinations
+                        {isOpen ? "" : " (expand to see ports)"}
                       </span>
                     ) : (
                       <div className="ip-symmetric-cell">
@@ -337,7 +383,11 @@ function SessionTable({
                   <td>
                     <div
                       className="risk-cell"
-                      title={isGroup && row.count > 1 ? "Highest risk among this app's active destinations" : undefined}
+                      title={
+                        isGroup && row.count > 1
+                          ? "Highest risk among this app's active destinations"
+                          : undefined
+                      }
                     >
                       <div
                         className={`risk-bar ${severityClass(s.latest_risk_score)}`}
@@ -381,24 +431,9 @@ function SessionTable({
                   </td>
                   <td
                     className="mono text-sm"
-                    style={{ color: "var(--text-muted)" }}
+                    style={{ color: "var(--text-muted)", textAlign: "right" }}
                   >
                     {formatTime(s.last_seen)}
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    {forecastTarget ? (
-                      <button
-                        className="btn btn-sm btn-primary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectSession?.(forecastTarget);
-                        }}
-                      >
-                        <TrendingUp size={11} /> Forecast
-                      </button>
-                    ) : (
-                      <span className="mono text-xs text-muted">expand to forecast</span>
-                    )}
                   </td>
                 </tr>
               );
@@ -407,7 +442,10 @@ function SessionTable({
                 <>
                   {mainRow}
                   {row.rows.map((d) => (
-                    <tr key={d.session_key} style={{ background: "var(--bg-elevated)" }}>
+                    <tr
+                      key={d.session_key}
+                      style={{ background: "var(--bg-elevated)" }}
+                    >
                       <td style={{ paddingLeft: "var(--sp-5)" }} />
                       <td>
                         <DirBadge dir={d.direction} />
@@ -428,18 +466,27 @@ function SessionTable({
                         </div>
                       </td>
                       <td>
-                        <PacketStat fwdPkts={d.tot_fwd_pkts} bwdPkts={d.tot_bwd_pkts} proto="IP" />
+                        <PacketStat
+                          fwdPkts={d.tot_fwd_pkts}
+                          bwdPkts={d.tot_bwd_pkts}
+                          proto="IP"
+                        />
                       </td>
                       <td className="mono" style={{ fontWeight: 700 }}>
                         {d.flow_count}
                       </td>
                       <td>
                         <div className="risk-cell">
-                          <div className={`risk-bar ${severityClass(d.latest_risk_score)}`} />
+                          <div
+                            className={`risk-bar ${severityClass(d.latest_risk_score)}`}
+                          />
                           <span
                             style={{
                               fontWeight: 700,
-                              color: (d.latest_risk_score || 0) > 0.5 ? "var(--c-red)" : "var(--text-primary)",
+                              color:
+                                (d.latest_risk_score || 0) > 0.5
+                                  ? "var(--c-red)"
+                                  : "var(--text-primary)",
                             }}
                           >
                             {formatProb(d.latest_risk_score)}
@@ -447,21 +494,25 @@ function SessionTable({
                         </div>
                       </td>
                       <td>
-                        <span className={`stage-badge ${stageClass(d.latest_stage)}`}>{d.latest_stage}</span>
+                        <span
+                          className={`stage-badge ${stageClass(d.latest_stage)}`}
+                        >
+                          {d.latest_stage}
+                        </span>
                       </td>
                       <td>
-                        <KillChainCompact currentStage={d.max_stage_reached || d.latest_stage} />
+                        <KillChainCompact
+                          currentStage={d.max_stage_reached || d.latest_stage}
+                        />
                       </td>
-                      <td className="mono text-sm" style={{ color: "var(--text-muted)" }}>
+                      <td
+                        className="mono text-sm"
+                        style={{
+                          color: "var(--text-muted)",
+                          textAlign: "right",
+                        }}
+                      >
                         {formatTime(d.last_seen)}
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        <button
-                          className="btn btn-sm btn-primary"
-                          onClick={() => onSelectSession?.(d)}
-                        >
-                          <TrendingUp size={11} /> Forecast
-                        </button>
                       </td>
                     </tr>
                   ))}

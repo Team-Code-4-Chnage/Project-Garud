@@ -117,6 +117,7 @@ class NetworkStateTracker:
 
     def summary(self):
         with self._lock:
+            self._ensure_loaded()
             rows = list(self._flows)
         by_source = {}
         for r in rows:
@@ -127,14 +128,86 @@ class NetworkStateTracker:
             out.update(first=min(ts).isoformat(), last=max(ts).isoformat())
         return out
 
+    def _ensure_loaded(self):
+        if self._flows:
+            return
+        try:
+            import sqlite3
+            db_path = BASE_DIR / "data" / "forecaster.db"
+            if not db_path.exists():
+                return
+            con = sqlite3.connect(str(db_path))
+            cur = con.cursor()
+            cur.execute("""
+                SELECT timestamp, src_ip, dst_ip, src_port, dst_port, protocol, source,
+                       flow_duration, tot_fwd_pkts, tot_bwd_pkts, fwd_pkt_len_mean, bwd_pkt_len_mean,
+                       flow_bytes_s, flow_pkts_s, flow_iat_mean, flow_iat_std, fwd_iat_mean, bwd_iat_mean,
+                       syn_flag_cnt, ack_flag_cnt, fin_flag_cnt, rst_flag_cnt, psh_flag_cnt, urg_flag_cnt,
+                       down_up_ratio, pkt_size_avg, ttl_variance, tcp_win_size, retransmit_cnt
+                FROM flow_records
+                ORDER BY timestamp DESC
+                LIMIT 50000
+            """)
+            rows = cur.fetchall()
+            con.close()
+            for r in reversed(rows):
+                ts_val = r[0]
+                if isinstance(ts_val, str):
+                    try:
+                        ts = datetime.fromisoformat(ts_val)
+                    except Exception:
+                        ts = datetime.now(timezone.utc)
+                else:
+                    ts = ts_val or datetime.now(timezone.utc)
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                row = {
+                    "src_ip": r[1] or "0.0.0.0",
+                    "dst_ip": r[2] or "0.0.0.0",
+                    "src_port": r[3] or 0,
+                    "dst_port": r[4] or 0,
+                    "protocol": r[5] or "TCP",
+                    "_source": r[6] or "api",
+                    "timestamp": ts,
+                    "flow_duration": float(r[7] or 0),
+                    "tot_fwd_pkts": float(r[8] or 0),
+                    "tot_bwd_pkts": float(r[9] or 0),
+                    "fwd_pkt_len_mean": float(r[10] or 0),
+                    "bwd_pkt_len_mean": float(r[11] or 0),
+                    "flow_bytes_s": float(r[12] or 0),
+                    "flow_pkts_s": float(r[13] or 0),
+                    "flow_iat_mean": float(r[14] or 0),
+                    "flow_iat_std": float(r[15] or 0),
+                    "fwd_iat_mean": float(r[16] or 0),
+                    "bwd_iat_mean": float(r[17] or 0),
+                    "syn_flag_cnt": float(r[18] or 0),
+                    "ack_flag_cnt": float(r[19] or 0),
+                    "fin_flag_cnt": float(r[20] or 0),
+                    "rst_flag_cnt": float(r[21] or 0),
+                    "psh_flag_cnt": float(r[22] or 0),
+                    "urg_flag_cnt": float(r[23] or 0),
+                    "down_up_ratio": float(r[24] or 0),
+                    "pkt_size_avg": float(r[25] or 0),
+                    "ttl_variance": float(r[26] or 0),
+                    "tcp_win_size": float(r[27] or 0),
+                    "retransmit_cnt": float(r[28] or 0),
+                }
+                self._flows.append(row)
+        except Exception as e:
+            logger.warning("Could not pre-seed flows from database: %s", e)
+
     def states(self):
         with self._lock:
+            self._ensure_loaded()
             rows = list(self._flows)
         if not rows:
             return None
         st = full_grid(minute_states(flows_from_features(rows)))
         now_min = np.datetime64(datetime.now(timezone.utc).replace(tzinfo=None, second=0, microsecond=0))
-        st = st[st.index.values < now_min]  # the current wall-clock minute may still receive more flows
+        # Include current minute so real-time attack bursts reflect immediately
+        st = st[st.index.values <= now_min]
+        if len(st) == 0:
+            st = full_grid(minute_states(flows_from_features(rows)))
         return st.iloc[-KEEP_MINUTES:]
 
     def analyze(self):

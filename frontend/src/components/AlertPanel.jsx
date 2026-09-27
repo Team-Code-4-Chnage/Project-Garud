@@ -219,20 +219,20 @@ export default function AlertPanel() {
         </div>
 
         <div className="card" style={{ padding: "12px 16px" }}>
-          <div
-            className="stat-card-label"
-            style={{ color: "var(--severity-low)" }}
-          >
-            ACKNOWLEDGED INCIDENTS
+          <div className="stat-card-label" style={{ color: "var(--c-gold)" }}>
+            HIGH SEVERITY
           </div>
           <div
             className="stat-card-value mono"
-            style={{ fontSize: "1.6rem", color: "var(--severity-low)" }}
+            style={{
+              fontSize: "1.6rem",
+              color: counts.high > 0 ? "var(--c-gold)" : "var(--text-muted)",
+            }}
           >
-            {counts.ack}
+            {counts.high}
           </div>
           <div className="stat-card-sub" style={{ fontSize: "0.72rem" }}>
-            Analyst confirmed & triaged
+            Elevated threat signatures
           </div>
         </div>
       </div>
@@ -553,9 +553,7 @@ export default function AlertPanel() {
                 <th style={{ width: "120px" }}>Infiltration Risk</th>
                 <th>Recommended Mitigation Playbook</th>
                 <th style={{ width: "140px" }}>Incident Time</th>
-                <th style={{ width: "130px", textAlign: "right" }}>
-                  Status / Action
-                </th>
+                <th style={{ width: "130px", textAlign: "right" }}>Status</th>
               </tr>
             </thead>
             <tbody>
