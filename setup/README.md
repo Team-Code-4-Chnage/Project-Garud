@@ -1,178 +1,139 @@
-# Project Garud — Setup: Lab Harness + Model Retraining
+# Project Garud -- Setup & Retraining
 
-**SIH 2026 PS:26153 (NTRO) • AI-Based Network Attack Forecasting**
-
-This folder contains everything needed to collect real multi-stage attack
-campaign data in an isolated VirtualBox lab and retrain the WorldModel.
+**SIH 2026 PS:26153 (NTRO) | AI-Based Network Attack Forecasting**
 
 ---
 
-## 📁 Files in This Folder
+## Quick Start -- One Command, Zero Setup
+
+```powershell
+python setup\run_all.py
+```
+
+That's it. No VMs. No Wireshark. No VirtualBox. No configuration.
+
+---
+
+## What `run_all.py` Does
+
+| Step | What Happens |
+|:---:|---|
+| 1 | Auto-installs missing packages (torch, pandas, numpy) |
+| 2 | Generates 80 attack + 120 benign sessions using 8 realistic campaign templates |
+| 3 | Fine-tunes (or trains from scratch) the WorldModel |
+| 4 | Saves updated artifacts to `backend/artifacts/` with auto-backup |
+
+### Campaign Templates Used
+
+| Template | Kill Chain |
+|---|---|
+| APT Full Kill Chain | Benign > Recon > Access > Lateral > C2 > Exfil |
+| Smash-and-Grab | Benign > Recon > Access > Exfil |
+| Slow Recon + Lateral | Benign > Recon (long) > Access > Lateral (heavy) > C2 |
+| C2 Persistent Backdoor | Benign > Recon > Access > C2 (long) > Exfil |
+| Insider Lateral Movement | Benign > Lateral > C2 > Exfil |
+| Reconnaissance Only | Benign > Recon > Benign (attacker backs off) |
+| Ransomware Kill Chain | Benign > Recon > Access > Lateral > Exfil (mass) |
+| Watering Hole + C2 | Benign > Access > C2 (long) > Lateral > Exfil |
+
+---
+
+## All Commands
+
+```powershell
+# Default: generate campaign data + fine-tune existing model
+python setup\run_all.py
+
+# Train from scratch instead of fine-tune
+python setup\run_all.py --mode scratch
+
+# Just generate dataset CSV, no training
+python setup\run_all.py --mode generate-only
+
+# More data (bigger dataset)
+python setup\run_all.py --attack-sessions 150 --benign-sessions 200
+
+# Combine with existing CIC-IDS base data
+python setup\run_all.py --combine-base
+
+# Fine-tune with frozen LSTM backbone (safest, head-only)
+python setup\run_all.py --freeze-lstm
+
+# Custom training params
+python setup\run_all.py --epochs 30 --lr 5e-4 --patience 8
+
+# Full custom run
+python setup\run_all.py --mode scratch --attack-sessions 200 --benign-sessions 300 --epochs 30 --combine-base
+```
+
+---
+
+## Fine-Tune vs Train From Scratch
+
+### Use Fine-Tune (default) when:
+- You have the existing trained model in `backend/artifacts/`
+- Lab/campaign data is small (< 10K flows)
+- You want to preserve existing detection quality (F1=0.862)
+
+### Use From Scratch when:
+- You have 20+ attack sessions (10K+ flows)
+- You changed the feature set or architecture
+- Fine-tuned model degraded on test set
+
+| | Fine-Tune | From Scratch |
+|---|---|---|
+| **Existing F1=0.862** | Preserved | Risk of regression |
+| **Data needed** | 2K-10K flows | 10K+ flows |
+| **Training time** | ~5-10 min | ~20-40 min |
+| **LR** | 1e-4 (auto) | 1e-3 |
+| **Risk** | Low | Higher with small data |
+
+---
+
+## Files in This Folder
 
 | File | Purpose |
 |---|---|
-| `lab_setup_and_retrain.ps1` | **Master script** — Fully automated Windows PowerShell pipeline (Phases 0-10) |
-| `finetune_model.py` | Fine-tune existing model on combined CIC-IDS + lab data (recommended) |
-| `train_from_scratch.py` | Train a new model from scratch on combined data |
-| `merge_lab_flows.py` | Merge lab campaign `flows.csv` files with CIC-IDS `real_flows.csv` |
-| `README.md` | This file |
+| **`run_all.py`** | **THE ONE FILE** -- generates data + trains model, zero config |
+| `lab_setup_and_retrain.ps1` | Full VM lab automation (if you want real traffic) |
+| `finetune_model.py` | Standalone fine-tuning script |
+| `train_from_scratch.py` | Standalone from-scratch wrapper |
+| `merge_lab_flows.py` | Merge lab flows with CIC-IDS data |
 
 ---
 
-## 🤔 Fine-Tune vs. Train From Scratch?
+## Expected Results
 
-### ✅ RECOMMENDED: Fine-Tune (default)
+| Metric | Before | After Fine-Tune | After From-Scratch |
+|---|:---:|:---:|:---:|
+| Binary F1 | 0.862 | 0.85 - 0.88 | 0.80 - 0.87 |
+| Early Warning Rate | 23.9% | 35 - 45% | 30 - 50% |
+| Per-stage macro-F1 | 0.928 | 0.90 - 0.93 | 0.85 - 0.92 |
+| FPR | 4.59% | 3 - 5% | 3 - 6% |
 
-```powershell
-python setup\finetune_model.py --data combined_flows.csv
-```
+---
 
-**Why fine-tune is better for your case:**
-
-| Factor | Fine-Tune | From Scratch |
-|---|---|---|
-| **Existing detection quality** | Preserved (F1=0.862) | Risk of regression |
-| **Lab data size** | Works with 2K-10K flows | Needs 10K+ flows minimum |
-| **Training time** | ~5-10 min (10 epochs) | ~20-40 min (25 epochs) |
-| **What it learns** | Campaign transitions | Everything from zero |
-| **Risk** | Low — worst case matches original | High — may overfit to small lab data |
-| **SIH demo value** | Shows transfer learning sophistication | Shows data-centric ML |
-
-**Three fine-tuning modes:**
+## After Training -- Next Steps
 
 ```powershell
-# Mode 1: Full fine-tune (recommended) — all weights updated with low LR
-python setup\finetune_model.py --data combined_flows.csv --lr 1e-4 --epochs 10
+# 1. Start the system
+powershell -File .\start_all.ps1
 
-# Mode 2: Head-only (safest) — LSTM frozen, only risk+stage heads retrained
-python setup\finetune_model.py --data combined_flows.csv --freeze-lstm --epochs 15
+# 2. Test with a sample
+curl -X POST http://localhost:8000/ingest/pcap -F "file=@dataset\run_001\traffic.pcap"
 
-# Mode 3: Aggressive (if 20+ lab runs) — higher LR, refit scaler
-python setup\finetune_model.py --data combined_flows.csv --lr 5e-4 --epochs 20 --refit-scaler
-```
-
-### 🔄 When to Train From Scratch Instead
-
-Use `train_from_scratch.py` only if:
-- You collected **20+ lab runs** (10K+ campaign flows)
-- You changed `FLOW_FEATURES` (different feature set)
-- You changed model architecture (hidden_size, num_layers)
-- Fine-tuned model **degraded** on the CIC-IDS test split
-
-```powershell
-python setup\train_from_scratch.py --data combined_flows.csv --epochs 30
+# 3. Open dashboard
+# http://localhost:3000
 ```
 
 ---
 
-## 🚀 Quick Start (Full Automated Pipeline)
+## Advanced: Full VM Lab (Optional)
 
-### On Windows — One Command
-
-```powershell
-# Runs everything: install tools → create VMs → collect data → merge → retrain
-powershell -ExecutionPolicy Bypass -File setup\lab_setup_and_retrain.ps1
-```
-
-The PS1 script auto-elevates to Administrator and auto-installs:
-- VirtualBox (via winget)
-- Wireshark/dumpcap (via winget)
-- 7-Zip (via winget)
-- Python packages (torch, scapy, shap, etc.)
-- OpenSSH client
-
-### Resume From Any Phase
+If you want real captured traffic instead of simulated data:
 
 ```powershell
-# VMs already configured — skip to collection + retrain:
-powershell -ExecutionPolicy Bypass -File setup\lab_setup_and_retrain.ps1 -SkipNetwork -SkipVMSetup
-
-# Data already collected — skip to merge + retrain:
-powershell -ExecutionPolicy Bypass -File setup\lab_setup_and_retrain.ps1 -SkipToTraining
-
-# More runs / more epochs:
-powershell -ExecutionPolicy Bypass -File setup\lab_setup_and_retrain.ps1 -Runs 10 -Epochs 30
+powershell -ExecutionPolicy Bypass -File .\setup\lab_setup_and_retrain.ps1
 ```
 
----
-
-## 🧪 Manual Step-by-Step (Without the PS1)
-
-If you prefer running each step yourself:
-
-### Step 1: Collect Lab Data
-```powershell
-cd Project-Garud
-python lab\reset_lab.py --config lab\lab_config.json
-python lab\collect_dataset.py --config lab\lab_config.json --out dataset
-```
-
-### Step 2: Extract Flows
-```powershell
-python lab\extract_flows.py --dataset dataset
-```
-
-### Step 3: Merge with CIC-IDS
-```powershell
-python setup\merge_lab_flows.py --dataset dataset --base real_flows.csv --output combined_flows.csv
-```
-
-### Step 4a: Fine-Tune (recommended)
-```powershell
-python setup\finetune_model.py --data combined_flows.csv
-```
-
-### Step 4b: OR Train From Scratch
-```powershell
-python setup\train_from_scratch.py --data combined_flows.csv
-```
-
-### Step 5: Calibrate
-```powershell
-python experiments\calibrate_stage_logits.py
-```
-
-### Step 6: Verify
-```powershell
-python -m pytest backend\tests -v
-```
-
----
-
-## 📊 Expected Results After Retraining
-
-### With Fine-Tuning on 5 Lab Runs (~5K campaign flows)
-
-| Metric | Before | After (Expected) | Notes |
-|---|:---:|:---:|---|
-| Binary F1 | 0.862 | 0.85-0.88 | Should stay stable |
-| Early Warning Rate | 23.9% | 35-45% | **Primary target improvement** |
-| Lead Time (12 flows) | 3.7% | 15-25% | Real campaigns help |
-| Per-stage macro-F1 | 0.928 | 0.90-0.93 | May dip slightly |
-| Unseen family AUC | 0.56 | 0.65-0.75 | Real transitions help |
-| FPR | 4.59% | 3-5% | Should stay stable |
-
-### Why Early Warning Improves
-The existing model was trained on CIC-IDS where each attack type is isolated
-in its own time block — no real Recon→Access→Lateral→C2→Exfil progression.
-Lab campaigns contain **actual kill chain transitions**, which is exactly what
-the world model's next-state prediction head needs to learn forecasting.
-
----
-
-## ⚠️ Important Notes
-
-1. **Backup**: Both scripts automatically back up `backend/artifacts/` before overwriting.
-   Backups are timestamped: `backend/artifacts/backup_20260927_150000/`
-
-2. **Calibration**: After retraining, run `experiments/calibrate_stage_logits.py` and
-   manually copy the bias values into `backend/artifacts/config.json`.
-
-3. **Test fixtures**: Some backend tests may fail after retraining because they reference
-   the old model's exact outputs. Update test fixtures if the model's predictions changed.
-
-4. **Lab isolation**: The lab VMs use host-only networking with no internet access.
-   **Never** add NAT or bridged adapters to lab VMs.
-
-5. **Scaler**: By default, fine-tuning uses the existing CIC-IDS scaler. Only use
-   `--refit-scaler` if lab features have significantly different distributions.
+This sets up VirtualBox VMs (Kali + Metasploitable2), runs actual attacks, captures PCAPs, extracts flows, and retrains. Requires ~20GB disk and 30-60 minutes.
