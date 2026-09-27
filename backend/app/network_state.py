@@ -348,11 +348,41 @@ class NetworkStateTracker:
                               risk=step_risk, behaviours=beh,
                               state={f: float(pred_states[k][m.features.index(f)]) for f in DISPLAY_FEATURES
                                      if f in m.features}))
+        # Determine attack state and trajectory
+        latest_risk = float(score[-1])
+        is_alert = bool(alert[-1])
+        if is_alert:
+            attack_state = "CRITICAL_ATTACK"
+            attack_state_label = "Sustained Attack Detected"
+            attack_stage = latest_emp_beh if latest_emp_beh != "Benign" else "Infiltration"
+        elif latest_risk >= 0.70:
+            attack_state = "ACTIVE_INTRUSION"
+            attack_state_label = "Active Intrusion in Progress"
+            attack_stage = latest_emp_beh if latest_emp_beh != "Benign" else "Initial Access"
+        elif latest_risk >= m.thr:
+            attack_state = "ELEVATED_THREAT"
+            attack_state_label = "Elevated Threat Level"
+            attack_stage = latest_emp_beh if latest_emp_beh != "Benign" else "Reconnaissance"
+        elif latest_risk >= 0.38 or latest_emp_threat >= 0.35:
+            attack_state = "SUSPICIOUS_PROBING"
+            attack_state_label = "Suspicious Probing Detected"
+            attack_stage = latest_emp_beh if latest_emp_beh != "Benign" else "Reconnaissance"
+        else:
+            attack_state = "NORMAL_BASELINE"
+            attack_state_label = "Defense Telemetry Nominal"
+            attack_stage = "Benign"
+
+        top_beh_name = latest_emp_beh if latest_emp_beh != "Benign" else (steps[0]["behaviours"][0]["behaviour"] if steps else "Benign")
+
         return dict(
             status="ok", minutes=minutes, state=display,
             risk_score=[None if np.isnan(v) else float(v) for v in score], alert=alert,
-            current=dict(minute=minutes[-1], alert=bool(alert[-1]), risk_score=float(score[-1]),
-                         consecutive_needed=m.N, threshold=m.thr),
+            current=dict(
+                minute=minutes[-1], alert=is_alert, risk_score=latest_risk,
+                attack_state=attack_state, attack_state_label=attack_state_label,
+                attack_stage=attack_stage, top_behaviour=top_beh_name,
+                consecutive_needed=m.N, threshold=m.thr
+            ),
             forecast=steps, explanation=explanation, model=self.model_info())
 
     def model_info(self):
