@@ -204,6 +204,17 @@ An experimental network-state model with multi-step training targets is document
 
 `experiments/tune_infiltration_threshold.py` searches for the F1-maximising decision threshold on validation only, then reports it once on the untouched test split (honest, no test-set tuning). Result: 0.6973 (vs the shipped 0.5) raises de-duplicated F1 from 0.838 to 0.847 and all-windows F1 from 0.862 to 0.868 — moving along the same ROC curve (AUC unchanged at 0.948/0.955), not improving the model. The cost: recall drops from 0.830 to 0.796 (de-duplicated), and at this threshold a genuine held-out Reconnaissance session that the shipped 0.5 threshold correctly alerts on is missed (caught by `backend/tests/test_model_quality.py`'s `TestForecastEscalation`). A small F1 gain bought by missing a real attack is not a genuine improvement for a forecasting system, so this threshold was **not deployed**; `DEFAULT_THRESHOLD` stays at 0.5.
 
+### 6.5 Retrain attempt (40 vs 20 epochs): explored, not deployed
+
+The shipped `backend/artifacts/world_model.pt` was backed up to `backups/model_backups/20260927_050220/` and a retrain was run with the exact same proven `pipeline_fixed.py` configuration, only doubling training length (40 vs 20 epochs), writing to an isolated `backend/artifacts_retrain_test/` so the shipped checkpoint was never touched during the run. `experiments/evaluate_model.py` was then run against both checkpoints, same held-out test split, same de-duplication rule:
+
+| | all-windows F1 | de-duplicated F1 | ROC-AUC (de-dup) | warned before attack onset |
+|---|---|---|---|---|
+| Shipped (epoch-checkpoint from a 20-epoch run) | 0.8615 | 0.8378 | 0.9484 | 32/134 (23.9%) |
+| Retrained (best val-F1 checkpoint, epoch 7 of 40) | 0.8572 | 0.8343 | 0.9515 | 43/134 (32.1%) |
+
+Validation F1 peaked at epoch 7 (0.8635) and oscillated in the 0.843–0.852 band through epoch 40 with no further improvement — the model had already converged; more epochs of the same configuration do not raise F1. The retrained checkpoint is not an improvement on the primary metric (de-duplicated F1 0.8343 vs 0.8378 shipped, i.e. flat-to-slightly-worse) despite a real and meaningful gain in early-warning recall (23.9% → 32.1% of sessions warned before the attack starts) and a small ROC-AUC gain. Per the same policy as 6.4, a checkpoint is only adopted when it is honestly better with no regression; this one is not, so it was **not deployed** — `backend/artifacts/` is unchanged. Neither the shipped nor the retrained checkpoint clears a 0.85 de-duplicated F1 bar; doing so would need a substantive change (architecture, feature engineering, or more/better-targeted augmentation of the weaker attack stages), not just more epochs of the current configuration.
+
 ## 7. Explainability & Trust Architecture
 
 1. **Fast Gradient Attribution ($\mathcal{O}(1)$):**

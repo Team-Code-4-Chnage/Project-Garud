@@ -23,8 +23,6 @@ import {
   Activity,
   ArrowUpRight,
   ArrowDownRight,
-  ArrowRight,
-  TrendingUp,
   CheckCircle2,
   Info,
   Clock,
@@ -50,12 +48,49 @@ const STATE_LABELS = {
 };
 
 const KILL_CHAIN_PHASES = [
-  { id: "Reconnaissance", label: "Reconnaissance", tech: "T1046 / T1595" },
-  { id: "Initial Access", label: "Initial Access", tech: "T1190 / T1110" },
-  { id: "Lateral Movement", label: "Lateral Movement", tech: "T1021 / T1570" },
-  { id: "C2", label: "Command & Control", tech: "T1071 / T1572" },
-  { id: "Exfiltration", label: "Exfiltration", tech: "T1041 / T1567" },
+  {
+    id: "Reconnaissance",
+    label: "Reconnaissance",
+    tech: "T1046 / T1595",
+    keys: ["recon", "scan", "port", "prob"],
+  },
+  {
+    id: "Initial Access",
+    label: "Initial Access",
+    tech: "T1190 / T1110",
+    keys: ["access", "initial", "brute", "auth", "exploit", "web"],
+  },
+  {
+    id: "Lateral Movement",
+    label: "Lateral Movement",
+    tech: "T1021 / T1570",
+    keys: ["lateral", "pivot", "smb", "rpc", "winrm"],
+  },
+  {
+    id: "C2",
+    label: "Command & Control",
+    tech: "T1071 / T1572",
+    keys: ["c2", "command", "beacon", "bot"],
+  },
+  {
+    id: "Exfiltration",
+    label: "Exfiltration",
+    tech: "T1041 / T1567",
+    keys: ["exfil", "infilt", "theft", "egress"],
+  },
 ];
+
+function getPhaseIndexForStage(stageName) {
+  if (!stageName) return -1;
+  const s = stageName.toLowerCase();
+  if (s === "benign") return -1;
+  for (let i = 0; i < KILL_CHAIN_PHASES.length; i++) {
+    if (KILL_CHAIN_PHASES[i].keys.some((k) => s.includes(k))) {
+      return i;
+    }
+  }
+  return -1;
+}
 
 const hhmm = (iso) => {
   if (!iso) return "";
@@ -144,7 +179,6 @@ function getAttackStateMeta(stateKey, risk, alert) {
 function NetworkForecastView() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [selectedHorizon, setSelectedHorizon] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -271,7 +305,8 @@ function NetworkForecastView() {
             className="text-muted text-xs mono"
             style={{ letterSpacing: "0.04em" }}
           >
-            Whole-network LSTM state rollout &bull; MITRE ATT&CK horizon mapping
+            Whole-network LSTM state rollout &bull; MITRE ATT&CK trajectory
+            tracking
           </div>
         </div>
       </div>
@@ -355,12 +390,53 @@ function NetworkForecastView() {
   );
   const StateIcon = stateMeta.icon;
 
-  // Determine current active kill chain stage
+  // Determine current active kill chain stage and matching phase index
   const activeStage =
     cur.attack_stage || (cur.risk_score > 0.5 ? "Reconnaissance" : "Benign");
+  const currentPhaseIdx = getPhaseIndexForStage(activeStage);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Dynamic Radar Blip CSS Styles */}
+      <style>{`
+        @keyframes radarBlipPing {
+          0% {
+            transform: scale(0.9);
+            box-shadow: 0 0 0 0 rgba(201, 74, 69, 0.85);
+            opacity: 1;
+          }
+          50% {
+            transform: scale(1.18);
+            box-shadow: 0 0 0 10px rgba(201, 74, 69, 0);
+            opacity: 0.85;
+          }
+          100% {
+            transform: scale(0.9);
+            box-shadow: 0 0 0 0 rgba(201, 74, 69, 0);
+            opacity: 1;
+          }
+        }
+        @keyframes radarSweepPulse {
+          0% { opacity: 0.4; }
+          50% { opacity: 1; }
+          100% { opacity: 0.4; }
+        }
+        .radar-blip-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: #E53935;
+          display: inline-block;
+          animation: radarBlipPing 1.25s infinite ease-out;
+        }
+        .active-blip-phase {
+          border: 1.5px solid var(--c-red, #C94A45) !important;
+          background: linear-gradient(135deg, rgba(201, 74, 69, 0.18), rgba(201, 74, 69, 0.05)) !important;
+          box-shadow: 0 0 18px rgba(201, 74, 69, 0.3) !important;
+          transform: translateY(-1px);
+        }
+      `}</style>
+
       {/* 1. TOP COMMAND & ATTACK STATE BANNER */}
       <div
         className="panel"
@@ -514,7 +590,7 @@ function NetworkForecastView() {
         </div>
       </div>
 
-      {/* 2. KILL CHAIN ATTACK STAGE PROGRESSION STEPPER */}
+      {/* 2. KILL CHAIN ATTACK STAGE PROGRESSION STEPPER (WITH LIVE RADAR "BLIP BLIP") */}
       <div className="panel" style={{ padding: "16px 20px" }}>
         <div
           style={{
@@ -522,13 +598,15 @@ function NetworkForecastView() {
             justifyContent: "space-between",
             alignItems: "center",
             marginBottom: 12,
+            flexWrap: "wrap",
+            gap: 8,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Layers size={15} color="var(--c-gold)" />
             <span
               style={{
-                fontSize: "0.85rem",
+                fontSize: "0.88rem",
                 fontWeight: 700,
                 color: "var(--text-primary)",
               }}
@@ -536,12 +614,48 @@ function NetworkForecastView() {
               MITRE ATT&CK &bull; Network State Trajectory
             </span>
           </div>
-          <span className="mono text-xs text-muted">
-            Current Stage:{" "}
-            <strong style={{ color: stateMeta.color }}>
-              {activeStage.toUpperCase()}
-            </strong>
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {currentPhaseIdx >= 0 ? (
+              <span
+                className="mono text-xs"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 7,
+                  padding: "4px 10px",
+                  background: "rgba(201, 74, 69, 0.15)",
+                  border: "1px solid var(--c-red)",
+                  borderRadius: "var(--radius-sm)",
+                  color: "var(--c-red)",
+                  fontWeight: 800,
+                }}
+              >
+                <span className="radar-blip-dot" />
+                ACTIVE TARGET BLIP: PHASE 0{currentPhaseIdx + 1} &mdash;{" "}
+                {KILL_CHAIN_PHASES[currentPhaseIdx].label.toUpperCase()} (
+                {activeStage.toUpperCase()})
+              </span>
+            ) : (
+              <span
+                className="mono text-xs"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px 10px",
+                  background: "rgba(88, 166, 104, 0.12)",
+                  border: "1px solid rgba(88, 166, 104, 0.35)",
+                  borderRadius: "var(--radius-sm)",
+                  color: "var(--severity-low)",
+                  fontWeight: 700,
+                }}
+              >
+                <CheckCircle2 size={13} />
+                DEFENSE TELEMETRY NOMINAL &bull; ALL 5 ATTACK PHASES INACTIVE /
+                CLEAR
+              </span>
+            )}
+          </div>
         </div>
 
         <div
@@ -552,32 +666,28 @@ function NetworkForecastView() {
           }}
         >
           {KILL_CHAIN_PHASES.map((phase, idx) => {
-            const isCurrent = activeStage
-              .toLowerCase()
-              .includes(phase.id.toLowerCase());
-            const isPassed =
-              cur.risk_score > 0.7 &&
-              KILL_CHAIN_PHASES.findIndex((p) =>
-                activeStage.toLowerCase().includes(p.id.toLowerCase()),
-              ) > idx;
+            const isCurrent = idx === currentPhaseIdx;
+            const isPassed = currentPhaseIdx > idx;
+
             return (
               <div
                 key={phase.id}
+                className={isCurrent ? "active-blip-phase" : ""}
                 style={{
-                  padding: "10px 12px",
+                  padding: "12px 14px",
                   borderRadius: "var(--radius-sm)",
                   background: isCurrent
-                    ? "rgba(201, 74, 69, 0.12)"
+                    ? undefined
                     : isPassed
                       ? "rgba(214, 179, 106, 0.08)"
                       : "var(--bg-dark)",
                   border: isCurrent
-                    ? "1.5px solid var(--c-red)"
+                    ? undefined
                     : isPassed
                       ? "1px solid var(--c-gold)"
                       : "1px solid var(--border)",
                   position: "relative",
-                  transition: "all 0.2s ease",
+                  transition: "all 0.25s ease",
                 }}
               >
                 <div
@@ -595,33 +705,41 @@ function NetworkForecastView() {
                         : isPassed
                           ? "var(--c-gold)"
                           : "var(--text-muted)",
-                      fontWeight: isCurrent || isPassed ? 800 : 500,
+                      fontWeight: isCurrent || isPassed ? 800 : 600,
                     }}
                   >
                     PHASE 0{idx + 1}
                   </span>
                   {isCurrent && (
-                    <span
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        background: "var(--c-red)",
-                        boxShadow: "0 0 8px var(--c-red)",
-                      }}
-                      className="blink"
-                    />
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 5 }}
+                    >
+                      <span className="radar-blip-dot" />
+                      <span
+                        className="mono"
+                        style={{
+                          fontSize: "0.62rem",
+                          color: "var(--c-red)",
+                          fontWeight: 800,
+                        }}
+                      >
+                        BLIPPING
+                      </span>
+                    </div>
                   )}
-                  {isPassed && <CheckCircle2 size={12} color="var(--c-gold)" />}
+                  {isPassed && <CheckCircle2 size={13} color="var(--c-gold)" />}
                 </div>
+
                 <div
                   style={{
-                    fontSize: "0.82rem",
-                    fontWeight: 700,
+                    fontSize: "0.85rem",
+                    fontWeight: isCurrent ? 800 : 700,
                     color: isCurrent
                       ? "var(--text-primary)"
-                      : "var(--text-secondary)",
-                    marginTop: 4,
+                      : isPassed
+                        ? "var(--c-gold)"
+                        : "var(--text-secondary)",
+                    marginTop: 6,
                   }}
                 >
                   {phase.label}
@@ -638,7 +756,7 @@ function NetworkForecastView() {
         </div>
       </div>
 
-      {/* 3. NETWORK MACRO RISK TIMELINE (CHART) */}
+      {/* 3. NETWORK MACRO RISK TIMELINE (CHART WITH OBSERVED & FORECAST) */}
       <div className="panel">
         <div
           className="panel-header"
@@ -653,7 +771,8 @@ function NetworkForecastView() {
           <div>
             <span className="panel-title">Network Macro Risk Timeline</span>
             <span className="panel-meta" style={{ marginLeft: 8 }}>
-              Observed risk per minute + 4-minute future horizon rollout
+              Observed risk per minute + 4-minute future horizon rollout (t+1 ..
+              t+4)
             </span>
           </div>
           <div style={{ display: "flex", gap: 16 }}>
@@ -717,7 +836,7 @@ function NetworkForecastView() {
                   name === "observed"
                     ? "Observed Macro Risk"
                     : name === "forecast"
-                      ? "Horizon Projection"
+                      ? "Horizon Projection (t+1..t+4)"
                       : "Alert Active",
                 ]}
               />
@@ -781,183 +900,7 @@ function NetworkForecastView() {
         </div>
       </div>
 
-      {/* 4. 4-STEP HORIZON FORECAST CARDS (t+1 .. t+4) */}
-      <div className="panel" style={{ padding: "16px 20px" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 12,
-          }}
-        >
-          <div>
-            <span
-              style={{
-                fontSize: "0.9rem",
-                fontWeight: 700,
-                color: "var(--text-primary)",
-              }}
-            >
-              Predictive Lookahead &bull; Horizon Steps (t+1 .. t+4)
-            </span>
-            <div className="text-muted text-xs mono" style={{ marginTop: 2 }}>
-              Dynamic risk projection and behavior classification for upcoming
-              minutes
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: 12,
-          }}
-        >
-          {data.forecast.map((s) => {
-            const b = s.behaviours[0] || {
-              behaviour: "Benign",
-              probability: 0,
-              techniques: [],
-              tactics: [],
-            };
-            const isHigh = s.risk >= 0.518;
-            return (
-              <div
-                key={s.step}
-                onClick={() => setSelectedHorizon(s.step)}
-                style={{
-                  background:
-                    selectedHorizon === s.step
-                      ? "rgba(214, 179, 106, 0.08)"
-                      : "var(--bg-dark)",
-                  border:
-                    selectedHorizon === s.step
-                      ? "1.5px solid var(--c-gold)"
-                      : "1px solid var(--border)",
-                  borderRadius: "var(--radius-sm)",
-                  padding: "12px 14px",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span
-                    className="mono text-xs"
-                    style={{ color: "var(--c-gold)", fontWeight: 700 }}
-                  >
-                    +{s.step} MIN ({hhmm(s.minute)})
-                  </span>
-                  <span
-                    className="mono text-xs"
-                    style={{
-                      padding: "2px 6px",
-                      borderRadius: 3,
-                      background: isHigh
-                        ? "rgba(201, 74, 69, 0.2)"
-                        : "rgba(88, 166, 104, 0.15)",
-                      color: isHigh ? "var(--c-red)" : "var(--severity-low)",
-                      fontWeight: 800,
-                    }}
-                  >
-                    {(s.risk * 100).toFixed(1)}% RISK
-                  </span>
-                </div>
-
-                <div style={{ marginTop: 10 }}>
-                  <div
-                    className="text-muted text-xs mono uppercase"
-                    style={{ fontSize: "0.65rem" }}
-                  >
-                    Predicted Behavior
-                  </div>
-                  <div
-                    style={{
-                      fontWeight: 700,
-                      fontSize: "0.92rem",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    {b.behaviour}
-                  </div>
-                </div>
-
-                {/* Probability Bar */}
-                <div style={{ marginTop: 8 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: "0.68rem",
-                    }}
-                    className="mono text-muted"
-                  >
-                    <span>Confidence</span>
-                    <span>{(b.probability * 100).toFixed(0)}%</span>
-                  </div>
-                  <div
-                    style={{
-                      width: "100%",
-                      height: 4,
-                      background: "rgba(255,255,255,0.06)",
-                      borderRadius: 2,
-                      marginTop: 3,
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: `${Math.min(100, b.probability * 100)}%`,
-                        height: "100%",
-                        background: isHigh ? "var(--c-red)" : "var(--c-gold)",
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* MITRE ATT&CK Reference */}
-                <div
-                  style={{
-                    marginTop: 10,
-                    paddingTop: 8,
-                    borderTop: "1px solid rgba(255,255,255,0.05)",
-                  }}
-                >
-                  <div
-                    className="mono text-xs text-muted"
-                    style={{ fontSize: "0.68rem" }}
-                  >
-                    {b.techniques.length ? (
-                      <span style={{ color: "var(--c-gold)" }}>
-                        {b.techniques.join(", ")}
-                      </span>
-                    ) : (
-                      "No malicious techniques"
-                    )}
-                  </div>
-                  {b.tactics.length > 0 && (
-                    <div
-                      className="text-muted text-xs"
-                      style={{ fontSize: "0.68rem", marginTop: 2 }}
-                    >
-                      {b.tactics.join(" &bull; ")}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 5. PREDICTED NETWORK MACRO STATE & RISK FACTOR ATTRIBUTION */}
+      {/* 4. PREDICTED NETWORK MACRO STATE & RISK FACTOR ATTRIBUTION */}
       <div
         className="grid-2"
         style={{
@@ -1200,7 +1143,7 @@ function NetworkForecastView() {
         </div>
       </div>
 
-      {/* 6. MODEL BENCHMARK & VALIDATION (DECISIVE FIX: F1=0.862, ROC-AUC=0.885) */}
+      {/* 5. MODEL BENCHMARK & VALIDATION (F1=0.862, ROC-AUC=0.885) */}
       <div className="panel">
         <div
           className="panel-header"
