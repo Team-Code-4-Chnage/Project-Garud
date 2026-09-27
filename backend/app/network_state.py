@@ -19,7 +19,7 @@ import os
 import sys
 import threading
 from collections import defaultdict, deque
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -106,9 +106,10 @@ def compute_empirical_threat(st_row):
     """
     Computes an empirical threat score [0.0, 1.0] and behaviour class based on
     physical flow characteristics across all 5 MITRE ATT&CK kill chain stages.
+    Safeguards quiet real-world live traffic (broadcast, mDNS, SSDP, web) from false alarms.
     """
     n_flows = float(st_row.get("n_flows", 0))
-    if n_flows < 3:
+    if n_flows < 5:
         return 0.0, "Benign"
 
     dport_max = float(st_row.get("n_dport_per_src_max", 0))
@@ -121,35 +122,34 @@ def compute_empirical_threat(st_row):
     uniq_dports = float(st_row.get("n_uniq_dst_port", 0))
     dur_mean = float(st_row.get("f_dur_mean", 0))
     iat_mean = float(st_row.get("f_iat_mean", 0))
-    bps_mean = float(st_row.get("f_bps_mean", 0))
     pkt_size_mean = float(st_row.get("f_pkt_size_mean", 0))
     down_up_mean = float(st_row.get("f_down_up_mean", 0))
 
     scores = {}
 
     # 1. Phase 01: Reconnaissance / PortScan
-    # Probing many ports, high port entropy, SYN/RST probes, small packets
-    if dport_max >= 8 or (uniq_dports >= 8 and ent_port >= 2.2):
+    # Probing many ports by one source, elevated port entropy, SYN/RST probes or small flow sweep
+    if (dport_max >= 12 or (uniq_dports >= 12 and ent_port >= 2.5)) and (syn_ratio + rst_ratio >= 0.20 or small_frac >= 0.50):
         scores["Reconnaissance"] = 0.68
 
     # 2. Phase 02: Initial Access / BruteForce / DoS
-    # Repeated attempts against few ports, elevated RST/SYN, or fast flood
-    if (conn_rate >= 0.4 and dport_max <= 5 and (rst_ratio >= 0.12 or syn_ratio >= 0.22)) or (conn_rate >= 2.0 and syn_ratio >= 0.25):
+    # High-rate repeated attempts against few ports, elevated RST/SYN, or rapid flood
+    if n_flows >= 25 and ((conn_rate >= 0.8 and dport_max <= 4 and (rst_ratio >= 0.20 or syn_ratio >= 0.30)) or (conn_rate >= 3.0 and syn_ratio >= 0.35)):
         scores["Initial Access"] = 0.78
 
     # 3. Phase 03: Lateral Movement
-    # Internal pivot signatures: sustained duration, high packet payload, internal down/up ratio
-    if dur_mean >= 50000 and pkt_size_mean >= 280 and down_up_mean >= 1.6 and dport_max <= 6:
+    # Internal pivot: substantial internal data transfer, sustained duration, high packet payload
+    if n_flows >= 15 and tot_bytes >= 200_000 and dur_mean >= 80000 and pkt_size_mean >= 350 and down_up_mean >= 1.8 and dport_max <= 6:
         scores["Lateral Movement"] = 0.85
 
     # 4. Phase 04: Command & Control (C2 / Beaconing)
-    # Periodic beaconing: high inter-arrival times or long-lived low-rate connection
-    if iat_mean >= 45000 or (dur_mean >= 140000 and bps_mean < 8000 and conn_rate < 0.8):
+    # Steady heartbeat beaconing with sustained flow count, high IAT, and high duration
+    if n_flows >= 15 and tot_bytes >= 50_000 and (iat_mean >= 150000 or dur_mean >= 200000):
         scores["C2"] = 0.89
 
     # 5. Phase 05: Exfiltration (Data Theft / Egress Spike)
-    # High byte egress velocity or large payload delivery
-    if bps_mean >= 15000 or (tot_bytes >= 30000 and pkt_size_mean >= 450 and small_frac <= 0.35) or tot_bytes >= 5_000_000:
+    # Heavy data transfer (at least 2 MB in a minute, or high payload bursts)
+    if tot_bytes >= 2_000_000 or (tot_bytes >= 500_000 and pkt_size_mean >= 600 and small_frac <= 0.25):
         scores["Exfiltration"] = 0.94
 
     if not scores:
@@ -383,14 +383,17 @@ class NetworkStateTracker:
             emp_scores.append(es)
             emp_behaviours.append(eb)
 
-        # Check recent flows for ongoing active stage burst (even if in first seconds of new minute)
-        recent_flows = rows[-80:] if len(rows) >= 80 else rows
-        recent_stages = [r.get("stage") for r in recent_flows if r.get("stage") and r.get("stage") != "Benign"]
-        if recent_stages and len(emp_scores) > 0:
-            top_recent = max(recent_stages, key=lambda s: KILL_CHAIN_ORDER.get(s, 0))
-            recent_risk = STAGE_CALIBRATED_RISK.get(top_recent, 0.75)
-            emp_scores[-1] = max(emp_scores[-1], recent_risk)
-            emp_behaviours[-1] = top_recent
+        # Check recent flows for ongoing active stage burst (within 90s of latest telemetry)
+        if rows:
+            latest_ts = max(r["timestamp"] for r in rows)
+            active_cutoff = latest_ts - timedelta(seconds=90)
+            active_flows = [r for r in rows if r["timestamp"] >= active_cutoff]
+            recent_stages = [r.get("stage") for r in active_flows if r.get("stage") and r.get("stage") != "Benign"]
+            if recent_stages and len(emp_scores) > 0:
+                top_recent = max(recent_stages, key=lambda s: KILL_CHAIN_ORDER.get(s, 0))
+                recent_risk = STAGE_CALIBRATED_RISK.get(top_recent, 0.75)
+                emp_scores[-1] = max(emp_scores[-1], recent_risk)
+                emp_behaviours[-1] = top_recent
 
         for w_i, end_idx in enumerate(range(m.W - 1, len(Z))):
             base_risk = float(risk[w_i].max())
