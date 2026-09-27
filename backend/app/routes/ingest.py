@@ -43,6 +43,9 @@ async def ingest_flow(
         raise HTTPException(status_code=422, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.exception("Unexpected error during flow ingestion: %s", e)
+        raise HTTPException(status_code=500, detail=f"Flow ingestion error: {str(e)}")
 
 
 @router.post("/ingest/csv", response_model=IngestResponse)

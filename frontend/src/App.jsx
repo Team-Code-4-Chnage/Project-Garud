@@ -21,7 +21,6 @@ import { apiFetch, apiPost, createWebSocket } from "./api";
 import { formatTime, flowKey } from "./utils";
 import { WellbeingModal } from "./components/Badges";
 import Dashboard from "./components/Dashboard";
-import ForecastView from "./components/ForecastView";
 import NetworkForecastView from "./components/NetworkForecastView";
 import { AlertsView } from "./components/AlertPanel";
 import LiveLogsView from "./components/LiveLogsView";
@@ -56,7 +55,7 @@ export default function App() {
 
   const onSelectSession = (session) => {
     setSelectedSession(session);
-    setView("forecast");
+    setView("network");
     setMobileMenuOpen(false);
   };
 
@@ -276,7 +275,6 @@ export default function App() {
     dashboard: "Dashboard",
     live_logs: "Live Event Stream",
     alerts: "Incident Alerts",
-    forecast: "Attack Forecast",
     network: "Network Forecast",
     explain: "Explainable AI (XAI)",
     reports: "Forensic Audit Reports",
@@ -347,12 +345,6 @@ export default function App() {
           >
             <AlertTriangle size={15} /> Incident Alerts
             {alertCount > 0 && <span className="nav-badge">{alertCount}</span>}
-          </button>
-          <button
-            className={`nav-item ${view === "forecast" ? "active" : ""}`}
-            onClick={() => handleNavClick("forecast")}
-          >
-            <Activity size={15} /> Attack Forecast
           </button>
           <button
             className={`nav-item ${view === "network" ? "active" : ""}`}
@@ -516,18 +508,12 @@ export default function App() {
 
       <main className="main-content">
         {view === "dashboard" && (
-          <Dashboard systemMode={systemMode} onSelectSession={onSelectSession} />
-        )}
-        {view === "forecast" && (
-          <ForecastView
-            session={selectedSession}
-            onBack={() => setView("dashboard")}
-            featureList={featureList}
+          <Dashboard
+            systemMode={systemMode}
+            onSelectSession={onSelectSession}
           />
         )}
-        {view === "network" && (
-          <NetworkForecastView />
-        )}
+        {(view === "network" || view === "forecast") && <NetworkForecastView />}
         {view === "alerts" && <AlertsView />}
         {view === "live_logs" && (
           <LiveLogsView

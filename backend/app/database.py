@@ -126,11 +126,60 @@ engine = create_async_engine(DATABASE_URL, echo=False)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
+def _migrate_sqlite_schema(sync_conn):
+    """Ensure any newly added columns in ORM models are present in existing SQLite tables."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(sync_conn)
+    tables = inspector.get_table_names()
+
+    expected_columns = {
+        "sessions": {
+            "src_port": "INTEGER",
+            "dst_port": "INTEGER",
+            "process_name": "VARCHAR(64)",
+            "app_name": "VARCHAR(64)",
+            "tot_fwd_pkts": "FLOAT",
+            "tot_bwd_pkts": "FLOAT",
+            "src_identity": "VARCHAR(32)",
+            "dst_identity": "VARCHAR(32)",
+            "source": "VARCHAR(32)",
+            "direction": "VARCHAR(16)",
+            "max_stage_reached": "VARCHAR(32)",
+        },
+        "flow_records": {
+            "src_port": "INTEGER",
+            "dst_port": "INTEGER",
+            "protocol": "VARCHAR(16)",
+            "process_name": "VARCHAR(64)",
+            "app_name": "VARCHAR(64)",
+            "direction": "VARCHAR(16)",
+            "src_identity": "VARCHAR(32)",
+            "dst_identity": "VARCHAR(32)",
+            "source": "VARCHAR(32)",
+        },
+        "alerts": {
+            "acknowledged": "BOOLEAN DEFAULT 0",
+        },
+    }
+
+    for table_name, cols in expected_columns.items():
+        if table_name in tables:
+            existing = {c["name"] for c in inspector.get_columns(table_name)}
+            for col_name, col_type in cols.items():
+                if col_name not in existing:
+                    try:
+                        sync_conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}"))
+                        logger.info("Migrated schema: added %s.%s (%s)", table_name, col_name, col_type)
+                    except Exception as e:
+                        logger.warning("Could not add column %s to %s: %s", col_name, table_name, e)
+
+
 async def init_db():
-    """Create tables if they don't exist."""
+    """Create tables if they don't exist and apply auto-migrations."""
     DB_DIR.mkdir(parents=True, exist_ok=True)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_migrate_sqlite_schema)
     logger.info("Database initialized at %s", DATABASE_URL)
 
 

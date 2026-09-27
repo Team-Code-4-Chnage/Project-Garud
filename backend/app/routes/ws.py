@@ -73,35 +73,71 @@ async def get_sessions(
         cutoff = datetime.now(timezone.utc) - timedelta(seconds=active_within_seconds)
         stmt = stmt.where(SessionDB.last_seen >= cutoff)
 
-    stmt = stmt.order_by(sort_col).limit(limit)
+    stmt = stmt.order_by(sort_col).limit(limit * 3)
     result = await db.execute(stmt)
     sessions = result.scalars().all()
 
-    return [
-        {
-            "id": s.id,
-            "session_key": s.session_key,
-            "src_ip": s.src_ip,
-            "dst_ip": s.dst_ip,
-            "src_port": s.src_port,
-            "dst_port": s.dst_port,
-            "flow_count": s.flow_count,
-            "latest_risk_score": s.latest_risk_score,
-            "latest_stage": s.latest_stage,
-            "max_stage_reached": s.max_stage_reached,
-            "direction": s.direction,
-            "process_name": s.process_name,
-            "app_name": s.app_name,
-            "tot_fwd_pkts": s.tot_fwd_pkts or 0,
-            "tot_bwd_pkts": s.tot_bwd_pkts or 0,
-            "src_identity": s.src_identity,
-            "dst_identity": s.dst_identity,
-            "source": s.source,
-            "first_seen": s.first_seen.isoformat() if s.first_seen else None,
-            "last_seen": s.last_seen.isoformat() if s.last_seen else None,
-        }
-        for s in sessions
-    ]
+    # Deduplicate by application / process identity so an application (e.g. Spotify) running once appears once
+    deduped = {}
+    for s in sessions:
+        app_name = s.app_name or s.process_name
+        if app_name and app_name.lower().strip() not in ("unknown", "general network", "system network"):
+            group_key = f"app:{app_name.lower().strip()}"
+        else:
+            endpoint_pair = s.session_key.split("@")[0] if "@" in s.session_key else s.session_key
+            group_key = f"endpoint:{endpoint_pair}"
+
+        if group_key not in deduped:
+            deduped[group_key] = {
+                "id": s.id,
+                "session_key": s.session_key,
+                "src_ip": s.src_ip,
+                "dst_ip": s.dst_ip,
+                "src_port": s.src_port,
+                "dst_port": s.dst_port,
+                "flow_count": s.flow_count or 0,
+                "latest_risk_score": s.latest_risk_score or 0.0,
+                "latest_stage": s.latest_stage or "Benign",
+                "max_stage_reached": s.max_stage_reached or "Benign",
+                "direction": s.direction or "outbound",
+                "process_name": s.process_name,
+                "app_name": s.app_name,
+                "tot_fwd_pkts": s.tot_fwd_pkts or 0,
+                "tot_bwd_pkts": s.tot_bwd_pkts or 0,
+                "src_identity": s.src_identity,
+                "dst_identity": s.dst_identity,
+                "source": s.source,
+                "first_seen": s.first_seen.isoformat() if s.first_seen else None,
+                "last_seen": s.last_seen.isoformat() if s.last_seen else None,
+                "_last_seen_dt": s.last_seen,
+            }
+        else:
+            prev = deduped[group_key]
+            prev["flow_count"] += (s.flow_count or 0)
+            prev["tot_fwd_pkts"] += (s.tot_fwd_pkts or 0)
+            prev["tot_bwd_pkts"] += (s.tot_bwd_pkts or 0)
+            if (s.latest_risk_score or 0.0) > (prev["latest_risk_score"] or 0.0):
+                prev["latest_risk_score"] = s.latest_risk_score
+                prev["latest_stage"] = s.latest_stage
+            if s.last_seen and (prev["_last_seen_dt"] is None or s.last_seen > prev["_last_seen_dt"]):
+                prev["_last_seen_dt"] = s.last_seen
+                prev["last_seen"] = s.last_seen.isoformat()
+                prev["dst_ip"] = s.dst_ip
+                if s.dst_port:
+                    prev["dst_port"] = s.dst_port
+
+    output_sessions = list(deduped.values())
+    for s in output_sessions:
+        s.pop("_last_seen_dt", None)
+
+    if sort_by == "latest_risk_score":
+        output_sessions.sort(key=lambda s: s.get("latest_risk_score") or 0.0, reverse=True)
+    elif sort_by == "flow_count":
+        output_sessions.sort(key=lambda s: s.get("flow_count") or 0, reverse=True)
+    else:
+        output_sessions.sort(key=lambda s: s.get("last_seen") or "", reverse=True)
+
+    return output_sessions[:limit]
 
 
 @router.get("/sessions/{session_key}/flows")

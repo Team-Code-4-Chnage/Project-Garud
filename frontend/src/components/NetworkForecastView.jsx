@@ -38,7 +38,10 @@ const STATE_LABELS = {
 const hhmm = (iso) => {
   if (!iso) return "";
   const asUtc = /[Zz]|[+-]\d\d:\d\d$/.test(iso) ? iso : `${iso}Z`;
-  return new Date(asUtc).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Date(asUtc).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 const fmt = (v) =>
   v == null
@@ -116,7 +119,9 @@ function NetworkForecastView() {
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <Network size={16} color="var(--c-gold)" />
-        <span className="panel-title">Attack Forecast &bull; Network World Model</span>
+        <span className="panel-title">
+          Network Forecast &bull; Macro World Model
+        </span>
       </div>
       <span
         className="mono text-xs text-muted"
