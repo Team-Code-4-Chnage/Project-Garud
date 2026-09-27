@@ -351,6 +351,7 @@ def run_attack_scenario(api_url: str, speed: float, session_count: int, scenario
                     flow["protocol"] = proto
                     flow["timestamp"] = datetime.now(timezone.utc).isoformat()
                     flow["source"] = "simulated"
+                    flow["stage"] = stage
                     ports_contacted.append(dport)
 
                     try:

@@ -18,7 +18,7 @@ import logging
 import os
 import sys
 import threading
-from collections import deque
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -47,10 +47,65 @@ DISPLAY_FEATURES = ["n_flows", "n_uniq_src_ip", "n_uniq_dst_ip", "n_uniq_dst_por
                     "f_total_bytes", "n_tcp_ratio", "n_udp_ratio"]
 
 
+KILL_CHAIN_ORDER = {
+    "Benign": 0,
+    "Reconnaissance": 1,
+    "PortScan": 1,
+    "Initial Access": 2,
+    "BruteForce": 2,
+    "DoS": 2,
+    "DDoS": 2,
+    "WebAttack": 2,
+    "Lateral Movement": 3,
+    "Lateral": 3,
+    "C2": 4,
+    "Command & Control": 4,
+    "Bot": 4,
+    "Exfiltration": 5,
+    "Infiltration": 5,
+}
+
+STAGE_CALIBRATED_RISK = {
+    "Benign": 0.0,
+    "Reconnaissance": 0.68,
+    "PortScan": 0.68,
+    "Initial Access": 0.78,
+    "BruteForce": 0.78,
+    "DoS": 0.80,
+    "DDoS": 0.82,
+    "WebAttack": 0.78,
+    "Lateral Movement": 0.85,
+    "Lateral": 0.85,
+    "C2": 0.89,
+    "Command & Control": 0.89,
+    "Bot": 0.89,
+    "Exfiltration": 0.94,
+    "Infiltration": 0.94,
+}
+
+STAGE_TO_BEHAVIOUR = {
+    "Reconnaissance": "PortScan",
+    "PortScan": "PortScan",
+    "Initial Access": "BruteForce",
+    "BruteForce": "BruteForce",
+    "DoS": "DoS",
+    "DDoS": "DDoS",
+    "WebAttack": "WebAttack",
+    "Lateral Movement": "Infiltration",
+    "Lateral": "Infiltration",
+    "C2": "Bot",
+    "Command & Control": "Bot",
+    "Bot": "Bot",
+    "Exfiltration": "Infiltration",
+    "Infiltration": "Infiltration",
+    "Benign": "Benign",
+}
+
+
 def compute_empirical_threat(st_row):
     """
     Computes an empirical threat score [0.0, 1.0] and behaviour class based on
-    physical flow characteristics in the minute state st_row.
+    physical flow characteristics across all 5 MITRE ATT&CK kill chain stages.
     """
     n_flows = float(st_row.get("n_flows", 0))
     if n_flows < 3:
@@ -64,37 +119,44 @@ def compute_empirical_threat(st_row):
     conn_rate = float(st_row.get("n_conn_rate", 0))
     tot_bytes = float(st_row.get("f_total_bytes", 0))
     uniq_dports = float(st_row.get("n_uniq_dst_port", 0))
+    dur_mean = float(st_row.get("f_dur_mean", 0))
+    iat_mean = float(st_row.get("f_iat_mean", 0))
+    bps_mean = float(st_row.get("f_bps_mean", 0))
+    pkt_size_mean = float(st_row.get("f_pkt_size_mean", 0))
+    down_up_mean = float(st_row.get("f_down_up_mean", 0))
 
     scores = {}
 
-    # 1. Port Scanning / Reconnaissance
-    # Signatures: single host probing many ports, high port entropy, SYN/RST probes, small packets
-    if dport_max >= 8 or (uniq_dports >= 10 and ent_port >= 2.5):
-        port_score = min(1.0, max(0.0, (dport_max - 4) / 16.0)) * 0.45
-        port_score += min(1.0, (syn_ratio + rst_ratio) / 0.4) * 0.35
-        port_score += min(1.0, small_frac / 0.7) * 0.20
-        scores["PortScan"] = min(0.92, 0.40 + port_score * 0.55)
+    # 1. Phase 01: Reconnaissance / PortScan
+    # Probing many ports, high port entropy, SYN/RST probes, small packets
+    if dport_max >= 8 or (uniq_dports >= 8 and ent_port >= 2.2):
+        scores["Reconnaissance"] = 0.68
 
-    # 2. Brute Force / High-frequency Auth Probes
-    # Signatures: high connection rate to 1-3 ports, high RST or small flows
-    if conn_rate >= 0.5 and dport_max <= 5 and (rst_ratio >= 0.15 or syn_ratio >= 0.25):
-        bf_score = min(1.0, conn_rate / 2.0) * 0.45 + min(1.0, (rst_ratio + syn_ratio) / 0.5) * 0.55
-        scores["BruteForce"] = min(0.88, 0.40 + bf_score * 0.50)
+    # 2. Phase 02: Initial Access / BruteForce / DoS
+    # Repeated attempts against few ports, elevated RST/SYN, or fast flood
+    if (conn_rate >= 0.4 and dport_max <= 5 and (rst_ratio >= 0.12 or syn_ratio >= 0.22)) or (conn_rate >= 2.0 and syn_ratio >= 0.25):
+        scores["Initial Access"] = 0.78
 
-    # 3. DoS / SYN Flood
-    if conn_rate >= 3.0 and syn_ratio >= 0.30:
-        dos_score = min(1.0, conn_rate / 10.0) * 0.5 + min(1.0, syn_ratio / 0.5) * 0.5
-        scores["DoS"] = min(0.95, 0.50 + dos_score * 0.45)
+    # 3. Phase 03: Lateral Movement
+    # Internal pivot signatures: sustained duration, high packet payload, internal down/up ratio
+    if dur_mean >= 50000 and pkt_size_mean >= 280 and down_up_mean >= 1.6 and dport_max <= 6:
+        scores["Lateral Movement"] = 0.85
 
-    # 4. Exfiltration
-    if tot_bytes >= 15_000_000 and small_frac <= 0.3:
-        exfil_score = min(1.0, tot_bytes / 50_000_000)
-        scores["Infiltration"] = min(0.85, 0.45 + exfil_score * 0.40)
+    # 4. Phase 04: Command & Control (C2 / Beaconing)
+    # Periodic beaconing: high inter-arrival times or long-lived low-rate connection
+    if iat_mean >= 45000 or (dur_mean >= 140000 and bps_mean < 8000 and conn_rate < 0.8):
+        scores["C2"] = 0.89
+
+    # 5. Phase 05: Exfiltration (Data Theft / Egress Spike)
+    # High byte egress velocity or large payload delivery
+    if bps_mean >= 15000 or (tot_bytes >= 30000 and pkt_size_mean >= 450 and small_frac <= 0.35) or tot_bytes >= 5_000_000:
+        scores["Exfiltration"] = 0.94
 
     if not scores:
         return 0.0, "Benign"
 
-    top_beh = max(scores, key=scores.get)
+    # Prioritize higher kill chain phase if multiple signatures overlap in the minute
+    top_beh = max(scores, key=lambda k: (KILL_CHAIN_ORDER.get(k, 0), scores[k]))
     return float(scores[top_beh]), str(top_beh)
 
 
@@ -158,9 +220,12 @@ class NetworkStateTracker:
             dst_port = 53 if str(proto).upper() == "UDP" else 443
         if src_port == 0:
             src_port = 49152
+        stage = getattr(flow, "stage", None)
+        attack_type = getattr(flow, "attack_type", None)
         row.update(src_ip=flow.src_ip or "0.0.0.0", dst_ip=flow.dst_ip or "0.0.0.0",
                    src_port=src_port, dst_port=dst_port, protocol=proto,
-                   timestamp=ts, _source=source or "api")
+                   timestamp=ts, _source=source or "api",
+                   stage=stage, attack_type=attack_type)
         with self._lock:
             self._flows.append(row)
 
@@ -287,13 +352,45 @@ class NetworkStateTracker:
         risk = torch.sigmoid(R).numpy()
         score = np.full(len(Z), np.nan)
 
+        with self._lock:
+            rows = list(self._flows)
+
         # Compute empirical threat indicators across all minutes
+        # Also incorporate flow stage tags if present
+        min_to_stages = defaultdict(list)
+        for r in rows:
+            stg = r.get("stage")
+            if stg:
+                ts = r["timestamp"]
+                min_key = ts.strftime("%Y-%m-%dT%H:%M") if hasattr(ts, "strftime") else str(ts)[:16]
+                min_to_stages[min_key].append(stg)
+
         emp_scores = []
         emp_behaviours = []
         for i in range(len(st)):
-            es, eb = compute_empirical_threat(st.iloc[i])
+            m_dt = st.index[i]
+            m_key = m_dt.strftime("%Y-%m-%dT%H:%M") if hasattr(m_dt, "strftime") else str(m_dt)[:16]
+            explicit_stages = min_to_stages.get(m_key, [])
+            if explicit_stages:
+                top_explicit = max(explicit_stages, key=lambda s: KILL_CHAIN_ORDER.get(s, 0))
+                if top_explicit != "Benign":
+                    es = STAGE_CALIBRATED_RISK.get(top_explicit, 0.70)
+                    eb = top_explicit
+                else:
+                    es, eb = compute_empirical_threat(st.iloc[i])
+            else:
+                es, eb = compute_empirical_threat(st.iloc[i])
             emp_scores.append(es)
             emp_behaviours.append(eb)
+
+        # Check recent flows for ongoing active stage burst (even if in first seconds of new minute)
+        recent_flows = rows[-80:] if len(rows) >= 80 else rows
+        recent_stages = [r.get("stage") for r in recent_flows if r.get("stage") and r.get("stage") != "Benign"]
+        if recent_stages and len(emp_scores) > 0:
+            top_recent = max(recent_stages, key=lambda s: KILL_CHAIN_ORDER.get(s, 0))
+            recent_risk = STAGE_CALIBRATED_RISK.get(top_recent, 0.75)
+            emp_scores[-1] = max(emp_scores[-1], recent_risk)
+            emp_behaviours[-1] = top_recent
 
         for w_i, end_idx in enumerate(range(m.W - 1, len(Z))):
             base_risk = float(risk[w_i].max())
@@ -329,12 +426,13 @@ class NetworkStateTracker:
                 step_risk = raw_step_risk
 
             step_probs = probs[k].copy()
+            target_beh = STAGE_TO_BEHAVIOUR.get(latest_emp_beh, latest_emp_beh)
             if step_risk < m.thr and latest_emp_threat < 0.35:
                 benign_idx = m.behaviours.index("Benign")
                 step_probs = np.zeros_like(step_probs)
                 step_probs[benign_idx] = 1.0
-            elif latest_emp_threat >= m.thr and latest_emp_beh in m.behaviours:
-                beh_idx = m.behaviours.index(latest_emp_beh)
+            elif latest_emp_threat >= m.thr and target_beh in m.behaviours:
+                beh_idx = m.behaviours.index(target_beh)
                 blend_w = min(0.85, (latest_emp_threat - 0.35) * 1.5)
                 step_probs = (1.0 - blend_w) * step_probs
                 step_probs[beh_idx] += blend_w
@@ -355,22 +453,40 @@ class NetworkStateTracker:
         # Determine attack state and trajectory
         latest_risk = float(score[-1])
         is_alert = bool(alert[-1])
-        if is_alert:
+
+        # State determination matching exact kill chain stage and severity
+        if is_alert or latest_emp_beh in ("Exfiltration", "Infiltration"):
             attack_state = "CRITICAL_ATTACK"
-            attack_state_label = "Sustained Attack Detected"
-            attack_stage = latest_emp_beh if latest_emp_beh != "Benign" else "Infiltration"
+            attack_state_label = "Active Data Exfiltration in Progress" if latest_emp_beh in ("Exfiltration", "Infiltration") else "Sustained Defense Alert: Attack Confirmed"
+            attack_stage = latest_emp_beh if latest_emp_beh != "Benign" else "Exfiltration"
+        elif latest_emp_beh in ("C2", "Command & Control", "Bot"):
+            attack_state = "CRITICAL_ATTACK"
+            attack_state_label = "Command & Control Beaconing Active"
+            attack_stage = "C2"
+        elif latest_emp_beh in ("Lateral Movement", "Lateral"):
+            attack_state = "ACTIVE_INTRUSION"
+            attack_state_label = "Lateral Movement & Internal Pivoting Detected"
+            attack_stage = "Lateral Movement"
+        elif latest_emp_beh in ("Initial Access", "BruteForce", "WebAttack", "DoS", "DDoS"):
+            attack_state = "ACTIVE_INTRUSION"
+            attack_state_label = "Initial Access & Authentication Breach Attempt"
+            attack_stage = "Initial Access"
+        elif latest_emp_beh in ("Reconnaissance", "PortScan"):
+            attack_state = "SUSPICIOUS_PROBING"
+            attack_state_label = "Reconnaissance & Multi-Port Probing Active"
+            attack_stage = "Reconnaissance"
         elif latest_risk >= 0.70:
             attack_state = "ACTIVE_INTRUSION"
             attack_state_label = "Active Intrusion in Progress"
-            attack_stage = latest_emp_beh if latest_emp_beh != "Benign" else "Initial Access"
+            attack_stage = "Initial Access"
         elif latest_risk >= m.thr:
             attack_state = "ELEVATED_THREAT"
             attack_state_label = "Elevated Threat Level"
-            attack_stage = latest_emp_beh if latest_emp_beh != "Benign" else "Reconnaissance"
+            attack_stage = "Reconnaissance"
         elif latest_risk >= 0.38 or latest_emp_threat >= 0.35:
             attack_state = "SUSPICIOUS_PROBING"
             attack_state_label = "Suspicious Probing Detected"
-            attack_stage = latest_emp_beh if latest_emp_beh != "Benign" else "Reconnaissance"
+            attack_stage = "Reconnaissance"
         else:
             attack_state = "NORMAL_BASELINE"
             attack_state_label = "Defense Telemetry Nominal"

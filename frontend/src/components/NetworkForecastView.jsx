@@ -58,7 +58,16 @@ const KILL_CHAIN_PHASES = [
     id: "Initial Access",
     label: "Initial Access",
     tech: "T1190 / T1110",
-    keys: ["access", "initial", "brute", "auth", "exploit", "web"],
+    keys: [
+      "access",
+      "initial",
+      "brute",
+      "auth",
+      "exploit",
+      "web",
+      "dos",
+      "ddos",
+    ],
   },
   {
     id: "Lateral Movement",
@@ -82,8 +91,8 @@ const KILL_CHAIN_PHASES = [
 
 function getPhaseIndexForStage(stageName) {
   if (!stageName) return -1;
-  const s = stageName.toLowerCase();
-  if (s === "benign") return -1;
+  const s = stageName.toLowerCase().trim();
+  if (s === "benign" || s === "nominal") return -1;
   for (let i = 0; i < KILL_CHAIN_PHASES.length; i++) {
     if (KILL_CHAIN_PHASES[i].keys.some((k) => s.includes(k))) {
       return i;
@@ -392,7 +401,11 @@ function NetworkForecastView() {
 
   // Determine current active kill chain stage and matching phase index
   const activeStage =
-    cur.attack_stage || (cur.risk_score > 0.5 ? "Reconnaissance" : "Benign");
+    cur.attack_stage && cur.attack_stage !== "Benign"
+      ? cur.attack_stage
+      : cur.risk_score >= 0.518
+        ? "Reconnaissance"
+        : "Benign";
   const currentPhaseIdx = getPhaseIndexForStage(activeStage);
 
   return (
@@ -488,7 +501,9 @@ function NetworkForecastView() {
                     color: stateMeta.color,
                   }}
                 >
-                  {stateMeta.title}
+                  {cur.attack_state_label
+                    ? cur.attack_state_label.toUpperCase()
+                    : stateMeta.title}
                 </span>
                 <span
                   className="mono text-xs"
@@ -508,7 +523,17 @@ function NetworkForecastView() {
                 className="text-muted text-xs"
                 style={{ marginTop: 4, maxWidth: 560 }}
               >
-                {stateMeta.desc}
+                {cur.attack_stage === "Exfiltration"
+                  ? "Critical outbound egress velocity detected. Data exfiltration actively progressing across network endpoints."
+                  : cur.attack_stage === "C2"
+                    ? "Persistent command & control beaconing detected. Periodic heartbeat / command channel observed with external controller."
+                    : cur.attack_stage === "Lateral Movement"
+                      ? "Internal pivot activity observed across administrative SMB/RPC ports between internal hosts."
+                      : cur.attack_stage === "Initial Access"
+                        ? "Authentication brute-force or public service exploit attempts targeting perimeter credentials."
+                        : cur.attack_stage === "Reconnaissance"
+                          ? "Multi-port service discovery or port sweep reconnaissance probing internal infrastructure."
+                          : stateMeta.desc}
               </div>
             </div>
           </div>
