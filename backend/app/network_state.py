@@ -500,13 +500,46 @@ class NetworkStateTracker:
         else:
             top_beh_name = latest_emp_beh if latest_emp_beh != "Benign" else (steps[0]["behaviours"][0]["behaviour"] if steps else "Benign")
 
+        # Estimate time to reach critical attack / breach
+        if is_alert or attack_stage in ("Exfiltration", "Infiltration"):
+            etr_label = "0 min (Breach Active Now)"
+            etr_desc = "Critical intrusion velocity reached — immediate containment active."
+            etr_minutes = 0
+        elif attack_stage in ("C2", "Command & Control", "Bot"):
+            etr_label = "< 1 min (Exfiltration Imminent)"
+            etr_desc = "C2 beaconing established. Data exfiltration phase expected within ~60 seconds."
+            etr_minutes = 1
+        elif attack_stage in ("Lateral Movement", "Lateral"):
+            etr_label = "~1 - 2 min to Critical Reach"
+            etr_desc = "Internal pivoting detected. Pivoting to C2 and exfiltration projected in upcoming steps."
+            etr_minutes = 2
+        elif attack_stage in ("Initial Access", "BruteForce", "WebAttack", "DoS", "DDoS"):
+            etr_label = "~2 - 3 min to Critical Reach"
+            etr_desc = "Initial access breach active. Lateral movement and C2 projected within 2 to 3 minutes."
+            etr_minutes = 3
+        elif attack_stage in ("Reconnaissance", "PortScan"):
+            etr_label = "~3 - 4 min to Critical Reach"
+            etr_desc = "Reconnaissance probing active. Host exploitation attempts projected within 3 to 4 minutes."
+            etr_minutes = 4
+        else:
+            etr_label = "Stable (Nominal Baseline)"
+            etr_desc = "Telemetry baseline nominal across next 4+ minutes. Zero intrusion velocity."
+            etr_minutes = None
+
+        stages = [str(b) for b in emp_behaviours]
+
         return dict(
             status="ok", minutes=minutes, state=display,
-            risk_score=[None if np.isnan(v) else float(v) for v in score], alert=alert,
+            risk_score=[None if np.isnan(v) else float(v) for v in score],
+            stages=stages,
+            alert=alert,
             current=dict(
                 minute=minutes[-1], alert=is_alert, risk_score=latest_risk,
                 attack_state=attack_state, attack_state_label=attack_state_label,
                 attack_stage=attack_stage, top_behaviour=top_beh_name,
+                estimated_time_to_attack=etr_label,
+                estimated_time_desc=etr_desc,
+                estimated_reach_minutes=etr_minutes,
                 consecutive_needed=m.N, threshold=m.thr
             ),
             forecast=steps, explanation=explanation, model=self.model_info())

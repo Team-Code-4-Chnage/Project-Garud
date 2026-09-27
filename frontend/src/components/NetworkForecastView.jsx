@@ -47,17 +47,69 @@ const STATE_LABELS = {
   f_total_bytes: "Bytes / min",
 };
 
+const STAGE_COLORS = {
+  Benign: "#58A668",
+  Reconnaissance: "#5294E2",
+  Recon: "#5294E2",
+  PortScan: "#5294E2",
+  "Initial Access": "#D6B36A",
+  Initial: "#D6B36A",
+  BruteForce: "#D6B36A",
+  WebAttack: "#D6B36A",
+  DoS: "#D6B36A",
+  DDoS: "#D6B36A",
+  "Lateral Movement": "#DE934B",
+  Lateral: "#DE934B",
+  C2: "#D1643F",
+  "Command & Control": "#D1643F",
+  Bot: "#D1643F",
+  Exfiltration: "#C94A45",
+  Infiltration: "#C94A45",
+};
+
+export function getStageColor(stage) {
+  if (!stage) return STAGE_COLORS.Benign;
+  const s = String(stage).trim().toLowerCase();
+  if (s === "benign" || s === "nominal") return STAGE_COLORS.Benign;
+  if (s.includes("exfil") || s.includes("infilt"))
+    return STAGE_COLORS.Exfiltration;
+  if (s.includes("c2") || s.includes("bot") || s.includes("command"))
+    return STAGE_COLORS.C2;
+  if (s.includes("lateral") || s.includes("pivot"))
+    return STAGE_COLORS["Lateral Movement"];
+  if (
+    s.includes("initial") ||
+    s.includes("access") ||
+    s.includes("brute") ||
+    s.includes("dos") ||
+    s.includes("web")
+  ) {
+    return STAGE_COLORS["Initial Access"];
+  }
+  if (
+    s.includes("recon") ||
+    s.includes("scan") ||
+    s.includes("port") ||
+    s.includes("prob")
+  ) {
+    return STAGE_COLORS.Reconnaissance;
+  }
+  return STAGE_COLORS.Benign;
+}
+
 const KILL_CHAIN_PHASES = [
   {
     id: "Reconnaissance",
     label: "Reconnaissance",
     tech: "T1046 / T1595",
+    color: "#5294E2",
     keys: ["recon", "scan", "port", "prob"],
   },
   {
     id: "Initial Access",
     label: "Initial Access",
     tech: "T1190 / T1110",
+    color: "#D6B36A",
     keys: [
       "access",
       "initial",
@@ -73,18 +125,21 @@ const KILL_CHAIN_PHASES = [
     id: "Lateral Movement",
     label: "Lateral Movement",
     tech: "T1021 / T1570",
+    color: "#DE934B",
     keys: ["lateral", "pivot", "smb", "rpc", "winrm"],
   },
   {
     id: "C2",
     label: "Command & Control",
     tech: "T1071 / T1572",
+    color: "#D1643F",
     keys: ["c2", "command", "beacon", "bot"],
   },
   {
     id: "Exfiltration",
     label: "Exfiltration",
     tech: "T1041 / T1567",
+    color: "#C94A45",
     keys: ["exfil", "infilt", "theft", "egress"],
   },
 ];
@@ -120,14 +175,22 @@ const fmt = (v) => {
 
 const fmtStat = (v) => (v == null ? "-" : Number(v).toFixed(3));
 
-function getAttackStateMeta(stateKey, risk, alert) {
+function getAttackStateMeta(stateKey, risk, alert, activeStage) {
+  const stageCol = getStageColor(activeStage);
   if (alert) {
+    const isExfil =
+      activeStage === "Exfiltration" || activeStage === "Infiltration";
+    const color = isExfil
+      ? "#C94A45"
+      : stageCol !== "#58A668"
+        ? stageCol
+        : "#C94A45";
     return {
       title: "SUSTAINED DEFENSE ALERT: ATTACK CONFIRMED",
       desc: "Intrusion threshold sustained across consecutive windows. Immediate automated containment recommended.",
-      color: "var(--c-red, #C94A45)",
-      bg: "rgba(201, 74, 69, 0.15)",
-      border: "rgba(201, 74, 69, 0.4)",
+      color: color,
+      bg: `${color}22`,
+      border: `${color}66`,
       badge: "CRITICAL ALERT",
       icon: AlertTriangle,
       level: "critical",
@@ -138,36 +201,39 @@ function getAttackStateMeta(stateKey, risk, alert) {
     stateKey === "ACTIVE_INTRUSION" ||
     stateKey === "CRITICAL_ATTACK"
   ) {
+    const color = stageCol !== "#58A668" ? stageCol : "#C94A45";
     return {
       title: "ACTIVE INTRUSION DETECTED",
       desc: "High infiltration velocity detected. Multi-vector attack patterns actively progressing.",
-      color: "#E57373",
-      bg: "rgba(229, 115, 115, 0.12)",
-      border: "rgba(229, 115, 115, 0.35)",
+      color: color,
+      bg: `${color}20`,
+      border: `${color}55`,
       badge: "HIGH THREAT",
       icon: ShieldAlert,
       level: "high",
     };
   }
   if (risk >= 0.518 || stateKey === "ELEVATED_THREAT") {
+    const color = stageCol !== "#58A668" ? stageCol : "#D6B36A";
     return {
       title: "ELEVATED INTRUSION RISK",
       desc: "Network telemetry exceeds warning threshold. Suspicious connection cadence or scanning detected.",
-      color: "var(--c-gold, #D6B36A)",
-      bg: "rgba(214, 179, 106, 0.12)",
-      border: "rgba(214, 179, 106, 0.35)",
+      color: color,
+      bg: `${color}1e`,
+      border: `${color}55`,
       badge: "ELEVATED",
       icon: Zap,
       level: "medium",
     };
   }
   if (risk >= 0.38 || stateKey === "SUSPICIOUS_PROBING") {
+    const color = stageCol !== "#58A668" ? stageCol : "#5294E2";
     return {
       title: "SUSPICIOUS MULTI-PORT PROBING",
       desc: "Anomalous destination port diversity or handshake patterns observed above baseline.",
-      color: "#E5A93C",
-      bg: "rgba(229, 169, 60, 0.10)",
-      border: "rgba(229, 169, 60, 0.30)",
+      color: color,
+      bg: `${color}1a`,
+      border: `${color}4d`,
       badge: "PROBING",
       icon: Search,
       level: "guarded",
@@ -176,13 +242,85 @@ function getAttackStateMeta(stateKey, risk, alert) {
   return {
     title: "DEFENSE TELEMETRY NOMINAL",
     desc: "Network traffic within standard statistical distribution. No sustained intrusion signatures observed.",
-    color: "var(--severity-low, #58A668)",
+    color: "#58A668",
     bg: "rgba(88, 166, 104, 0.08)",
     border: "rgba(88, 166, 104, 0.25)",
     badge: "NOMINAL",
     icon: ShieldCheck,
     level: "normal",
   };
+}
+
+function CustomForecastTooltip({ active, payload }) {
+  if (!active || !payload || !payload.length) return null;
+  const p = payload.find((item) => item.value != null)?.payload;
+  if (!p) return null;
+  const stage = p.stage || "Benign";
+  const stageCol = p.stageColor || getStageColor(stage);
+  const isObs = p.observed != null;
+  const val = isObs ? p.observed : p.forecast;
+
+  return (
+    <div
+      style={{
+        background: "#181410",
+        border: `1.5px solid ${stageCol}`,
+        borderRadius: 4,
+        padding: "10px 14px",
+        boxShadow: "0 6px 18px rgba(0, 0, 0, 0.65)",
+        minWidth: 190,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: 6,
+        }}
+      >
+        <span className="mono text-xs text-muted">{p.minute}</span>
+        <span
+          className="mono"
+          style={{
+            padding: "2px 7px",
+            borderRadius: 3,
+            background: `${stageCol}24`,
+            color: stageCol,
+            fontWeight: 800,
+            fontSize: "0.68rem",
+            border: `1px solid ${stageCol}66`,
+          }}
+        >
+          {stage.toUpperCase()}
+        </span>
+      </div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+        <span
+          className="mono"
+          style={{ fontSize: "1.2rem", fontWeight: 900, color: stageCol }}
+        >
+          {val == null ? "-" : `${(val * 100).toFixed(1)}%`}
+        </span>
+        <span className="text-muted text-xs">
+          {p.step
+            ? `Horizon (+${p.step}m)`
+            : p.alert
+              ? "CRITICAL ALERT"
+              : "Observed Risk"}
+        </span>
+      </div>
+      {p.step && (
+        <div
+          className="text-muted text-xs mono"
+          style={{ marginTop: 4, fontSize: "0.68rem" }}
+        >
+          Projected step t+{p.step}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function NetworkForecastView() {
@@ -212,20 +350,39 @@ function NetworkForecastView() {
 
   const chart = useMemo(() => {
     if (!data || data.status !== "ok") return [];
-    const hist = data.minutes.map((m, i) => ({
-      minute: hhmm(m),
-      observed: data.risk_score[i],
-      alert: data.alert[i] ? data.risk_score[i] : null,
-      rawMinute: m,
-    }));
+    const stages = data.stages || [];
+    const hist = data.minutes.map((m, i) => {
+      const stageName =
+        stages[i] ||
+        (data.alert[i]
+          ? "Exfiltration"
+          : data.risk_score[i] >= 0.518
+            ? "Reconnaissance"
+            : "Benign");
+      return {
+        minute: hhmm(m),
+        observed: data.risk_score[i],
+        alert: data.alert[i] ? data.risk_score[i] : null,
+        stage: stageName,
+        stageColor: getStageColor(stageName),
+        rawMinute: m,
+      };
+    });
     const last = hist[hist.length - 1];
-    const fc = data.forecast.map((s) => ({
-      minute: hhmm(s.minute),
-      forecast: s.risk,
-      step: s.step,
-      rawMinute: s.minute,
-    }));
-    if (last) last.forecast = last.observed;
+    const fc = data.forecast.map((s) => {
+      const topBeh = s.behaviours?.[0]?.behaviour || "Benign";
+      return {
+        minute: hhmm(s.minute),
+        forecast: s.risk,
+        step: s.step,
+        stage: topBeh,
+        stageColor: getStageColor(topBeh),
+        rawMinute: s.minute,
+      };
+    });
+    if (last) {
+      last.forecast = last.observed;
+    }
     return [...hist.slice(-35), ...fc];
   }, [data]);
 
@@ -392,12 +549,6 @@ function NetworkForecastView() {
   const cur = data.current;
   const info = data.model;
   const tr = info.test_results;
-  const stateMeta = getAttackStateMeta(
-    cur.attack_state,
-    cur.risk_score,
-    cur.alert,
-  );
-  const StateIcon = stateMeta.icon;
 
   // Determine current active kill chain stage and matching phase index
   const activeStage =
@@ -406,7 +557,16 @@ function NetworkForecastView() {
       : cur.risk_score >= 0.518
         ? "Reconnaissance"
         : "Benign";
+  const activeStageColor = getStageColor(activeStage);
   const currentPhaseIdx = getPhaseIndexForStage(activeStage);
+
+  const stateMeta = getAttackStateMeta(
+    cur.attack_state,
+    cur.risk_score,
+    cur.alert,
+    activeStage,
+  );
+  const StateIcon = stateMeta.icon;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -415,17 +575,17 @@ function NetworkForecastView() {
         @keyframes radarBlipPing {
           0% {
             transform: scale(0.9);
-            box-shadow: 0 0 0 0 rgba(201, 74, 69, 0.85);
+            box-shadow: 0 0 0 0 currentColor;
             opacity: 1;
           }
           50% {
             transform: scale(1.18);
-            box-shadow: 0 0 0 10px rgba(201, 74, 69, 0);
+            box-shadow: 0 0 0 10px transparent;
             opacity: 0.85;
           }
           100% {
             transform: scale(0.9);
-            box-shadow: 0 0 0 0 rgba(201, 74, 69, 0);
+            box-shadow: 0 0 0 0 transparent;
             opacity: 1;
           }
         }
@@ -438,15 +598,9 @@ function NetworkForecastView() {
           width: 10px;
           height: 10px;
           border-radius: 50%;
-          background: #E53935;
+          background-color: currentColor;
           display: inline-block;
           animation: radarBlipPing 1.25s infinite ease-out;
-        }
-        .active-blip-phase {
-          border: 1.5px solid var(--c-red, #C94A45) !important;
-          background: linear-gradient(135deg, rgba(201, 74, 69, 0.18), rgba(201, 74, 69, 0.05)) !important;
-          box-shadow: 0 0 18px rgba(201, 74, 69, 0.3) !important;
-          transform: translateY(-1px);
         }
       `}</style>
 
@@ -484,9 +638,7 @@ function NetworkForecastView() {
                 alignItems: "center",
                 justifyContent: "center",
                 color: stateMeta.color,
-                boxShadow: cur.alert
-                  ? "0 0 12px rgba(201, 74, 69, 0.4)"
-                  : "none",
+                boxShadow: cur.alert ? `0 0 14px ${stateMeta.color}66` : "none",
               }}
             >
               <StateIcon size={24} strokeWidth={2.2} />
@@ -547,6 +699,7 @@ function NetworkForecastView() {
               padding: "10px 16px",
               borderRadius: "var(--radius-sm)",
               border: "1px solid var(--border)",
+              flexWrap: "wrap",
             }}
           >
             <div>
@@ -584,13 +737,45 @@ function NetworkForecastView() {
                   fontSize: "1.25rem",
                   color:
                     cur.risk_score >= 0.7
-                      ? "var(--c-red)"
+                      ? "#C94A45"
                       : cur.risk_score >= 0.4
-                        ? "var(--c-gold)"
-                        : "var(--severity-low)",
+                        ? "#D6B36A"
+                        : "#58A668",
                 }}
               >
                 {(cur.risk_score * 100).toFixed(1)}%
+              </div>
+            </div>
+            <div
+              style={{ width: 1, height: 26, background: "var(--border)" }}
+            />
+            <div>
+              <div
+                className="text-muted text-xs uppercase mono"
+                style={{
+                  fontSize: "0.65rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Clock size={11} color={activeStageColor} />
+                Est. Time to Attack
+              </div>
+              <div
+                className="mono"
+                style={{
+                  fontWeight: 800,
+                  fontSize: "1.02rem",
+                  color:
+                    cur.estimated_reach_minutes === 0
+                      ? "#C94A45"
+                      : cur.estimated_reach_minutes != null
+                        ? activeStageColor
+                        : "#58A668",
+                }}
+              >
+                {cur.estimated_time_to_attack || "Stable (Baseline)"}
               </div>
             </div>
             <div
@@ -648,14 +833,17 @@ function NetworkForecastView() {
                   alignItems: "center",
                   gap: 7,
                   padding: "4px 10px",
-                  background: "rgba(201, 74, 69, 0.15)",
-                  border: "1px solid var(--c-red)",
+                  background: `${activeStageColor}22`,
+                  border: `1px solid ${activeStageColor}`,
                   borderRadius: "var(--radius-sm)",
-                  color: "var(--c-red)",
+                  color: activeStageColor,
                   fontWeight: 800,
                 }}
               >
-                <span className="radar-blip-dot" />
+                <span
+                  className="radar-blip-dot"
+                  style={{ color: activeStageColor }}
+                />
                 ACTIVE TARGET BLIP: PHASE 0{currentPhaseIdx + 1} &mdash;{" "}
                 {KILL_CHAIN_PHASES[currentPhaseIdx].label.toUpperCase()} (
                 {activeStage.toUpperCase()})
@@ -671,11 +859,11 @@ function NetworkForecastView() {
                   background: "rgba(88, 166, 104, 0.12)",
                   border: "1px solid rgba(88, 166, 104, 0.35)",
                   borderRadius: "var(--radius-sm)",
-                  color: "var(--severity-low)",
+                  color: "#58A668",
                   fontWeight: 700,
                 }}
               >
-                <CheckCircle2 size={13} />
+                <CheckCircle2 size={13} color="#58A668" />
                 DEFENSE TELEMETRY NOMINAL &bull; ALL 5 ATTACK PHASES INACTIVE /
                 CLEAR
               </span>
@@ -693,24 +881,26 @@ function NetworkForecastView() {
           {KILL_CHAIN_PHASES.map((phase, idx) => {
             const isCurrent = idx === currentPhaseIdx;
             const isPassed = currentPhaseIdx > idx;
+            const phaseCol = phase.color;
 
             return (
               <div
                 key={phase.id}
-                className={isCurrent ? "active-blip-phase" : ""}
                 style={{
                   padding: "12px 14px",
                   borderRadius: "var(--radius-sm)",
                   background: isCurrent
-                    ? undefined
+                    ? `linear-gradient(135deg, ${phaseCol}2e, ${phaseCol}0a)`
                     : isPassed
-                      ? "rgba(214, 179, 106, 0.08)"
+                      ? `${phaseCol}14`
                       : "var(--bg-dark)",
                   border: isCurrent
-                    ? undefined
+                    ? `1.5px solid ${phaseCol}`
                     : isPassed
-                      ? "1px solid var(--c-gold)"
+                      ? `1px solid ${phaseCol}88`
                       : "1px solid var(--border)",
+                  boxShadow: isCurrent ? `0 0 16px ${phaseCol}40` : "none",
+                  transform: isCurrent ? "translateY(-1px)" : "none",
                   position: "relative",
                   transition: "all 0.25s ease",
                 }}
@@ -725,11 +915,8 @@ function NetworkForecastView() {
                   <span
                     className="mono text-xs"
                     style={{
-                      color: isCurrent
-                        ? "var(--c-red)"
-                        : isPassed
-                          ? "var(--c-gold)"
-                          : "var(--text-muted)",
+                      color:
+                        isCurrent || isPassed ? phaseCol : "var(--text-muted)",
                       fontWeight: isCurrent || isPassed ? 800 : 600,
                     }}
                   >
@@ -739,12 +926,15 @@ function NetworkForecastView() {
                     <div
                       style={{ display: "flex", alignItems: "center", gap: 5 }}
                     >
-                      <span className="radar-blip-dot" />
+                      <span
+                        className="radar-blip-dot"
+                        style={{ color: phaseCol }}
+                      />
                       <span
                         className="mono"
                         style={{
                           fontSize: "0.62rem",
-                          color: "var(--c-red)",
+                          color: phaseCol,
                           fontWeight: 800,
                         }}
                       >
@@ -752,7 +942,7 @@ function NetworkForecastView() {
                       </span>
                     </div>
                   )}
-                  {isPassed && <CheckCircle2 size={13} color="var(--c-gold)" />}
+                  {isPassed && <CheckCircle2 size={13} color={phaseCol} />}
                 </div>
 
                 <div
@@ -762,7 +952,7 @@ function NetworkForecastView() {
                     color: isCurrent
                       ? "var(--text-primary)"
                       : isPassed
-                        ? "var(--c-gold)"
+                        ? phaseCol
                         : "var(--text-secondary)",
                     marginTop: 6,
                   }}
@@ -816,6 +1006,61 @@ function NetworkForecastView() {
           </div>
         </div>
 
+        {/* Stage Palette Legend Bar matching Live Logs */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+            padding: "8px 20px",
+            background: "rgba(0,0,0,0.18)",
+            borderBottom: "1px solid var(--border)",
+            fontSize: "0.72rem",
+            fontFamily: "var(--font-mono)",
+          }}
+        >
+          <span
+            className="text-muted"
+            style={{ fontWeight: 700, marginRight: 4 }}
+          >
+            STAGE PALETTE:
+          </span>
+          {[
+            { label: "Benign", color: "#58A668" },
+            { label: "Phase 1: Recon", color: "#5294E2" },
+            { label: "Phase 2: Initial Access", color: "#D6B36A" },
+            { label: "Phase 3: Lateral Move", color: "#DE934B" },
+            { label: "Phase 4: C2 Channel", color: "#D1643F" },
+            { label: "Phase 5: Exfiltration", color: "#C94A45" },
+          ].map((stg) => (
+            <span
+              key={stg.label}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "2px 8px",
+                borderRadius: "var(--radius-sm)",
+                background: `${stg.color}18`,
+                border: `1px solid ${stg.color}4d`,
+                color: stg.color,
+                fontWeight: 700,
+              }}
+            >
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background: stg.color,
+                }}
+              />
+              {stg.label}
+            </span>
+          ))}
+        </div>
+
         <div
           className="panel-body chart-container"
           style={{ minHeight: 300, padding: "16px 20px" }}
@@ -827,8 +1072,16 @@ function NetworkForecastView() {
             >
               <defs>
                 <linearGradient id="riskAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#D6B36A" stopOpacity={0.25} />
-                  <stop offset="100%" stopColor="#D6B36A" stopOpacity={0.0} />
+                  <stop
+                    offset="0%"
+                    stopColor={activeStageColor}
+                    stopOpacity={0.28}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor={activeStageColor}
+                    stopOpacity={0.0}
+                  />
                 </linearGradient>
               </defs>
               <CartesianGrid
@@ -847,24 +1100,7 @@ function NetworkForecastView() {
                 tick={{ fontSize: 10, fill: "#B8B0A3" }}
                 stroke="#3A3228"
               />
-              <Tooltip
-                contentStyle={{
-                  background: "#1E1A14",
-                  border: "1px solid #3A3228",
-                  borderRadius: 4,
-                  color: "#F5F1E8",
-                  fontSize: 12,
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
-                }}
-                formatter={(v, name) => [
-                  v == null ? "-" : `${(v * 100).toFixed(1)}%`,
-                  name === "observed"
-                    ? "Observed Macro Risk"
-                    : name === "forecast"
-                      ? "Horizon Projection (t+1..t+4)"
-                      : "Alert Active",
-                ]}
-              />
+              <Tooltip content={<CustomForecastTooltip />} />
               <Legend
                 wrapperStyle={{ color: "#B8B0A3", fontSize: 11, paddingTop: 8 }}
               />
@@ -890,9 +1126,26 @@ function NetworkForecastView() {
                 type="monotone"
                 dataKey="observed"
                 name="observed"
-                stroke="#D6B36A"
+                stroke={activeStageColor}
                 strokeWidth={2.5}
-                dot={false}
+                dot={(dotProps) => {
+                  const { cx, cy, payload } = dotProps;
+                  if (cx == null || cy == null || payload.observed == null)
+                    return null;
+                  const col = payload.stageColor || "#58A668";
+                  const isAlert = payload.alert != null;
+                  return (
+                    <circle
+                      key={`dot-obs-${payload.rawMinute || cx}`}
+                      cx={cx}
+                      cy={cy}
+                      r={isAlert ? 5.5 : 3.5}
+                      fill={col}
+                      stroke="#12100C"
+                      strokeWidth={1.5}
+                    />
+                  );
+                }}
                 isAnimationActive={false}
               />
               <Line
@@ -902,7 +1155,7 @@ function NetworkForecastView() {
                 stroke="#C94A45"
                 strokeWidth={3.5}
                 dot={{
-                  r: 4,
+                  r: 4.5,
                   fill: "#C94A45",
                   stroke: "#1A1610",
                   strokeWidth: 1.5,
@@ -914,10 +1167,26 @@ function NetworkForecastView() {
                 type="monotone"
                 dataKey="forecast"
                 name="forecast"
-                stroke="#D6B36A"
+                stroke="var(--c-gold, #D6B36A)"
                 strokeWidth={2}
                 strokeDasharray="6 4"
-                dot={{ r: 3.5, fill: "#D6B36A" }}
+                dot={(dotProps) => {
+                  const { cx, cy, payload } = dotProps;
+                  if (cx == null || cy == null || payload.forecast == null)
+                    return null;
+                  const col = payload.stageColor || "#D6B36A";
+                  return (
+                    <circle
+                      key={`dot-fc-${payload.rawMinute || cx}`}
+                      cx={cx}
+                      cy={cy}
+                      r={4}
+                      fill={col}
+                      stroke="#12100C"
+                      strokeWidth={1.5}
+                    />
+                  );
+                }}
                 isAnimationActive={false}
               />
             </ComposedChart>
