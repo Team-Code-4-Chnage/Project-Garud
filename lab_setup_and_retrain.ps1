@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Redirector — The full lab setup has moved to setup\lab_setup_and_retrain.ps1
+    Redirector -- The full lab setup has moved to setup\lab_setup_and_retrain.ps1
 
 .DESCRIPTION
     This file forwards to setup\lab_setup_and_retrain.ps1 with all arguments.
