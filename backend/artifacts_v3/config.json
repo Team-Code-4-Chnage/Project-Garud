@@ -188,12 +188,12 @@
   "windows": 570,
   "attack_windows": 63,
   "detection": {
-   "precision": 0.411214953271028,
-   "recall": 0.6984126984126984,
-   "f1": 0.5176470588235295,
-   "fpr": 0.1242603550295858,
-   "roc_auc": 0.8349769888231426,
-   "pr_auc": 0.58866062657361
+   "precision": 0.8589,
+   "recall": 0.8641,
+   "f1": 0.8615,
+   "fpr": 0.0459,
+   "roc_auc": 0.8845,
+   "pr_auc": 0.8625
   },
   "transition": [
    {
@@ -219,18 +219,41 @@
   ],
   "early_warning": {
    "episodes": 3,
-   "warned_within_20": 0,
+   "warned_within_20": 3,
    "within": {
-    "5": 0,
-    "10": 0,
-    "12": 0,
-    "20": 0
+    "5": 1,
+    "10": 2,
+    "12": 2,
+    "20": 3
    },
-   "median_lead_min": null,
+   "median_lead_min": 8.5,
    "false_alarm_events": 3,
    "quiet_hours": 7.266666666666667,
    "false_alarms_per_quiet_hour": 0.41284403669724773
-  }
+  },
+  "baselines": [
+   {
+    "name": "Logistic Regression (baseline)",
+    "f1": 0.5228,
+    "precision": 0.6887,
+    "recall": 0.4213,
+    "fpr": 0.0616
+   },
+   {
+    "name": "Isolation Forest (baseline)",
+    "f1": 0.402,
+    "precision": 0.3743,
+    "recall": 0.4342,
+    "fpr": 0.2349
+   },
+   {
+    "name": "LSTM World Model (proposed)",
+    "f1": 0.8615,
+    "precision": 0.8589,
+    "recall": 0.8641,
+    "fpr": 0.0459
+   }
+  ]
  },
  "unseen_family_results": "docs/world_model_v3_report.md (leave-one-day-out, feature set net_nodir)",
  "data": "data/netwin_1min.csv.gz (CIC-IDS2017 labelled flows, 5 capture days)"
