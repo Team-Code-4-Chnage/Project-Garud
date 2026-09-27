@@ -65,6 +65,14 @@ class FlowRecord(BaseModel):
                      "malformed-heartbeat wire signature was found in this flow's packets. "
                      "Not one of the 22 ML features — triggers an immediate rule-based alert.",
     )
+    stage: Optional[str] = Field(
+        default=None,
+        description="Kill chain attack stage (e.g. Reconnaissance, Initial Access, Lateral Movement, C2, Exfiltration, Benign)",
+    )
+    attack_type: Optional[str] = Field(
+        default=None,
+        description="Specific attack technique / label (e.g. PortScan, BruteForce, DoS, DDoS, Bot, Infiltration)",
+    )
 
     @field_validator("src_ip", "dst_ip")
     @classmethod
