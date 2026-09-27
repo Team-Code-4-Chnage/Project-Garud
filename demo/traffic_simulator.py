@@ -86,10 +86,10 @@ STAGE_PROFILES = {
         "flow_iat_std": (500, 400),
         "fwd_iat_mean": (800, 600),
         "bwd_iat_mean": (1200, 900),
-        "syn_flag_cnt": (8, 3),
+        "syn_flag_cnt": (1.0, 0.2),
         "ack_flag_cnt": (1, 1),
         "fin_flag_cnt": (0, 0.3),
-        "rst_flag_cnt": (5, 3),
+        "rst_flag_cnt": (1.0, 0.4),
         "psh_flag_cnt": (0, 0.2),
         "urg_flag_cnt": (0, 0.1),
         "down_up_ratio": (0.3, 0.2),
@@ -197,6 +197,51 @@ STAGE_PROFILES = {
 }
 
 
+RECON_PORTS = [
+    21, 22, 23, 25, 53, 80, 110, 135, 139, 143,
+    443, 445, 993, 995, 1433, 1521, 3306, 3389,
+    5432, 5900, 8000, 8080, 8443, 8888, 9000,
+]
+BENIGN_PORTS = [80, 443, 8080, 53]
+AUTH_PORTS = [22, 3389, 445]
+LATERAL_PORTS = [445, 135, 3389, 5985, 22]
+C2_PORTS = [443, 8443, 80, 53]
+EXFIL_PORTS = [443, 80, 21, 8080]
+
+BURST_SIZES = {
+    "Benign": 1,
+    "Reconnaissance": 6,
+    "Initial Access": 5,
+    "Lateral Movement": 4,
+    "C2": 2,
+    "Exfiltration": 4,
+}
+
+
+def get_ports_for_stage(stage: str, step_idx: int, flow_idx: int = 0) -> tuple[int, int, str]:
+    """Returns (src_port, dst_port, protocol) appropriate for the MITRE kill chain stage."""
+    src_port = random.randint(49152, 65535)
+    if stage == "Reconnaissance":
+        dst_port = RECON_PORTS[(step_idx * 11 + flow_idx) % len(RECON_PORTS)]
+        protocol = "TCP"
+    elif stage == "Initial Access":
+        dst_port = AUTH_PORTS[step_idx % len(AUTH_PORTS)]
+        protocol = "TCP"
+    elif stage == "Lateral Movement":
+        dst_port = LATERAL_PORTS[(step_idx + flow_idx) % len(LATERAL_PORTS)]
+        protocol = "TCP"
+    elif stage == "C2":
+        dst_port = random.choice(C2_PORTS)
+        protocol = "UDP" if dst_port == 53 else "TCP"
+    elif stage == "Exfiltration":
+        dst_port = random.choice(EXFIL_PORTS)
+        protocol = "TCP"
+    else:  # Benign
+        dst_port = random.choice(BENIGN_PORTS)
+        protocol = "UDP" if dst_port == 53 else "TCP"
+    return src_port, dst_port, protocol
+
+
 def generate_flow(stage: str) -> dict:
     """Generate a single flow record based on the stage profile."""
     profile = STAGE_PROFILES[stage]
@@ -292,48 +337,64 @@ def run_attack_scenario(api_url: str, speed: float, session_count: int, scenario
                     continue
 
                 stage = session["stages"][session["current_step"]]
-                flow = generate_flow(stage)
-                flow["src_ip"] = session["src_ip"]
-                flow["dst_ip"] = session["dst_ip"]
-                flow["timestamp"] = datetime.now(timezone.utc).isoformat()
-                flow["source"] = "simulated"
+                burst_count = BURST_SIZES.get(stage, 1)
+                ports_contacted = []
+                last_result = None
 
-                try:
-                    resp = requests.post(
-                        f"{api_url}/ingest",
-                        json=flow,
-                        timeout=10,
-                    )
-                    total_sent += 1
+                for b_i in range(burst_count):
+                    flow = generate_flow(stage)
+                    sport, dport, proto = get_ports_for_stage(stage, session["current_step"], b_i)
+                    flow["src_ip"] = session["src_ip"]
+                    flow["dst_ip"] = session["dst_ip"]
+                    flow["src_port"] = sport
+                    flow["dst_port"] = dport
+                    flow["protocol"] = proto
+                    flow["timestamp"] = datetime.now(timezone.utc).isoformat()
+                    flow["source"] = "simulated"
+                    ports_contacted.append(dport)
 
-                    if resp.status_code == 200:
-                        result = resp.json()
-                        pred = result.get("prediction")
-                        alert = result.get("alert")
-
-                        status = f"[{session['label']:>9}] {session['src_ip']:>15} → {session['dst_ip']:>15} | "
-                        status += f"Stage: {stage:<18} | "
-
-                        if pred:
-                            prob = pred["infiltration_probability"]
-                            pred_stage = pred["predicted_stage"]
-                            status += f"P(inf)={prob:.3f} | Pred: {pred_stage}"
-                            if alert:
+                    try:
+                        resp = requests.post(
+                            f"{api_url}/ingest",
+                            json=flow,
+                            timeout=10,
+                        )
+                        total_sent += 1
+                        if resp.status_code == 200:
+                            last_result = resp.json()
+                            if last_result.get("alert"):
                                 total_alerts += 1
-                                status += f" | 🚨 ALERT: {alert['severity'].upper()}"
                         else:
-                            buf_size = result.get("buffer_size", "?")
-                            status += f"Buffering ({buf_size}/{6})"
+                            print(f"  ERROR: HTTP {resp.status_code} — {resp.text[:100]}", flush=True)
+                    except requests.exceptions.ConnectionError:
+                        print(f"  ERROR: Cannot connect to {api_url} — is the backend running?", flush=True)
+                        sys.exit(1)
+                    except requests.exceptions.Timeout:
+                        print("  WARNING: Ingestion request timed out", flush=True)
 
-                        print(status, flush=True)
+                if last_result:
+                    pred = last_result.get("prediction")
+                    alert = last_result.get("alert")
+
+                    status = f"[{session['label']:>9}] {session['src_ip']:>15} → {session['dst_ip']:>15} | "
+                    status += f"Stage: {stage:<18} | "
+                    if burst_count > 1:
+                        port_str = f"Ports: {len(set(ports_contacted))} probed | "
                     else:
-                        print(f"  ERROR: HTTP {resp.status_code} — {resp.text[:100]}", flush=True)
+                        port_str = f"Port: {ports_contacted[0]} | "
+                    status += port_str
 
-                except requests.exceptions.ConnectionError:
-                    print(f"  ERROR: Cannot connect to {api_url} — is the backend running?", flush=True)
-                    sys.exit(1)
-                except requests.exceptions.Timeout:
-                    print("  WARNING: Ingestion request timed out", flush=True)
+                    if pred:
+                        prob = pred["infiltration_probability"]
+                        pred_stage = pred["predicted_stage"]
+                        status += f"P(inf)={prob:.3f} | Pred: {pred_stage}"
+                        if alert:
+                            status += f" | 🚨 ALERT: {alert['severity'].upper()}"
+                    else:
+                        buf_size = last_result.get("buffer_size", "?")
+                        status += f"Buffering ({buf_size}/{6})"
+
+                    print(status, flush=True)
 
                 session["current_step"] += 1
 

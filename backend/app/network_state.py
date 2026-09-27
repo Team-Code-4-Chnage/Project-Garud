@@ -47,6 +47,57 @@ DISPLAY_FEATURES = ["n_flows", "n_uniq_src_ip", "n_uniq_dst_ip", "n_uniq_dst_por
                     "f_total_bytes", "n_tcp_ratio", "n_udp_ratio"]
 
 
+def compute_empirical_threat(st_row):
+    """
+    Computes an empirical threat score [0.0, 1.0] and behaviour class based on
+    physical flow characteristics in the minute state st_row.
+    """
+    n_flows = float(st_row.get("n_flows", 0))
+    if n_flows < 3:
+        return 0.0, "Benign"
+
+    dport_max = float(st_row.get("n_dport_per_src_max", 0))
+    ent_port = float(st_row.get("n_ent_dst_port", 0))
+    syn_ratio = float(st_row.get("f_syn_ratio", 0))
+    rst_ratio = float(st_row.get("f_rst_ratio", 0))
+    small_frac = float(st_row.get("f_small_flow_frac", 0))
+    conn_rate = float(st_row.get("n_conn_rate", 0))
+    tot_bytes = float(st_row.get("f_total_bytes", 0))
+    uniq_dports = float(st_row.get("n_uniq_dst_port", 0))
+
+    scores = {}
+
+    # 1. Port Scanning / Reconnaissance
+    # Signatures: single host probing many ports, high port entropy, SYN/RST probes, small packets
+    if dport_max >= 8 or (uniq_dports >= 10 and ent_port >= 2.5):
+        port_score = min(1.0, max(0.0, (dport_max - 4) / 16.0)) * 0.45
+        port_score += min(1.0, (syn_ratio + rst_ratio) / 0.4) * 0.35
+        port_score += min(1.0, small_frac / 0.7) * 0.20
+        scores["PortScan"] = min(0.92, 0.40 + port_score * 0.55)
+
+    # 2. Brute Force / High-frequency Auth Probes
+    # Signatures: high connection rate to 1-3 ports, high RST or small flows
+    if conn_rate >= 0.5 and dport_max <= 5 and (rst_ratio >= 0.15 or syn_ratio >= 0.25):
+        bf_score = min(1.0, conn_rate / 2.0) * 0.45 + min(1.0, (rst_ratio + syn_ratio) / 0.5) * 0.55
+        scores["BruteForce"] = min(0.88, 0.40 + bf_score * 0.50)
+
+    # 3. DoS / SYN Flood
+    if conn_rate >= 3.0 and syn_ratio >= 0.30:
+        dos_score = min(1.0, conn_rate / 10.0) * 0.5 + min(1.0, syn_ratio / 0.5) * 0.5
+        scores["DoS"] = min(0.95, 0.50 + dos_score * 0.45)
+
+    # 4. Exfiltration
+    if tot_bytes >= 15_000_000 and small_frac <= 0.3:
+        exfil_score = min(1.0, tot_bytes / 50_000_000)
+        scores["Infiltration"] = min(0.85, 0.45 + exfil_score * 0.40)
+
+    if not scores:
+        return 0.0, "Benign"
+
+    top_beh = max(scores, key=scores.get)
+    return float(scores[top_beh]), str(top_beh)
+
+
 class NetworkWorldModel:
     def __init__(self, directory=ARTIFACTS_V3):
         self.cfg = json.load(open(directory / "config.json"))
@@ -100,8 +151,15 @@ class NetworkStateTracker:
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
         row = {f: float(getattr(flow, f)) for f in FLOW_FEATURES}
+        src_port = getattr(flow, "src_port", None) or 0
+        dst_port = getattr(flow, "dst_port", None) or 0
+        proto = getattr(flow, "protocol", "TCP") or "TCP"
+        if dst_port == 0:
+            dst_port = 53 if str(proto).upper() == "UDP" else 443
+        if src_port == 0:
+            src_port = 49152
         row.update(src_ip=flow.src_ip or "0.0.0.0", dst_ip=flow.dst_ip or "0.0.0.0",
-                   src_port=flow.src_port or 0, dst_port=flow.dst_port or 0, protocol=flow.protocol or "TCP",
+                   src_port=src_port, dst_port=dst_port, protocol=proto,
                    timestamp=ts, _source=source or "api")
         with self._lock:
             self._flows.append(row)
@@ -228,7 +286,20 @@ class NetworkStateTracker:
             S, R, C = m.model.rollout(torch.tensor(win), m.H)
         risk = torch.sigmoid(R).numpy()
         score = np.full(len(Z), np.nan)
-        score[m.W - 1:] = risk.max(axis=1)
+
+        # Compute empirical threat indicators across all minutes
+        emp_scores = []
+        emp_behaviours = []
+        for i in range(len(st)):
+            es, eb = compute_empirical_threat(st.iloc[i])
+            emp_scores.append(es)
+            emp_behaviours.append(eb)
+
+        for w_i, end_idx in enumerate(range(m.W - 1, len(Z))):
+            base_risk = float(risk[w_i].max())
+            e_threat = emp_scores[end_idx]
+            score[end_idx] = max(base_risk, e_threat)
+
         flag = np.nan_to_num(score, nan=0.0) >= m.thr
         run, alert = 0, []
         for f in flag:
@@ -246,18 +317,35 @@ class NetworkStateTracker:
         probs = torch.softmax(C1, dim=-1).detach().numpy()[0]
         pred_states = m.decode(S1.detach().numpy()[0])
         last_minute = st.index[-1]
+        latest_emp_threat = emp_scores[-1]
+        latest_emp_beh = emp_behaviours[-1]
+
         steps = []
         for k in range(m.H):
-            top = np.argsort(-probs[k])[:3]
+            raw_step_risk = float(torch.sigmoid(R1[0, k]).item())
+            if latest_emp_threat > 0.0:
+                step_risk = max(raw_step_risk, float(latest_emp_threat * (0.95 ** (k + 1))))
+            else:
+                step_risk = raw_step_risk
+
+            step_probs = probs[k].copy()
+            if latest_emp_threat >= m.thr and latest_emp_beh in m.behaviours:
+                beh_idx = m.behaviours.index(latest_emp_beh)
+                blend_w = min(0.80, (latest_emp_threat - 0.40) * 1.5)
+                step_probs = (1.0 - blend_w) * step_probs
+                step_probs[beh_idx] += blend_w
+                step_probs /= step_probs.sum()
+
+            top = np.argsort(-step_probs)[:3]
             beh = []
             for i in top:
                 name = m.behaviours[i]
                 entry = mitre_lookup(name) or {}
-                beh.append(dict(behaviour=name, probability=float(probs[k][i]),
+                beh.append(dict(behaviour=name, probability=float(step_probs[i]),
                                 techniques=[t["technique_id"] for t in entry.get("techniques", [])],
                                 tactics=sorted({t["tactic"] for t in entry.get("techniques", [])})))
             steps.append(dict(step=k + 1, minute=(last_minute + np.timedelta64(k + 1, "m")).isoformat(),
-                              risk=float(torch.sigmoid(R1[0, k]).item()), behaviours=beh,
+                              risk=step_risk, behaviours=beh,
                               state={f: float(pred_states[k][m.features.index(f)]) for f in DISPLAY_FEATURES
                                      if f in m.features}))
         return dict(
