@@ -697,8 +697,9 @@ export default function SettingsPanel({
           </div>
 
 
-          {/* Interactive Simulation Lab Console */}
-          <div className="panel" style={{ gridColumn: "1 / -1" }}>
+          {/* Interactive Simulation Lab Console (Visible only in Simulation Research Lab mode) */}
+          {systemMode === "simulated" && (
+            <div className="panel" style={{ gridColumn: "1 / -1" }}>
             <div
               className="panel-header"
               style={{
@@ -1022,6 +1023,7 @@ export default function SettingsPanel({
               </div>
             </div>
           </div>
+        )}
         </>
       )}
 

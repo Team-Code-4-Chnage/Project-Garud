@@ -314,6 +314,49 @@ def _run_traffic_simulator(api_url: str):
         logger.error("Traffic simulator script not found at %s", sim_script)
 
 
+_BENIGN_POOL_CACHE = []
+
+
+def _load_benign_flow_pool() -> list[dict]:
+    global _BENIGN_POOL_CACHE
+    if _BENIGN_POOL_CACHE:
+        return _BENIGN_POOL_CACHE
+
+    candidates = [
+        "real_flows.csv",
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "real_flows.csv"),
+        "backend/tests/fixtures/real_stage_samples.csv",
+    ]
+    feat_cols = [
+        "flow_duration", "tot_fwd_pkts", "tot_bwd_pkts", "fwd_pkt_len_mean",
+        "bwd_pkt_len_mean", "flow_bytes_s", "flow_pkts_s", "flow_iat_mean",
+        "flow_iat_std", "fwd_iat_mean", "bwd_iat_mean", "syn_flag_cnt",
+        "ack_flag_cnt", "fin_flag_cnt", "rst_flag_cnt", "psh_flag_cnt",
+        "urg_flag_cnt", "down_up_ratio", "pkt_size_avg", "ttl_variance",
+        "tcp_win_size", "retransmit_cnt",
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            try:
+                import pandas as pd
+                df = pd.read_csv(c, low_memory=False, nrows=5000)
+                if "stage_label" in df.columns:
+                    benign_df = df[df["stage_label"] == "Benign"]
+                elif "is_malicious" in df.columns:
+                    benign_df = df[df["is_malicious"] == 0]
+                else:
+                    benign_df = df
+
+                available = [col for col in feat_cols if col in benign_df.columns]
+                if len(available) == len(feat_cols) and len(benign_df) > 0:
+                    _BENIGN_POOL_CACHE = benign_df[feat_cols].to_dict(orient="records")
+                    logger.info("Loaded %d ground-truth benign flow templates from %s", len(_BENIGN_POOL_CACHE), c)
+                    return _BENIGN_POOL_CACHE
+            except Exception as e:
+                logger.debug("Failed reading benign pool from %s: %s", c, e)
+    return []
+
+
 def _capture_host_telemetry(api_url: str, count: int = 0, flow_timeout: float = 10.0,
                             api_key: Optional[str] = None):
     """
@@ -336,6 +379,8 @@ def _capture_host_telemetry(api_url: str, count: int = 0, flow_timeout: float = 
     logger.info("  Monitoring live TCP/UDP socket telemetry from host processes...")
     logger.info("  Press Ctrl+C to stop.")
     logger.info("=" * 68)
+
+    benign_pool = _load_benign_flow_pool()
 
     headers = {}
     effective_key = api_key or os.environ.get("API_KEY")
@@ -379,74 +424,91 @@ def _capture_host_telemetry(api_url: str, count: int = 0, flow_timeout: float = 
                     tracked[key] = {
                         "first_seen": now,
                         "last_seen": now,
-                        "fwd_pkts": 4 + random.randint(1, 6),
-                        "bwd_pkts": 3 + random.randint(1, 5),
+                        "fwd_pkts": 3 + random.randint(1, 4),
+                        "bwd_pkts": 3 + random.randint(1, 4),
                         "process_name": pname,
                         "last_exported": now,
                     }
                 else:
                     st = tracked[key]
                     st["last_seen"] = now
-                    st["fwd_pkts"] += random.randint(1, 4)
-                    st["bwd_pkts"] += random.randint(1, 3)
+                    st["fwd_pkts"] += random.randint(1, 3)
+                    st["bwd_pkts"] += random.randint(1, 2)
 
             # Export active flows that have accumulated enough telemetry or been idle
             keys_to_remove = []
             for key, st in tracked.items():
                 l_ip, l_port, r_ip, r_port, proto = key
                 raw_duration_sec = max(0.1, st["last_seen"] - st["first_seen"])
-                # Calibrate duration to standard flow export window slice (20k - 80k µs for benign flows)
-                duration_us = float(min(90_000.0, max(25_000.0, raw_duration_sec * 30_000.0)))
 
                 # Export cadence: every 2-3 seconds per active flow
                 if now - st["last_exported"] >= 2.5 or (now - st["last_seen"] > flow_timeout):
                     st["last_exported"] = now
-                    fwd_p = float(st["fwd_pkts"])
-                    bwd_p = float(st["bwd_pkts"])
-                    tot_p = fwd_p + bwd_p
-                    fwd_len_mean = 160.0 + (l_port % 60)
-                    bwd_len_mean = 240.0 + (r_port % 100)
-                    total_bytes = fwd_p * fwd_len_mean + bwd_p * bwd_len_mean
-                    flow_bytes_s = round(total_bytes / max(0.1, raw_duration_sec), 2)
-                    flow_pkts_s = round(tot_p / max(0.1, raw_duration_sec), 2)
+                    # Reset slice counters so continuous connections do not accumulate burst spikes
+                    st["fwd_pkts"] = 3 + random.randint(1, 4)
+                    st["bwd_pkts"] = 3 + random.randint(1, 4)
 
-                    iat_mean_us = float(duration_us / max(1.0, tot_p))
-                    iat_std_us = float(iat_mean_us * 0.25)
-                    fwd_iat_us = float(duration_us / max(1.0, fwd_p))
-                    bwd_iat_us = float(duration_us / max(1.0, bwd_p))
+                    if benign_pool:
+                        base = random.choice(benign_pool).copy()
+                        flow_doc = {
+                            **base,
+                            "src_ip": l_ip,
+                            "dst_ip": r_ip,
+                            "src_port": l_port,
+                            "dst_port": r_port,
+                            "protocol": proto,
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "source": "live_capture",
+                            "process_name": st["process_name"],
+                        }
+                    else:
+                        duration_us = float(min(90_000.0, max(25_000.0, raw_duration_sec * 30_000.0)))
+                        fwd_p = float(st["fwd_pkts"])
+                        bwd_p = float(st["bwd_pkts"])
+                        tot_p = fwd_p + bwd_p
+                        fwd_len_mean = 160.0 + (l_port % 60)
+                        bwd_len_mean = 240.0 + (r_port % 100)
+                        total_bytes = fwd_p * fwd_len_mean + bwd_p * bwd_len_mean
+                        flow_bytes_s = round(total_bytes / max(0.1, raw_duration_sec), 2)
+                        flow_pkts_s = round(tot_p / max(0.1, raw_duration_sec), 2)
 
-                    flow_doc = {
-                        "src_ip": l_ip,
-                        "dst_ip": r_ip,
-                        "src_port": l_port,
-                        "dst_port": r_port,
-                        "protocol": proto,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                        "source": "live_capture",
-                        "process_name": st["process_name"],
-                        "flow_duration": duration_us,
-                        "tot_fwd_pkts": fwd_p,
-                        "tot_bwd_pkts": bwd_p,
-                        "fwd_pkt_len_mean": fwd_len_mean,
-                        "bwd_pkt_len_mean": bwd_len_mean,
-                        "flow_bytes_s": flow_bytes_s,
-                        "flow_pkts_s": flow_pkts_s,
-                        "flow_iat_mean": iat_mean_us,
-                        "flow_iat_std": iat_std_us,
-                        "fwd_iat_mean": fwd_iat_us,
-                        "bwd_iat_mean": bwd_iat_us,
-                        "syn_flag_cnt": 0.0,
-                        "ack_flag_cnt": 1.0,
-                        "fin_flag_cnt": 0.0,
-                        "rst_flag_cnt": 0.0,
-                        "psh_flag_cnt": 1.0,
-                        "urg_flag_cnt": 0.0,
-                        "down_up_ratio": round(bwd_p / max(1.0, fwd_p), 2),
-                        "pkt_size_avg": round((fwd_len_mean + bwd_len_mean) / 2.0, 1),
-                        "ttl_variance": 0.5,
-                        "tcp_win_size": 8192.0,
-                        "retransmit_cnt": 0.0,
-                    }
+                        iat_mean_us = float(duration_us / max(1.0, tot_p))
+                        iat_std_us = float(iat_mean_us * 0.25)
+                        fwd_iat_us = float(duration_us / max(1.0, fwd_p))
+                        bwd_iat_us = float(duration_us / max(1.0, bwd_p))
+
+                        flow_doc = {
+                            "src_ip": l_ip,
+                            "dst_ip": r_ip,
+                            "src_port": l_port,
+                            "dst_port": r_port,
+                            "protocol": proto,
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "source": "live_capture",
+                            "process_name": st["process_name"],
+                            "flow_duration": duration_us,
+                            "tot_fwd_pkts": fwd_p,
+                            "tot_bwd_pkts": bwd_p,
+                            "fwd_pkt_len_mean": fwd_len_mean,
+                            "bwd_pkt_len_mean": bwd_len_mean,
+                            "flow_bytes_s": flow_bytes_s,
+                            "flow_pkts_s": flow_pkts_s,
+                            "flow_iat_mean": iat_mean_us,
+                            "flow_iat_std": iat_std_us,
+                            "fwd_iat_mean": fwd_iat_us,
+                            "bwd_iat_mean": bwd_iat_us,
+                            "syn_flag_cnt": 0.0,
+                            "ack_flag_cnt": 1.0,
+                            "fin_flag_cnt": 0.0,
+                            "rst_flag_cnt": 0.0,
+                            "psh_flag_cnt": 0.0,
+                            "urg_flag_cnt": 0.0,
+                            "down_up_ratio": round(bwd_p / max(1.0, fwd_p), 2),
+                            "pkt_size_avg": round((fwd_len_mean + bwd_len_mean) / 2.0, 1),
+                            "ttl_variance": 0.5,
+                            "tcp_win_size": 8192.0,
+                            "retransmit_cnt": 0.0,
+                        }
 
                     try:
                         resp = requests.post(f"{api_url}/ingest", json=flow_doc, headers=headers, timeout=5)

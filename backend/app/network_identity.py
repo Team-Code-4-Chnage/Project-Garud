@@ -64,16 +64,17 @@ def get_host_identity() -> dict:
         for iface_name, addrs in net_addrs.items():
             is_up = net_stats.get(iface_name).isup if iface_name in net_stats else False
             for addr in addrs:
-                if addr.family == socket.AF_INET:
-                    ip = addr.address
-                    if ip:
-                        local_ips.add(ip)
+                if addr.family in (socket.AF_INET, getattr(socket, "AF_INET6", -1)):
+                    raw_ip = addr.address or ""
+                    clean_ip = raw_ip.split("%")[0].strip()
+                    if clean_ip:
+                        local_ips.add(clean_ip)
                         interfaces.append({
                             "name": iface_name,
-                            "ip": ip,
+                            "ip": clean_ip,
                             "netmask": addr.netmask,
                             "is_up": is_up,
-                            "is_primary": (ip == primary_ip),
+                            "is_primary": (clean_ip == primary_ip),
                         })
     except Exception as e:
         logger.debug("psutil adapter discovery skipped: %s", e)

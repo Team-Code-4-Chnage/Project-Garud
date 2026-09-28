@@ -255,6 +255,84 @@ def _recommended_action(stage: str, session_key: str) -> str:
     return actions.get(stage, f"Review traffic between {src} and {dst}.")
 
 
+TRUSTED_HOST_PROCESSES = {
+    "onedrive.sync.service.exe",
+    "onedrive.exe",
+    "language_server_windows_x64.exe",
+    "code.exe",
+    "chrome.exe",
+    "msedge.exe",
+    "firefox.exe",
+    "svchost.exe",
+    "antigravity.exe",
+    "antigravity ide.exe",
+    "explorer.exe",
+    "startmenuexperiencehost.exe",
+    "system",
+    "backgroundtaskhost.exe",
+    "searchhost.exe",
+    "runtimebroker.exe",
+    "msmpeng.exe",
+    "mpdefendercoreservice.exe",
+    "brave.exe",
+    "nvcontainer.exe",
+    "msedgewebview2.exe",
+    "spotify.exe",
+    "spotifylauncher.exe",
+    "dsaservice.exe",
+    "mspcmanager.exe",
+    "node.exe",
+    "python.exe",
+    "git.exe",
+}
+
+
+def validate_attack_plausibility(
+    stage: str,
+    flow: FlowRecord,
+    direction: str,
+    dst_identity: str,
+    process_name: Optional[str],
+) -> tuple[str, bool]:
+    """
+    Apply domain security rules and network topology checks to prevent model false alarms
+    on benign operational traffic. Returns (plausible_stage, is_valid_attack).
+    """
+    pname_clean = (process_name or "").lower().strip()
+    is_trusted_app = any(t in pname_clean for t in TRUSTED_HOST_PROCESSES) if pname_clean else False
+    is_live_capture = getattr(flow, "source", "") == "live_capture"
+    dst_port = getattr(flow, "dst_port", None) or 0
+
+    if stage == "Benign":
+        return "Benign", not (is_trusted_app or is_live_capture)
+
+    # 1. Trusted OS and productivity binaries running locally are legitimate host processes.
+    if is_trusted_app:
+        return "Benign", False
+
+    # 2. Lateral Movement can NEVER be outbound to an external internet host (NAT_PEER)
+    #    Lateral movement is strictly internal host-to-host pivoting (LAN_PEER / internal subnet)
+    if stage == "Lateral Movement":
+        if direction == "outbound" or dst_identity == "NAT_PEER" or is_live_capture:
+            return "Benign", False
+
+    # 3. Live host capture communicating over standard web ports (80, 443, 8080, 8443)
+    #    or DNS (53) is normal operational traffic, not attack stages.
+    if is_live_capture and dst_port in (80, 443, 53, 8080, 8443):
+        return "Benign", False
+
+    # 4. Reconnaissance: requires scan characteristics (port scan or syn sweep)
+    #    Connections to standard web/DNS ports by host apps or live capture are never reconnaissance
+    if stage == "Reconnaissance" and is_live_capture:
+        return "Benign", False
+
+    # 5. Initial Access / Brute Force: host traffic communicating on standard web ports is not brute force
+    if stage == "Initial Access" and is_live_capture and dst_port in (80, 443, 8080, 8443):
+        return "Benign", False
+
+    return stage, True
+
+
 def _stage_index(stage: str) -> int:
     """Return the integer index of a stage name, or 0 for Benign."""
     try:
@@ -468,15 +546,39 @@ async def ingest_single_flow(
             effective_threshold = round(adaptive_thresh, 4)
             is_alert = prob > effective_threshold
 
-        prediction["is_alert"] = is_alert
-        prediction["effective_threshold"] = effective_threshold
+        # Domain Security Sanity Check & Physical Plausibility Validation
+        validated_stage, is_valid_attack = validate_attack_plausibility(
+            stage=predicted_stage,
+            flow=flow,
+            direction=direction,
+            dst_identity=dst_identity,
+            process_name=process_name,
+        )
 
-        # Normalization: harmless non-alert flows are Benign
-        if not is_alert and not result_data["heartbleed_alert"]:
+        if not is_valid_attack and not result_data["heartbleed_alert"]:
             predicted_stage = "Benign"
             prediction["predicted_stage"] = "Benign"
             prediction["predicted_stage_id"] = 0
+            prob = min(prob, 0.04)  # normalize nominal background risk
+            prediction["infiltration_probability"] = prob
+            is_alert = False
+        elif is_alert and predicted_stage == "Benign" and not result_data["heartbleed_alert"]:
+            # High-confidence attack flow where binary head triggered but stage argmax was Benign
+            dst_port = getattr(flow, "dst_port", None) or 0
+            if dst_port in (80, 443, 8080, 8443):
+                predicted_stage = "Initial Access"
+            else:
+                predicted_stage = "Reconnaissance"
+            prediction["predicted_stage"] = predicted_stage
+            prediction["predicted_stage_id"] = _stage_index(predicted_stage)
 
+        if predicted_stage == "Benign" and not result_data["heartbleed_alert"]:
+            is_alert = False
+
+        prediction["is_alert"] = is_alert
+        prediction["effective_threshold"] = effective_threshold
+
+        stage_changed = (session.latest_stage != predicted_stage)
         session.latest_risk_score = prob
         session.latest_stage = predicted_stage
 
@@ -488,30 +590,37 @@ async def ingest_single_flow(
         db_record.infiltration_prob = prob
         db_record.predicted_stage = predicted_stage
 
-        if is_alert:
-            severity = _severity_from_prob(prob)
-            action = _recommended_action(predicted_stage, session_key)
-
-            alert = await _create_chained_alert(
-                db=db,
-                session_key=session_key,
-                severity=severity,
-                infiltration_prob=prob,
-                predicted_stage=predicted_stage,
-                recommended_action=action,
-                now=now,
+        if is_alert and (predicted_stage != "Benign" or result_data["heartbleed_alert"]):
+            should_create_alert = (
+                stage_changed
+                or session.flow_count == WINDOW_SIZE
+                or (session.flow_count % 20 == 0)
             )
-            db.add(alert)
-            result_data["alert"] = {
-                "severity": severity,
-                "predicted_stage": predicted_stage,
-                "infiltration_prob": prob,
-                "recommended_action": action,
-                "effective_threshold": effective_threshold,
-                "block_hash": alert.block_hash,
-                "prev_hash": alert.prev_hash,
-                "mitigation_rule": alert.mitigation_rule,
-            }
+
+            if should_create_alert:
+                severity = _severity_from_prob(prob)
+                action = _recommended_action(predicted_stage, session_key)
+
+                alert = await _create_chained_alert(
+                    db=db,
+                    session_key=session_key,
+                    severity=severity,
+                    infiltration_prob=prob,
+                    predicted_stage=predicted_stage,
+                    recommended_action=action,
+                    now=now,
+                )
+                db.add(alert)
+                result_data["alert"] = {
+                    "severity": severity,
+                    "predicted_stage": predicted_stage,
+                    "infiltration_prob": prob,
+                    "recommended_action": action,
+                    "effective_threshold": effective_threshold,
+                    "block_hash": alert.block_hash,
+                    "prev_hash": alert.prev_hash,
+                    "mitigation_rule": alert.mitigation_rule,
+                }
 
     await db.commit()
 

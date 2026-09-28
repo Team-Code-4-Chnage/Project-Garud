@@ -274,6 +274,7 @@ export default function App() {
   };
 
   const handleToggleMode = async (newMode) => {
+    setSystemMode(newMode);
     try {
       const res = await apiPost("/system/mode", { mode: newMode });
       setSystemMode(res.mode);
@@ -631,11 +632,6 @@ export default function App() {
           <Dashboard
             systemMode={systemMode}
             onSelectSession={onSelectSession}
-            captureRunning={captureRunning}
-            simulatorRunning={simulatorRunning}
-            onStartLiveCapture={handleStartLiveCapture}
-            onStopLiveCapture={handleStopLiveCapture}
-            onStartSimulator={handleStartSimulator}
           />
         )}
         {(view === "network" || view === "forecast") && <NetworkForecastView />}
