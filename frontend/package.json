@@ -23,7 +23,7 @@
     "vite": "^8.2.2"
   },
   "optionalDependencies": {
-    "@oxlint/binding-linux-x64-gnu": "1.81.0",
+    "@oxlint/binding-linux-x64-gnu": "1.85.0",
     "@oxlint/binding-win32-x64-msvc": "1.81.0",
     "@rolldown/binding-linux-x64-gnu": "1.2.7",
     "@rolldown/binding-win32-x64-msvc": "1.2.7",
