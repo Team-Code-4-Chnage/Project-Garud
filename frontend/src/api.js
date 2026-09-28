@@ -40,7 +40,9 @@ export async function apiUpload(endpoint, file) {
 
 export function createWebSocket() {
   const wsUrl = API_URL.replace(/^http/, 'ws') + '/ws/live';
-  return new WebSocket(wsUrl);
+  // Pass API key as query param for WebSocket authentication
+  const url = API_KEY ? `${wsUrl}?api_key=${encodeURIComponent(API_KEY)}` : wsUrl;
+  return new WebSocket(url);
 }
 
 export { API_URL };

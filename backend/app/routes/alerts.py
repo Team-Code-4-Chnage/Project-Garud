@@ -25,9 +25,10 @@ async def get_alerts(
     if acknowledged is not None:
         stmt = stmt.where(AlertDB.acknowledged == acknowledged)
     if stage and stage.lower() != "all":
-        stmt = stmt.where(func.lower(AlertDB.predicted_stage).ilike(f"%{stage.lower().strip()}%"))
+        stmt = stmt.where(func.lower(AlertDB.predicted_stage) == stage.lower().strip())
     if search and search.strip():
-        search_pattern = f"%{search.strip()}%"
+        clean_search = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        search_pattern = f"%{clean_search}%"
         stmt = stmt.where(
             or_(
                 AlertDB.session_key.ilike(search_pattern),
@@ -310,8 +311,16 @@ async def get_ledger_blocks(
 
 
 @router.post("/alerts/clear")
-async def clear_all_alerts(db: AsyncSession = Depends(get_db)):
-    """Purge all alerts from the database."""
+async def clear_all_alerts(
+    confirm: str = Query(..., description="Must be 'yes' to confirm destructive action"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Purge all alerts from the database. Requires ?confirm=yes."""
+    if confirm.lower() != "yes":
+        raise HTTPException(
+            status_code=400,
+            detail="Destructive action requires ?confirm=yes query parameter",
+        )
     from sqlalchemy import delete
     await db.execute(delete(AlertDB))
     await db.commit()

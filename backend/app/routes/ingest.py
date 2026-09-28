@@ -57,7 +57,13 @@ async def ingest_csv(
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=422, detail="File must be a CSV")
 
-    content = await file.read()
+    MAX_CSV_BYTES = 10 * 1024 * 1024  # 10 MB limit
+    content = await file.read(MAX_CSV_BYTES + 1)
+    if len(content) > MAX_CSV_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"CSV file exceeds {MAX_CSV_BYTES // (1024*1024)} MB limit",
+        )
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError:

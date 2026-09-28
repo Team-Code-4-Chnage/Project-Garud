@@ -511,3 +511,14 @@ async def get_host_network_identity():
     """Retrieve local machine hostname, active adapters, and local IPs."""
     return get_host_identity()
 
+
+@router.get("/drift")
+async def get_drift_telemetry():
+    """
+    Retrieve concept and data drift monitoring metrics (SIH 2026 PS:26153).
+    Tracks covariate shift, evolving traffic patterns, and adaptive baseline compensation.
+    """
+    from ..drift import drift_monitor
+    return drift_monitor.get_drift_report()
+
+

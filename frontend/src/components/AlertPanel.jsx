@@ -140,7 +140,7 @@ export default function AlertPanel() {
   const handleClearAll = async () => {
     if (!window.confirm("Purge all incident alerts from database?")) return;
     try {
-      await apiPost("/alerts/clear", {});
+      await apiPost("/alerts/clear?confirm=yes", {});
       setAlerts([]);
       fetchLedgerStatus();
     } catch (e) {

@@ -78,6 +78,7 @@ function LiveLogsView({
       list = list.filter((l) => !isAttackFlow(l));
     } else if (categoryFilter !== "all") {
       list = list.filter((l) => {
+        if (!isAttackFlow(l)) return false;
         const st = (l.predicted_stage || "").toLowerCase();
         if (categoryFilter === "recon") return st.includes("recon");
         if (categoryFilter === "initial") return st.includes("initial");
@@ -441,9 +442,10 @@ function LiveLogsView({
         ) : (
           visibleLines.map((line, i) => {
             const isThreat = isAttackFlow(line);
-            const stage =
-              line.predicted_stage || (isThreat ? "Attack Alert" : "Benign");
-            const tech = techniques(stage);
+            const stage = isThreat
+              ? (line.predicted_stage && line.predicted_stage !== "Benign" ? line.predicted_stage : "Attack Alert")
+              : "Benign";
+            const tech = isThreat ? techniques(stage) : null;
             return (
               <div
                 key={
@@ -520,9 +522,7 @@ function LiveLogsView({
                     fontWeight: 700,
                   }}
                 >
-                  {formatProb(
-                    line.infiltration_prob ?? (isThreat ? 0.85 : 0.05),
-                  )}
+                  {formatProb(line.infiltration_prob ?? line.infiltration_probability)}
                 </span>
 
                 <span className="val" style={{ fontSize: "0.74rem" }}>

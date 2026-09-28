@@ -5,6 +5,7 @@ BUG-01 fix: _active_connections and broadcast() moved to live.py to allow
 ingestion.py to import broadcast without a circular dependency.
 """
 import logging
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -12,6 +13,7 @@ from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import API_KEY
 from ..database import FlowRecordDB, SessionDB, get_db
 from ..live import (  # noqa: F401 (re-exported for convenience)
     broadcast,
@@ -28,11 +30,18 @@ router = APIRouter()
 async def websocket_live_feed(
     websocket: WebSocket,
     session_key: Optional[str] = Query(None),
+    api_key: Optional[str] = Query(None),
 ):
     """
     WebSocket endpoint for real-time flow events.
     Clients can optionally filter by session_key (?session_key=...).
+    When API_KEY is set, clients must pass ?api_key=<key> to authenticate.
     """
+    if API_KEY:
+        if not api_key or not secrets.compare_digest(api_key.encode(), API_KEY.encode()):
+            await websocket.close(code=4001, reason="Unauthorized: invalid or missing api_key")
+            return
+
     await websocket.accept()
     register(websocket)
     try:
@@ -265,7 +274,7 @@ async def get_recent_flows(
             "flow_duration": f.flow_duration or 0.0,
             "infiltration_prob": f.infiltration_prob,
             "predicted_stage": f.predicted_stage,
-            "is_alert": (f.infiltration_prob or 0.0) > 0.5 or (bool(f.predicted_stage) and f.predicted_stage != "Benign"),
+            "is_alert": bool(f.infiltration_prob is not None and f.infiltration_prob > 0.5),
             "timestamp": f.timestamp.isoformat() if f.timestamp else None,
             "_ts": f.timestamp.isoformat() if f.timestamp else None,
         }

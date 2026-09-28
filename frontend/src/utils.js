@@ -112,13 +112,12 @@ export function stageColor(stage) {
 export function isAttackFlow(flow) {
   if (!flow) return false;
   if (typeof flow.is_alert === "boolean") return flow.is_alert;
+  // Only use the model's actual probability score — never guess from stage name
   const prob =
     flow.infiltration_prob ??
     flow.infiltration_probability ??
-    flow.latest_risk_score ??
     0;
-  const stage = flow.predicted_stage ?? flow.latest_stage;
-  return prob > 0.5 || (!!stage && stage !== "Benign");
+  return prob > 0.5;
 }
 
 export function severityClass(prob) {

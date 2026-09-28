@@ -32,6 +32,7 @@ from .config import (
     WINDOW_SIZE,
 )
 from .database import AlertDB, FlowRecordDB, SessionDB
+from .drift import drift_monitor
 from .inference import predict_single
 from .live import broadcast
 from .model_loader import artifacts
@@ -289,6 +290,8 @@ async def ingest_single_flow(
     if np.any(~np.isfinite(raw_features)):
         raise ValueError("Flow contains NaN or Inf values — rejected")
 
+    drift_monitor.record_flow(raw_features)
+
     import random
     if random.random() < 0.01:
         evict_stale_buffers()
@@ -446,18 +449,6 @@ async def ingest_single_flow(
         result_data["prediction"] = prediction
 
         predicted_stage = prediction["predicted_stage"]
-
-        session.latest_risk_score = prediction["infiltration_probability"]
-        session.latest_stage = predicted_stage
-
-        current_max_idx = _stage_index(session.max_stage_reached or "Benign")
-        new_stage_idx = _stage_index(predicted_stage)
-        if new_stage_idx > current_max_idx:
-            session.max_stage_reached = predicted_stage
-
-        db_record.infiltration_prob = prediction["infiltration_probability"]
-        db_record.predicted_stage = predicted_stage
-
         prob = prediction["infiltration_probability"]
         effective_threshold = DEFAULT_THRESHOLD
         is_alert = prediction["is_alert"]
@@ -479,6 +470,23 @@ async def ingest_single_flow(
 
         prediction["is_alert"] = is_alert
         prediction["effective_threshold"] = effective_threshold
+
+        # Normalization: harmless non-alert flows are Benign
+        if not is_alert and not result_data["heartbleed_alert"]:
+            predicted_stage = "Benign"
+            prediction["predicted_stage"] = "Benign"
+            prediction["predicted_stage_id"] = 0
+
+        session.latest_risk_score = prob
+        session.latest_stage = predicted_stage
+
+        current_max_idx = _stage_index(session.max_stage_reached or "Benign")
+        new_stage_idx = _stage_index(predicted_stage)
+        if new_stage_idx > current_max_idx:
+            session.max_stage_reached = predicted_stage
+
+        db_record.infiltration_prob = prob
+        db_record.predicted_stage = predicted_stage
 
         if is_alert:
             severity = _severity_from_prob(prob)

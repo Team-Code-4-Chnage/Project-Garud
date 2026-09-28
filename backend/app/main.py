@@ -135,8 +135,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key", "X-Request-ID"],
 )
 
 try:
@@ -155,9 +155,25 @@ except ImportError:
 
 
 @app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """Add security headers to every HTTP response."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
+
+
+@app.middleware("http")
 async def api_key_auth_middleware(request: Request, call_next):
-    if API_KEY and not request.url.path.startswith(("/health", "/docs", "/openapi.json", "/redoc", "/ws")):
-        key = request.headers.get("X-API-Key") or ""
+    """Enforce API key authentication on all non-public endpoints when API_KEY is set."""
+    PUBLIC_PREFIXES = ("/health", "/docs", "/openapi.json", "/redoc")
+    if API_KEY and not request.url.path.startswith(PUBLIC_PREFIXES):
+        if request.headers.get("upgrade", "").lower() == "websocket":
+            return await call_next(request)
+        key = request.headers.get("X-API-Key") or request.query_params.get("api_key") or ""
         if not secrets.compare_digest(key.encode(), API_KEY.encode()):
             return JSONResponse(
                 status_code=401,
