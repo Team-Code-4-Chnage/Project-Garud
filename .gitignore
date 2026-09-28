@@ -1,45 +1,75 @@
-# Virtual environments
+# ─── Virtual environments ──────────────────────────────────────────────────────
 venv/
 .venv/
 backend/venv/
+frontend/venv/
 env/
 
-# Python
+# ─── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
-*.pytest_cache/
+.pytest_cache/
+.ruff_cache/
 .coverage
 htmlcov/
+*.egg-info/
+dist/
 
-# Node / Frontend
+# ─── Node / Frontend ────────────────────────────────────────────────────────────
 node_modules/
 frontend/node_modules/
 frontend/dist/
 .vite/
 
-# Database & Runtime Data
+# ─── Environment & Secrets (NEVER commit credentials) ──────────────────────────
+.env
+frontend/.env
+lab/lab_config.json
+
+# ─── Database & Runtime Data ────────────────────────────────────────────────────
 backend/data/*.db
 backend/data/*.sqlite3
-backend/data/archives/*.json
+backend/data/archives/
 *.db
 *.sqlite3
 
-# Logs & System
+# ─── IDE & Editor configs ───────────────────────────────────────────────────────
+.vscode/
+.idea/
+pyrefly.toml
+pyrightconfig.json
+*.swp
+*.swo
+
+# ─── Logs & OS ──────────────────────────────────────────────────────────────────
 *.log
 .DS_Store
 Thumbs.db
-.vscode/
-.idea/
 
-# Raw dataset downloads and large flow files (keep benchmark_comparison.csv)
+# ─── Raw datasets & large flow files (keep benchmark_comparison.csv) ────────────
 data/raw/
 data/raw_cicids/
 data/raw_cicids2018/
 real_flows.csv
 real_flows.csv.pre_*_backup
+campaign_dataset.csv
 data/*.pcap
 data/*.pcapng
 *.tmp
+
+# ─── Scratch & Backups ──────────────────────────────────────────────────────────
 scratch/
 scratch_prompt.txt
+backups/
+backend/artifacts/backup_*/
+backend/artifacts_v2/
+demo/*.bak
+
+# ─── Root-level JS (frontend is self-contained in frontend/) ───────────────────
+/package.json
+/package-lock.json
+/node_modules/
+
+# ─── Render / Cloud deploy (not used for SIH) ──────────────────────────────────
+render.yaml

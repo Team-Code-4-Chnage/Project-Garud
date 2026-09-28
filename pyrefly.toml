@@ -1,7 +1,0 @@
-python-interpreter-path = "backend/venv/Scripts/python.exe"
-search_path = [
-  ".",
-  "backend",
-  "capture",
-  "backend/venv/Lib/site-packages"
-]

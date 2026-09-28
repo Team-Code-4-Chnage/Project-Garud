@@ -20,6 +20,7 @@ from .routes import (
     alerts,
     explain,
     forecast,
+    graph,
     ingest,
     mitre,
     network,
@@ -120,11 +121,11 @@ async def _migrate_db():
 
 
 app = FastAPI(
-    title="Network Attack Forecasting API",
+    title="Network Attack Forecasting API — Project Garud",
     description=(
-        "Network attack forecasting from live traffic data. "
-        "LSTM-based stage classification and infiltration probability forecasting "
-        "with feature attribution explainability."
+        "SIH 2026 PS:26153 — LSTM World Model for network attack forecasting. "
+        "Features: graph-based topology, MITRE ATT&CK mapping, Monte-Carlo rollout, "
+        "SHAP + gradient explainability, proactive containment rules."
     ),
     version="1.0.0",
     lifespan=lifespan,
@@ -174,6 +175,7 @@ app.include_router(pcap.router, tags=["PCAP Ingestion"])
 app.include_router(reports.router, tags=["Reports"])
 app.include_router(mitre.router, tags=["MITRE"])
 app.include_router(network.router, tags=["Network State"])
+app.include_router(graph.router)   # graph topology — PS 26153 graph-based representation
 app.include_router(system.router, tags=["System"])
 app.include_router(ws.router, tags=["Live Feed"])
 
