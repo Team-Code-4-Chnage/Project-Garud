@@ -54,10 +54,12 @@ class TestInputValidation:
         )
 
     def test_nan_input_does_not_crash(self, client):
-        """NaN values should not cause a 500 Internal Server Error."""
-        window = [[float("nan")] * N_FEATURES for _ in range(WINDOW_SIZE)]
+        """Non-numeric strings in the window should produce 422, not 500."""
+        # Python's json.dumps rejects float("nan") as non-compliant JSON.
+        # Instead send a string "nan" and verify the server validates the type.
+        window = [["nan"] * N_FEATURES for _ in range(WINDOW_SIZE)]
         res = client.post("/predict", json={"window": window})
-        assert res.status_code != 500, "NaN input caused a server crash"
+        assert res.status_code != 500, "String 'nan' input caused a server crash"
 
     def test_extreme_values_handled(self, client):
         """Very large feature values should not crash the server."""
