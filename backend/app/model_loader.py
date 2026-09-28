@@ -202,7 +202,8 @@ class ModelArtifacts:
         """Scale raw features using the loaded scaler. Input: (n_samples, 22)."""
         if not self._loaded:
             raise RuntimeError("Artifacts not loaded — call load() first")
-        return self.scaler.transform(raw_features)
+        scaled = self.scaler.transform(raw_features)
+        return np.clip(scaled, -5.0, 5.0)
 
     def get_shap_background(self) -> np.ndarray:
         """Return background data for SHAP KernelExplainer (scaler mean in scaled space = zeros)."""
