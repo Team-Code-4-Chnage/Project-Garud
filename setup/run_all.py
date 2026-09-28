@@ -75,6 +75,7 @@ def phase0_install_deps():
         "numpy": "numpy",
         "matplotlib": "matplotlib",
         "tqdm": "tqdm",
+        "sklearn": "scikit-learn",
     }
     for mod, pip_spec in required.items():
         try:
