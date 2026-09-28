@@ -26,7 +26,7 @@
     "@oxlint/binding-linux-x64-gnu": "1.81.0",
     "@oxlint/binding-win32-x64-msvc": "1.81.0",
     "@rolldown/binding-linux-x64-gnu": "1.2.7",
-    "@rolldown/binding-win32-x64-msvc": "1.2.7",
+    "@rolldown/binding-win32-x64-msvc": "1.2.11",
     "lightningcss-linux-x64-gnu": "1.33.0",
     "lightningcss-win32-x64-msvc": "1.33.0"
   }
