@@ -187,6 +187,9 @@ export default function SettingsPanel({
   onStartSimulator,
   onStopSimulator,
   onPurgeSimulated,
+  captureRunning,
+  onStartLiveCapture,
+  onStopLiveCapture,
 }) {
   const [activeTab, setActiveTab] = useState("lab");
   const [scenario, setScenario] = useState("full_kill_chain");
@@ -197,6 +200,14 @@ export default function SettingsPanel({
   const [isStarting, setIsStarting] = useState(false);
   const [stats, setStats] = useState(null);
   const logContainerRef = useRef(null);
+
+  // Live packet capture states
+  const [isCaptureRunning, setIsCaptureRunning] = useState(captureRunning);
+  const [isCaptureStarting, setIsCaptureStarting] = useState(false);
+  const [captureLogs, setCaptureLogs] = useState("");
+  const [captureStatus, setCaptureStatus] = useState(null);
+  const [captureMode, setCaptureMode] = useState("auto");
+  const captureLogContainerRef = useRef(null);
 
   // Poll simulator status & live logs
   useEffect(() => {
@@ -231,12 +242,46 @@ export default function SettingsPanel({
     };
   }, [simulatorRunning]);
 
+  // Poll live capture status & logs
+  useEffect(() => {
+    let mounted = true;
+    const fetchCaptureStatus = async () => {
+      try {
+        const res = await apiFetch("/system/capture/status");
+        if (!mounted) return;
+        setIsCaptureRunning(Boolean(res.running));
+        setCaptureStatus(res);
+        if (res.logs) {
+          setCaptureLogs(res.logs);
+        }
+      } catch {}
+    };
+
+    fetchCaptureStatus();
+    const iv = setInterval(fetchCaptureStatus, isCaptureRunning ? 2000 : 5000);
+    return () => {
+      mounted = false;
+      clearInterval(iv);
+    };
+  }, [isCaptureRunning]);
+
+  // Sync captureRunning prop
+  useEffect(() => {
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) setIsCaptureRunning(captureRunning);
+    });
+    return () => {
+      active = false;
+    };
+  }, [captureRunning]);
+
   // Fetch db stats
   useEffect(() => {
     apiFetch("/dashboard/stats")
       .then(setStats)
       .catch(() => {});
-  }, [simulatorRunning]);
+  }, [simulatorRunning, captureRunning]);
 
   // Auto scroll terminal to bottom on update
   useEffect(() => {
@@ -244,6 +289,13 @@ export default function SettingsPanel({
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
   }, [simulatorLogs]);
+
+  // Auto scroll capture terminal to bottom on update
+  useEffect(() => {
+    if (captureLogContainerRef.current) {
+      captureLogContainerRef.current.scrollTop = captureLogContainerRef.current.scrollHeight;
+    }
+  }, [captureLogs]);
 
   const handleLaunch = async () => {
     setIsStarting(true);
@@ -282,6 +334,44 @@ export default function SettingsPanel({
         await apiPost("/system/simulator/stop", {});
       }
       setIsRunning(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleLaunchCapture = async () => {
+    setIsCaptureStarting(true);
+    try {
+      if (onStartLiveCapture) {
+        await onStartLiveCapture({
+          mode: captureMode,
+          auto_switch_mode: true,
+        });
+      } else {
+        await apiPost("/system/capture/start", {
+          mode: captureMode,
+          auto_switch_mode: true,
+        });
+      }
+      setIsCaptureRunning(true);
+      if (onToggleMode && systemMode !== "live") {
+        onToggleMode("live");
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsCaptureStarting(false);
+    }
+  };
+
+  const handleStopCapture = async () => {
+    try {
+      if (onStopLiveCapture) {
+        await onStopLiveCapture();
+      } else {
+        await apiPost("/system/capture/stop", {});
+      }
+      setIsCaptureRunning(false);
     } catch (e) {
       console.error(e);
     }
@@ -470,6 +560,76 @@ export default function SettingsPanel({
                     inspected by the LSTM model. Synthetic simulation traffic is
                     strictly rejected.
                   </p>
+
+                  {systemMode === "live" && (
+                    <div
+                      style={{
+                        marginTop: 10,
+                        paddingTop: 8,
+                        borderTop: "1px solid rgba(88, 166, 104, 0.2)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: 8,
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span
+                        style={{
+                          fontSize: "0.72rem",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          color: isCaptureRunning
+                            ? "var(--severity-low)"
+                            : "var(--text-muted)",
+                          fontFamily: "var(--font-mono)",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: "50%",
+                            background: isCaptureRunning
+                              ? "var(--severity-low)"
+                              : "var(--text-muted)",
+                            boxShadow: isCaptureRunning
+                              ? "0 0 6px var(--severity-low)"
+                              : "none",
+                          }}
+                        />
+                        {isCaptureRunning
+                          ? `Host Sniffer Active (PID ${captureStatus?.pid || ""})`
+                          : "Sniffer Idle"}
+                      </span>
+
+                      {isCaptureRunning ? (
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={handleStopCapture}
+                          style={{ fontSize: "0.7rem", padding: "2px 8px" }}
+                        >
+                          <Square size={10} fill="currentColor" /> Stop Sniffer
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={handleLaunchCapture}
+                          disabled={isCaptureStarting}
+                          style={{ fontSize: "0.7rem", padding: "2px 10px" }}
+                        >
+                          {isCaptureStarting ? (
+                            <RefreshCw size={10} className="spin" />
+                          ) : (
+                            <Play size={10} fill="currentColor" />
+                          )}
+                          Start Sniffer
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Simulation Research Lab Card */}
@@ -543,6 +703,268 @@ export default function SettingsPanel({
                     detection, attribution, and 4-minute future horizon
                     forecasting.
                   </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Live Network Telemetry Sniffer Console */}
+          <div
+            className="panel"
+            style={{
+              gridColumn: "1 / -1",
+              border:
+                systemMode === "live"
+                  ? "1px solid var(--severity-low)"
+                  : "1px solid var(--border-dark)",
+            }}
+          >
+            <div
+              className="panel-header"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "var(--sp-2)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Wifi size={16} color="var(--severity-low)" />
+                <span className="panel-title">
+                  Live Network Telemetry & Packet Sniffer
+                </span>
+                <span
+                  style={{
+                    fontSize: "0.68rem",
+                    color: "var(--severity-low)",
+                    border: "1px solid rgba(88, 166, 104, 0.4)",
+                    background: "rgba(88, 166, 104, 0.1)",
+                    padding: "1px 6px",
+                    borderRadius: 3,
+                    fontWeight: 700,
+                  }}
+                >
+                  ZERO-ADMIN TELEMETRY
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "3px 10px",
+                    borderRadius: "var(--radius-sm)",
+                    background: isCaptureRunning
+                      ? "rgba(88, 166, 104, 0.15)"
+                      : "rgba(58, 50, 40, 0.5)",
+                    border: `1px solid ${isCaptureRunning ? "rgba(88, 166, 104, 0.4)" : "var(--border-dark)"}`,
+                    color: isCaptureRunning
+                      ? "var(--severity-low)"
+                      : "var(--text-muted)",
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    fontFamily: "var(--font-mono)",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: isCaptureRunning
+                        ? "var(--severity-low)"
+                        : "var(--text-muted)",
+                      boxShadow: isCaptureRunning
+                        ? "0 0 6px var(--severity-low)"
+                        : "none",
+                    }}
+                  />
+                  {isCaptureRunning
+                    ? `Live Capture Running (PID ${captureStatus?.pid || ""})`
+                    : "Live Capture Idle"}
+                </span>
+
+                {isCaptureRunning ? (
+                  <button
+                    className="btn btn-sm btn-danger"
+                    onClick={handleStopCapture}
+                    style={{ fontSize: "0.72rem", padding: "4px 12px" }}
+                  >
+                    <Square size={11} fill="currentColor" /> STOP LIVE CAPTURE
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={handleLaunchCapture}
+                    disabled={isCaptureStarting}
+                    style={{ fontSize: "0.72rem", padding: "4px 14px" }}
+                  >
+                    {isCaptureStarting ? (
+                      <RefreshCw size={11} className="spin" />
+                    ) : (
+                      <Play size={11} fill="currentColor" />
+                    )}
+                    START LIVE CAPTURE
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="panel-body">
+              {/* Telemetry Capture Engine Selector */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                  gap: 12,
+                  marginBottom: 16,
+                }}
+              >
+                {[
+                  {
+                    id: "auto",
+                    name: "Auto-Resilient Sniffer (Recommended)",
+                    badge: "ZERO-ADMIN SAFE",
+                    badgeColor: "var(--severity-low)",
+                    desc: "Attempts Scapy raw socket; if non-admin Windows/no-Npcap detected, automatically seamlessly activates unprivileged User-Space Host Telemetry.",
+                  },
+                  {
+                    id: "host",
+                    name: "Host Sockets (Zero-Admin)",
+                    badge: "USER-SPACE",
+                    badgeColor: "var(--c-gold)",
+                    desc: "Direct unprivileged telemetry of active TCP/UDP sockets (browsers, apps, OS services) with 22 flow features computed in real time.",
+                  },
+                  {
+                    id: "raw",
+                    name: "Raw Socket Sniffer (Npcap/Admin)",
+                    badge: "PROMISCUOUS",
+                    badgeColor: "#5294E2",
+                    desc: "Full packet-level promiscuous capture requiring Administrator rights or Npcap driver installed.",
+                  },
+                ].map((m) => {
+                  const isSelected = captureMode === m.id;
+                  return (
+                    <div
+                      key={m.id}
+                      onClick={() => setCaptureMode(m.id)}
+                      style={{
+                        background: isSelected
+                          ? "rgba(88, 166, 104, 0.08)"
+                          : "var(--bg-dark)",
+                        border: `1px solid ${isSelected ? "var(--severity-low)" : "var(--border-dark)"}`,
+                        borderRadius: "var(--radius-sm)",
+                        padding: "10px 14px",
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: 4,
+                        }}
+                      >
+                        <strong
+                          style={{
+                            fontSize: "0.85rem",
+                            color: isSelected
+                              ? "var(--severity-low)"
+                              : "var(--text-primary)",
+                          }}
+                        >
+                          {m.name}
+                        </strong>
+                        <span
+                          style={{
+                            fontSize: "0.62rem",
+                            fontWeight: 800,
+                            color: m.badgeColor,
+                            border: `1px solid ${m.badgeColor}40`,
+                            background: `${m.badgeColor}15`,
+                            padding: "1px 6px",
+                            borderRadius: 3,
+                          }}
+                        >
+                          {m.badge}
+                        </span>
+                      </div>
+                      <p
+                        style={{
+                          fontSize: "0.72rem",
+                          color: "var(--text-muted)",
+                          margin: 0,
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {m.desc}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Integrated Real-Time Capture Output Terminal */}
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <Terminal size={14} color="var(--severity-low)" />
+                    <span
+                      style={{
+                        fontSize: "0.74rem",
+                        fontWeight: 700,
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      Live Network Capture Output Stream
+                    </span>
+                  </div>
+                  <span
+                    className="mono"
+                    style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}
+                  >
+                    {isCaptureRunning
+                      ? "Streaming genuine packets/flows from capture/live_capture.py"
+                      : "Sniffer idle — click Start Live Capture to stream"}
+                  </span>
+                </div>
+
+                <div
+                  ref={captureLogContainerRef}
+                  style={{
+                    background: "rgba(10, 16, 12, 0.95)",
+                    border: "1px solid var(--border-dark)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "10px 14px",
+                    height: "180px",
+                    overflowY: "auto",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "0.72rem",
+                    color: "var(--text-primary)",
+                    lineHeight: 1.5,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {captureLogs ? (
+                    captureLogs
+                  ) : (
+                    <span style={{ color: "var(--text-muted)" }}>
+                      Live packet sniffer logs will stream here in real-time when live capture is started...
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

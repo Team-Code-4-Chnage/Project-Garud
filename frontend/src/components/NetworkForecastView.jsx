@@ -878,33 +878,44 @@ function NetworkForecastView() {
             gap: 10,
           }}
         >
-          {KILL_CHAIN_PHASES.map((phase, idx) => {
-            const isCurrent = idx === currentPhaseIdx;
-            const isPassed = currentPhaseIdx > idx;
-            const phaseCol = phase.color;
+          {(() => {
+            const observedStageList = (data?.stages || [])
+              .filter((s) => s && s !== "Benign" && s !== "None")
+              .map((s) => String(s).toLowerCase());
+            if (activeStage && activeStage !== "Benign") {
+              observedStageList.push(activeStage.toLowerCase());
+            }
 
-            return (
-              <div
-                key={phase.id}
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: "var(--radius-sm)",
-                  background: isCurrent
-                    ? `linear-gradient(135deg, ${phaseCol}2e, ${phaseCol}0a)`
-                    : isPassed
-                      ? `${phaseCol}14`
-                      : "var(--bg-dark)",
-                  border: isCurrent
-                    ? `1.5px solid ${phaseCol}`
-                    : isPassed
-                      ? `1px solid ${phaseCol}88`
-                      : "1px solid var(--border)",
-                  boxShadow: isCurrent ? `0 0 16px ${phaseCol}40` : "none",
-                  transform: isCurrent ? "translateY(-1px)" : "none",
-                  position: "relative",
-                  transition: "all 0.25s ease",
-                }}
-              >
+            return KILL_CHAIN_PHASES.map((phase, idx) => {
+              const phaseWasObserved = phase.keys.some((k) =>
+                observedStageList.some((s) => s.includes(k)),
+              );
+              const isCurrent = idx === currentPhaseIdx;
+              const isPassed = !isCurrent && phaseWasObserved;
+              const phaseCol = phase.color;
+
+              return (
+                <div
+                  key={phase.id}
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: "var(--radius-sm)",
+                    background: isCurrent
+                      ? `linear-gradient(135deg, ${phaseCol}2e, ${phaseCol}0a)`
+                      : isPassed
+                        ? `${phaseCol}14`
+                        : "var(--bg-dark)",
+                    border: isCurrent
+                      ? `1.5px solid ${phaseCol}`
+                      : isPassed
+                        ? `1px solid ${phaseCol}88`
+                        : "1px solid var(--border)",
+                    boxShadow: isCurrent ? `0 0 16px ${phaseCol}40` : "none",
+                    transform: isCurrent ? "translateY(-1px)" : "none",
+                    position: "relative",
+                    transition: "all 0.25s ease",
+                  }}
+                >
                 <div
                   style={{
                     display: "flex",
@@ -967,7 +978,8 @@ function NetworkForecastView() {
                 </div>
               </div>
             );
-          })}
+          });
+        })()}
         </div>
       </div>
 

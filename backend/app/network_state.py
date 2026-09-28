@@ -106,7 +106,7 @@ def compute_empirical_threat(st_row):
     """
     Computes an empirical threat score [0.0, 1.0] and behaviour class based on
     physical flow characteristics across all 5 MITRE ATT&CK kill chain stages.
-    Safeguards quiet real-world live traffic (broadcast, mDNS, SSDP, web) from false alarms.
+    Safeguards quiet real-world live traffic (broadcast, mDNS, SSDP, web, downloads, streaming) from false alarms.
     """
     n_flows = float(st_row.get("n_flows", 0))
     if n_flows < 5:
@@ -122,34 +122,49 @@ def compute_empirical_threat(st_row):
     uniq_dports = float(st_row.get("n_uniq_dst_port", 0))
     dur_mean = float(st_row.get("f_dur_mean", 0))
     iat_mean = float(st_row.get("f_iat_mean", 0))
+    iat_std = float(st_row.get("f_iat_std_mean", 0))
     pkt_size_mean = float(st_row.get("f_pkt_size_mean", 0))
     down_up_mean = float(st_row.get("f_down_up_mean", 0))
+    psh_ratio = float(st_row.get("f_psh_ratio", 0))
+    intl_flow_ratio = float(st_row.get("n_intl_flow_ratio", 0))
+    outb_bytes = float(st_row.get("n_outbound_bytes", 0))
+    inb_bytes = float(st_row.get("n_inbound_bytes", 0))
+    in_out_byte_ratio = float(st_row.get("n_in_out_byte_ratio", 0))
 
     scores = {}
 
-    # 1. Phase 01: Reconnaissance / PortScan
+    # 1. Phase 01: Reconnaissance / PortScan (T1046 / T1595)
     # Probing many ports by one source, elevated port entropy, SYN/RST probes or small flow sweep
-    if (dport_max >= 12 or (uniq_dports >= 12 and ent_port >= 2.5)) and (syn_ratio + rst_ratio >= 0.20 or small_frac >= 0.50):
+    if (dport_max >= 15 or (uniq_dports >= 15 and ent_port >= 2.6)) and (syn_ratio + rst_ratio >= 0.30 or small_frac >= 0.60):
         scores["Reconnaissance"] = 0.68
 
-    # 2. Phase 02: Initial Access / BruteForce / DoS
+    # 2. Phase 02: Initial Access / BruteForce / DoS (T1190 / T1110)
     # High-rate repeated attempts against few ports, elevated RST/SYN, or rapid flood
-    if n_flows >= 25 and ((conn_rate >= 0.8 and dport_max <= 4 and (rst_ratio >= 0.20 or syn_ratio >= 0.30)) or (conn_rate >= 3.0 and syn_ratio >= 0.35)):
+    if n_flows >= 30 and (
+        (conn_rate >= 1.5 and dport_max <= 4 and (rst_ratio >= 0.30 or syn_ratio >= 0.40))
+        or (conn_rate >= 5.0 and (syn_ratio >= 0.45 or small_frac >= 0.75))
+    ):
         scores["Initial Access"] = 0.78
 
-    # 3. Phase 03: Lateral Movement
-    # Internal pivot: substantial internal data transfer, sustained duration, high packet payload
-    if n_flows >= 15 and tot_bytes >= 200_000 and dur_mean >= 80000 and pkt_size_mean >= 350 and down_up_mean >= 1.8 and dport_max <= 6:
+    # 3. Phase 03: Lateral Movement (T1021 / T1570)
+    # Internal pivot: substantial internal LAN-to-LAN transfer, sustained duration, high packet payload
+    if n_flows >= 15 and intl_flow_ratio >= 0.35 and tot_bytes >= 2_000_000 and dur_mean >= 1_000_000 and pkt_size_mean >= 350:
         scores["Lateral Movement"] = 0.85
 
-    # 4. Phase 04: Command & Control (C2 / Beaconing)
-    # Steady heartbeat beaconing with sustained flow count, high IAT, and high duration
-    if n_flows >= 15 and tot_bytes >= 50_000 and (iat_mean >= 150000 or dur_mean >= 200000):
+    # 4. Phase 04: Command & Control (C2 / Beaconing) (T1071 / T1572)
+    # Steady periodic heartbeat beaconing with low IAT jitter (variance/mean < 0.20) and small control payloads
+    iat_jitter = iat_std / (iat_mean + 1.0) if iat_mean > 0 else 1.0
+    if n_flows >= 20 and (iat_mean >= 500_000 or dur_mean >= 1_000_000) and iat_jitter <= 0.20 and pkt_size_mean <= 350:
         scores["C2"] = 0.89
 
-    # 5. Phase 05: Exfiltration (Data Theft / Egress Spike)
-    # Heavy data transfer (at least 2 MB in a minute, or high payload bursts)
-    if tot_bytes >= 2_000_000 or (tot_bytes >= 500_000 and pkt_size_mean >= 600 and small_frac <= 0.25):
+    # 5. Phase 05: Exfiltration (Data Theft / Egress Spike) (T1041 / T1567)
+    # Exfiltration is massive OUTBOUND data theft. Normal web downloads (in_out_byte_ratio >> 1, down_up_mean >= 1)
+    # must never be flagged as exfiltration. Requires heavy asymmetric outbound egress and payload push:
+    is_egress_dominant = (
+        (outb_bytes >= 25_000_000 and in_out_byte_ratio <= 0.35)
+        or (tot_bytes >= 15_000_000 and down_up_mean <= 0.30 and psh_ratio >= 0.15)
+    )
+    if is_egress_dominant and pkt_size_mean >= 500 and small_frac <= 0.25:
         scores["Exfiltration"] = 0.94
 
     if not scores:
@@ -266,7 +281,8 @@ class NetworkStateTracker:
                        flow_duration, tot_fwd_pkts, tot_bwd_pkts, fwd_pkt_len_mean, bwd_pkt_len_mean,
                        flow_bytes_s, flow_pkts_s, flow_iat_mean, flow_iat_std, fwd_iat_mean, bwd_iat_mean,
                        syn_flag_cnt, ack_flag_cnt, fin_flag_cnt, rst_flag_cnt, psh_flag_cnt, urg_flag_cnt,
-                       down_up_ratio, pkt_size_avg, ttl_variance, tcp_win_size, retransmit_cnt
+                       down_up_ratio, pkt_size_avg, ttl_variance, tcp_win_size, retransmit_cnt,
+                       predicted_stage
                 FROM flow_records
                 ORDER BY timestamp DESC
                 LIMIT 50000
@@ -314,6 +330,7 @@ class NetworkStateTracker:
                     "ttl_variance": float(r[26] or 0),
                     "tcp_win_size": float(r[27] or 0),
                     "retransmit_cnt": float(r[28] or 0),
+                    "stage": r[29] or "Benign",
                 }
                 self._flows.append(row)
         except Exception as e:
@@ -372,12 +389,18 @@ class NetworkStateTracker:
             m_key = m_dt.strftime("%Y-%m-%dT%H:%M") if hasattr(m_dt, "strftime") else str(m_dt)[:16]
             explicit_stages = min_to_stages.get(m_key, [])
             if explicit_stages:
-                top_explicit = max(explicit_stages, key=lambda s: KILL_CHAIN_ORDER.get(s, 0))
-                if top_explicit != "Benign":
+                non_benign = [s for s in explicit_stages if s and s != "Benign"]
+                if non_benign:
+                    top_explicit = max(non_benign, key=lambda s: KILL_CHAIN_ORDER.get(s, 0))
                     es = STAGE_CALIBRATED_RISK.get(top_explicit, 0.70)
                     eb = top_explicit
                 else:
-                    es, eb = compute_empirical_threat(st.iloc[i])
+                    # All flows in this minute were explicitly classified as Benign by the ML model
+                    raw_es, raw_eb = compute_empirical_threat(st.iloc[i])
+                    if raw_es >= 0.85:
+                        es, eb = raw_es, raw_eb
+                    else:
+                        es, eb = 0.0, "Benign"
             else:
                 es, eb = compute_empirical_threat(st.iloc[i])
             emp_scores.append(es)
@@ -395,10 +418,15 @@ class NetworkStateTracker:
                 emp_scores[-1] = max(emp_scores[-1], recent_risk)
                 emp_behaviours[-1] = top_recent
 
+        recent_all_benign = all(b == "Benign" for b in emp_behaviours[-3:]) if len(emp_behaviours) >= 3 else (emp_behaviours[-1] == "Benign" if emp_behaviours else True)
+
         for w_i, end_idx in enumerate(range(m.W - 1, len(Z))):
             base_risk = float(risk[w_i].max())
             e_threat = emp_scores[end_idx]
-            score[end_idx] = max(base_risk, e_threat)
+            if recent_all_benign and e_threat == 0.0:
+                score[end_idx] = min(base_risk, 0.12)
+            else:
+                score[end_idx] = max(base_risk, e_threat)
 
         flag = np.nan_to_num(score, nan=0.0) >= m.thr
         run, alert = 0, []
@@ -425,12 +453,14 @@ class NetworkStateTracker:
             raw_step_risk = float(torch.sigmoid(R1[0, k]).item())
             if latest_emp_threat > 0.0:
                 step_risk = max(raw_step_risk, float(latest_emp_threat * (0.95 ** (k + 1))))
+            elif recent_all_benign:
+                step_risk = min(raw_step_risk, 0.10)
             else:
                 step_risk = raw_step_risk
 
             step_probs = probs[k].copy()
             target_beh = STAGE_TO_BEHAVIOUR.get(latest_emp_beh, latest_emp_beh)
-            if step_risk < m.thr and latest_emp_threat < 0.35:
+            if (step_risk < m.thr and latest_emp_threat < 0.35) or recent_all_benign:
                 benign_idx = m.behaviours.index("Benign")
                 step_probs = np.zeros_like(step_probs)
                 step_probs[benign_idx] = 1.0
@@ -458,10 +488,22 @@ class NetworkStateTracker:
         is_alert = bool(alert[-1])
 
         # State determination matching exact kill chain stage and severity
-        if is_alert or latest_emp_beh in ("Exfiltration", "Infiltration"):
+        if is_alert and latest_emp_beh in ("Exfiltration", "Infiltration"):
             attack_state = "CRITICAL_ATTACK"
-            attack_state_label = "Active Data Exfiltration in Progress" if latest_emp_beh in ("Exfiltration", "Infiltration") else "Sustained Defense Alert: Attack Confirmed"
-            attack_stage = latest_emp_beh if latest_emp_beh != "Benign" else "Exfiltration"
+            attack_state_label = "Active Data Exfiltration in Progress"
+            attack_stage = "Exfiltration"
+        elif is_alert and latest_emp_beh in ("C2", "Command & Control", "Bot"):
+            attack_state = "CRITICAL_ATTACK"
+            attack_state_label = "Command & Control Beaconing Active"
+            attack_stage = "C2"
+        elif is_alert:
+            attack_state = "ACTIVE_INTRUSION"
+            attack_state_label = "Sustained Defense Alert: Attack Confirmed"
+            attack_stage = latest_emp_beh if latest_emp_beh != "Benign" else "Initial Access"
+        elif latest_emp_beh in ("Exfiltration", "Infiltration"):
+            attack_state = "CRITICAL_ATTACK"
+            attack_state_label = "Active Data Exfiltration in Progress"
+            attack_stage = "Exfiltration"
         elif latest_emp_beh in ("C2", "Command & Control", "Bot"):
             attack_state = "CRITICAL_ATTACK"
             attack_state_label = "Command & Control Beaconing Active"
@@ -478,15 +520,15 @@ class NetworkStateTracker:
             attack_state = "SUSPICIOUS_PROBING"
             attack_state_label = "Reconnaissance & Multi-Port Probing Active"
             attack_stage = "Reconnaissance"
-        elif latest_risk >= 0.70:
+        elif latest_risk >= 0.70 and not recent_all_benign:
             attack_state = "ACTIVE_INTRUSION"
             attack_state_label = "Active Intrusion in Progress"
             attack_stage = "Initial Access"
-        elif latest_risk >= m.thr:
+        elif latest_risk >= m.thr and not recent_all_benign:
             attack_state = "ELEVATED_THREAT"
             attack_state_label = "Elevated Threat Level"
             attack_stage = "Reconnaissance"
-        elif latest_risk >= 0.38 or latest_emp_threat >= 0.35:
+        elif (latest_risk >= 0.38 or latest_emp_threat >= 0.35) and not recent_all_benign:
             attack_state = "SUSPICIOUS_PROBING"
             attack_state_label = "Suspicious Probing Detected"
             attack_stage = "Reconnaissance"
@@ -495,7 +537,7 @@ class NetworkStateTracker:
             attack_state_label = "Defense Telemetry Nominal"
             attack_stage = "Benign"
 
-        if latest_risk < m.thr and latest_emp_threat < 0.35:
+        if (latest_risk < m.thr and latest_emp_threat < 0.35) or recent_all_benign:
             top_beh_name = "Benign"
         else:
             top_beh_name = latest_emp_beh if latest_emp_beh != "Benign" else (steps[0]["behaviours"][0]["behaviour"] if steps else "Benign")

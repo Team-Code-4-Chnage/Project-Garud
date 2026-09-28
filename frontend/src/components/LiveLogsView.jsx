@@ -9,7 +9,7 @@ import {
   RefreshCw,
   SlidersHorizontal,
 } from "lucide-react";
-import { formatTime, formatProb, isAttackFlow, stageClass } from "../utils";
+import { formatTime, formatProb, isAttackFlow, stageClass, formatIpEndpoint } from "../utils";
 import { apiFetch } from "../api";
 import { DirBadge, SourceBadge } from "./Badges";
 
@@ -18,6 +18,12 @@ function LiveLogsView({
   connected = false,
   onClear,
   onReloadRecent,
+  systemMode = "live",
+  captureRunning = false,
+  simulatorRunning = false,
+  onStartLiveCapture,
+  onStopLiveCapture,
+  onStartSimulator,
 }) {
   const containerRef = useRef(null);
   const [mitre, setMitre] = useState({});
@@ -205,6 +211,93 @@ function LiveLogsView({
             {isPaused ? "RESUME" : "PAUSE"}
           </button>
 
+          {systemMode === "live" && (
+            captureRunning ? (
+              <button
+                className="btn btn-sm btn-danger"
+                onClick={onStopLiveCapture}
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "3px 10px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+                title="Stop background live packet capture"
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: "#fff",
+                    display: "inline-block",
+                  }}
+                />
+                STOP CAPTURE
+              </button>
+            ) : (
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => onStartLiveCapture?.()}
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "3px 10px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+                title="Start live packet capture from network adapters"
+              >
+                <Play size={11} /> START LIVE CAPTURE
+              </button>
+            )
+          )}
+
+          {systemMode === "simulated" && (
+            simulatorRunning ? (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "3px 8px",
+                  borderRadius: "var(--radius-sm)",
+                  background: "rgba(214, 179, 106, 0.15)",
+                  border: "1px solid rgba(214, 179, 106, 0.4)",
+                  color: "var(--c-gold)",
+                  fontSize: "0.72rem",
+                  fontWeight: 700,
+                }}
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: "var(--c-gold)",
+                  }}
+                />
+                SIMULATOR RUNNING
+              </span>
+            ) : (
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => onStartSimulator?.()}
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "3px 10px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+                title="Start attack traffic simulator"
+              >
+                <Play size={11} /> START SIMULATOR
+              </button>
+            )
+          )}
+
           <button
             className="btn btn-sm btn-outline"
             onClick={() => {
@@ -388,6 +481,76 @@ function LiveLogsView({
                     World Model is listening for real-time traffic flows from
                     network interfaces or simulator.
                   </p>
+                  <div
+                    style={{
+                      marginTop: 16,
+                      display: "flex",
+                      gap: 10,
+                      justifyContent: "center",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    {systemMode === "live" && !captureRunning && (
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={() => onStartLiveCapture?.()}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <Play size={12} /> Start Live Capture
+                      </button>
+                    )}
+                    {systemMode === "live" && captureRunning && (
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          color: "var(--severity-low)",
+                          fontSize: "0.8rem",
+                          fontWeight: 700,
+                        }}
+                      >
+                        <span
+                          className="radar-blip-dot"
+                          style={{ background: "var(--severity-low)" }}
+                        />
+                        Live Sniffer Active &bull; Streaming Host Telemetry...
+                      </div>
+                    )}
+                    {systemMode === "simulated" && !simulatorRunning && (
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={() => onStartSimulator?.()}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <Play size={12} /> Launch Attack Simulator
+                      </button>
+                    )}
+                    {onReloadRecent && (
+                      <button
+                        className="btn btn-sm btn-outline"
+                        onClick={() => {
+                          setClearedBefore(0);
+                          onReloadRecent();
+                        }}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <RefreshCw size={12} /> Reload Recent Flows
+                      </button>
+                    )}
+                  </div>
                 </>
               ) : (
                 <>
@@ -478,30 +641,42 @@ function LiveLogsView({
                 </span>
 
                 <span
-                  className="ip ip-symmetric-cell"
+                  className="terminal-ip-cell"
                   title={`${line.src_ip || "?"}:${line.src_port || ""} → ${line.dst_ip || "?"}:${line.dst_port || ""}`}
                 >
-                  <span className="ip-digits">
-                    {line.src_ip || "?"}
-                    {line.src_port ? `:${line.src_port}` : ""}
+                  <span
+                    className="ip-digits ip-endpoint"
+                    title={`${line.src_ip || "?"}${line.src_port ? `:${line.src_port}` : ""}`}
+                  >
+                    {formatIpEndpoint(line.src_ip, line.src_port)}
                   </span>
                   <span
                     className="sep"
-                    style={{ margin: "0 6px", color: "var(--c-gold)" }}
+                    style={{ margin: "0 6px", color: "var(--c-gold)", flexShrink: 0 }}
                   >
                     &rarr;
                   </span>
-                  <span className="ip-digits">
-                    {line.dst_ip || "?"}
-                    {line.dst_port ? `:${line.dst_port}` : ""}
+                  <span
+                    className="ip-digits ip-endpoint"
+                    title={`${line.dst_ip || "?"}${line.dst_port ? `:${line.dst_port}` : ""}`}
+                  >
+                    {formatIpEndpoint(line.dst_ip, line.dst_port)}
                   </span>
                 </span>
 
-                <span className="val app-cell">
+                <span className="val app-cell" title={line.app_name || line.process_name || ""}>
                   {line.app_name || line.process_name ? (
                     <span
                       className="app-badge app-generic"
-                      style={{ padding: "1px 6px", fontSize: "0.7rem" }}
+                      style={{
+                        padding: "1px 6px",
+                        fontSize: "0.7rem",
+                        maxWidth: "140px",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        display: "inline-block",
+                      }}
                     >
                       {line.app_name || line.process_name}
                     </span>

@@ -38,6 +38,7 @@ export default function App() {
   const [featureList, setFeatureList] = useState(null);
   const [systemMode, setSystemMode] = useState("live");
   const [simulatorRunning, setSimulatorRunning] = useState(false);
+  const [captureRunning, setCaptureRunning] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [_selectedSession, setSelectedSession] = useState(null);
 
@@ -65,36 +66,86 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const ws = createWebSocket();
-    ws.onopen = () => setWsConnected(true);
-    ws.onclose = () => setWsConnected(false);
-    ws.onerror = () => setWsConnected(false);
+    let ws = null;
+    let reconnectTimer = null;
+    let pingInterval = null;
+    let delay = 1000;
+    let isUnmounted = false;
 
-    ws.onmessage = (evt) => {
+    function connect() {
+      if (isUnmounted) return;
       try {
-        const data = JSON.parse(evt.data);
-        if (data.type === "pong") return;
-        const key = flowKey(data);
-        if (seenFlowKeysRef.current.has(key)) return;
-        setLiveFlows((prev) => {
-          const next = [{ ...data, _ts: new Date().toISOString() }, ...prev];
-          const trimmed = next.length > 500 ? next.slice(0, 500) : next;
-          seenFlowKeysRef.current = new Set(trimmed.map(flowKey));
-          return trimmed;
-        });
-        if (data.alert) {
-          setAlertCount((c) => c + 1);
-        }
-      } catch {}
-    };
+        ws = createWebSocket();
 
-    const pingIv = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) ws.send("ping");
-    }, 15000);
+        ws.onopen = () => {
+          if (isUnmounted) return;
+          setWsConnected(true);
+          delay = 1000;
+        };
+
+        ws.onclose = () => {
+          if (isUnmounted) return;
+          setWsConnected(false);
+          scheduleReconnect();
+        };
+
+        ws.onerror = () => {
+          if (isUnmounted) return;
+          setWsConnected(false);
+          try {
+            ws.close();
+          } catch {}
+        };
+
+        ws.onmessage = (evt) => {
+          if (isUnmounted) return;
+          try {
+            const data = JSON.parse(evt.data);
+            if (data.type === "pong") return;
+            const key = flowKey(data);
+            if (seenFlowKeysRef.current.has(key)) return;
+            setLiveFlows((prev) => {
+              const next = [{ ...data, _ts: new Date().toISOString() }, ...prev];
+              const trimmed = next.length > 500 ? next.slice(0, 500) : next;
+              seenFlowKeysRef.current = new Set(trimmed.map(flowKey));
+              return trimmed;
+            });
+            if (data.alert || data.is_alert) {
+              setAlertCount((c) => c + 1);
+            }
+          } catch {}
+        };
+      } catch {
+        scheduleReconnect();
+      }
+    }
+
+    function scheduleReconnect() {
+      if (isUnmounted || reconnectTimer) return;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        delay = Math.min(delay * 1.5, 8000);
+        connect();
+      }, delay);
+    }
+
+    connect();
+
+    pingInterval = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send("ping");
+      }
+    }, 10000);
 
     return () => {
-      clearInterval(pingIv);
-      ws.close();
+      isUnmounted = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (pingInterval) clearInterval(pingInterval);
+      if (ws) {
+        try {
+          ws.close();
+        } catch {}
+      }
     };
   }, []);
 
@@ -147,6 +198,8 @@ export default function App() {
         if (m?.mode) setSystemMode(m.mode);
         if (typeof m?.simulator_running === "boolean")
           setSimulatorRunning(m.simulator_running);
+        if (typeof m?.capture_running === "boolean")
+          setCaptureRunning(m.capture_running);
       })
       .catch(() => {});
   }, []);
@@ -224,9 +277,38 @@ export default function App() {
     try {
       const res = await apiPost("/system/mode", { mode: newMode });
       setSystemMode(res.mode);
-      setSimulatorRunning(res.simulator_running);
+      setSimulatorRunning(Boolean(res.simulator_running));
+      setCaptureRunning(Boolean(res.capture_running));
+      if (newMode === "live") {
+        apiPost("/system/capture/start", {})
+          .then(() => setCaptureRunning(true))
+          .catch(() => {});
+      }
     } catch (e) {
       console.error("Failed to change mode", e);
+    }
+  };
+
+  const handleStartLiveCapture = async (options = {}) => {
+    try {
+      const res = await apiPost("/system/capture/start", options);
+      if (res.status === "started" || res.status === "already_running") {
+        setCaptureRunning(true);
+        if (res.mode) setSystemMode(res.mode);
+      }
+      return res;
+    } catch (e) {
+      alert(e.message || "Failed to start live capture");
+      throw e;
+    }
+  };
+
+  const handleStopLiveCapture = async () => {
+    try {
+      await apiPost("/system/capture/stop", {});
+      setCaptureRunning(false);
+    } catch (e) {
+      alert(e.message || "Failed to stop live capture");
     }
   };
 
@@ -388,13 +470,23 @@ export default function App() {
 
         <div className="sidebar-status">
           <div className="sidebar-status-label">DEFENSE READINESS</div>
-          <div className={`sidebar-status-value ${systemStatus}`}>
+          <div
+            className={`sidebar-status-value ${
+              systemStatus !== "nominal"
+                ? systemStatus
+                : alertCount > 0
+                  ? "critical"
+                  : "nominal"
+            }`}
+          >
             <span className="status-block">&#9632;</span>
-            {systemStatus === "nominal"
-              ? "DEFENSE NOMINAL"
+            {systemStatus === "offline"
+              ? "OFFLINE"
               : systemStatus === "degraded"
                 ? "DEGRADED"
-                : "OFFLINE"}
+                : alertCount > 0
+                  ? `DEFENSE ELEVATED (${alertCount})`
+                  : "DEFENSE NOMINAL"}
           </div>
         </div>
       </nav>
@@ -487,6 +579,28 @@ export default function App() {
             <HeartPulse size={11} color="var(--c-gold)" /> Wellbeing Audit
           </button>
 
+          <div
+            className="header-indicator"
+            title={
+              wsConnected
+                ? "Real-time WebSocket telemetry connected"
+                : "WebSocket disconnected, reconnecting..."
+            }
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: wsConnected
+                  ? "var(--severity-low)"
+                  : "var(--c-red)",
+                boxShadow: `0 0 6px ${wsConnected ? "var(--severity-low)" : "var(--c-red)"}`,
+                display: "inline-block",
+              }}
+            />
+            {wsConnected ? "Feed: Live" : "Feed: Offline"}
+          </div>
           <div className="header-indicator">
             <span
               className={`dot ${systemStatus === "nominal" ? "" : systemStatus}`}
@@ -517,6 +631,11 @@ export default function App() {
           <Dashboard
             systemMode={systemMode}
             onSelectSession={onSelectSession}
+            captureRunning={captureRunning}
+            simulatorRunning={simulatorRunning}
+            onStartLiveCapture={handleStartLiveCapture}
+            onStopLiveCapture={handleStopLiveCapture}
+            onStartSimulator={handleStartSimulator}
           />
         )}
         {(view === "network" || view === "forecast") && <NetworkForecastView />}
@@ -527,6 +646,12 @@ export default function App() {
             connected={wsConnected}
             onClear={handleClearLiveLogs}
             onReloadRecent={handleReloadRecentLogs}
+            systemMode={systemMode}
+            captureRunning={captureRunning}
+            simulatorRunning={simulatorRunning}
+            onStartLiveCapture={handleStartLiveCapture}
+            onStopLiveCapture={handleStopLiveCapture}
+            onStartSimulator={handleStartSimulator}
           />
         )}
         {view === "explain" && <ExplainView featureList={featureList} />}
@@ -540,6 +665,9 @@ export default function App() {
             simulatorRunning={simulatorRunning}
             onStartSimulator={handleStartSimulator}
             onStopSimulator={handleStopSimulator}
+            captureRunning={captureRunning}
+            onStartLiveCapture={handleStartLiveCapture}
+            onStopLiveCapture={handleStopLiveCapture}
             onPurgeSimulated={handlePurgeSimulated}
           />
         )}

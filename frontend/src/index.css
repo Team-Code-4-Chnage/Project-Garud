@@ -494,6 +494,12 @@ a:hover {
 .sidebar-status-value.nominal {
   color: var(--severity-low);
 }
+.sidebar-status-value.elevated {
+  color: var(--severity-high);
+}
+.sidebar-status-value.critical {
+  color: var(--severity-critical);
+}
 .sidebar-status-value.degraded {
   color: var(--severity-high);
 }
@@ -1163,10 +1169,10 @@ a:hover {
 
 .terminal-row {
   display: grid;
-  grid-template-columns: 95px 240px 1.4fr 140px 110px 170px 85px;
+  grid-template-columns: 85px 150px minmax(240px, 1.8fr) 140px 95px 165px 75px;
   align-items: center;
   gap: var(--sp-3);
-  padding: 9px 14px;
+  padding: 8px 14px;
   border-radius: var(--radius-sm);
   line-height: 1.4;
   border: 1px solid var(--border-muted);
@@ -1175,6 +1181,27 @@ a:hover {
   cursor: default !important;
   user-select: text;
   transition: all 0.12s ease;
+}
+
+.terminal-ip-cell {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.terminal-ip-cell .ip-endpoint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
 }
 
 .terminal-row-header {

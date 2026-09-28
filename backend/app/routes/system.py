@@ -27,6 +27,7 @@ router = APIRouter(prefix="/system", tags=["System"])
 class SystemState:
     mode: str = "live"
     simulator_proc: Optional[subprocess.Popen] = None
+    capture_proc: Optional[subprocess.Popen] = None
 
     @classmethod
     def is_simulator_running(cls) -> bool:
@@ -51,6 +52,29 @@ class SystemState:
             return True
         return False
 
+    @classmethod
+    def is_capture_running(cls) -> bool:
+        if cls.capture_proc is not None:
+            if cls.capture_proc.poll() is None:
+                return True
+            cls.capture_proc = None
+        return False
+
+    @classmethod
+    def stop_capture(cls) -> bool:
+        if cls.capture_proc is not None:
+            try:
+                cls.capture_proc.terminate()
+                cls.capture_proc.wait(timeout=2.0)
+            except Exception:
+                try:
+                    cls.capture_proc.kill()
+                except Exception:
+                    pass
+            cls.capture_proc = None
+            return True
+        return False
+
 
 class ModeUpdateRequest(BaseModel):
     mode: str
@@ -58,11 +82,12 @@ class ModeUpdateRequest(BaseModel):
 
 @router.get("/mode")
 async def get_system_mode():
-    """Get current operating mode and simulator status."""
+    """Get current operating mode, simulator status, and live capture status."""
     return {
         "mode": SystemState.mode,
         "allow_simulation": SystemState.mode == "simulated",
         "simulator_running": SystemState.is_simulator_running(),
+        "capture_running": SystemState.is_capture_running(),
     }
 
 
@@ -71,6 +96,7 @@ async def set_system_mode(req: ModeUpdateRequest):
     """
     Switch between 'live' and 'simulated' modes.
     When switching to 'live', automatically stops any running simulator.
+    When switching to 'simulated', automatically stops any running live capture.
     """
     new_mode = req.mode.strip().lower()
     if new_mode not in ("live", "simulated"):
@@ -84,12 +110,17 @@ async def set_system_mode(req: ModeUpdateRequest):
         stopped = SystemState.stop_simulator()
         if stopped:
             logger.info("Switched to LIVE mode — stopped background simulator.")
+    elif new_mode == "simulated":
+        stopped = SystemState.stop_capture()
+        if stopped:
+            logger.info("Switched to SIMULATED mode — stopped background live capture.")
 
     logger.info("System operating mode changed to: %s", new_mode.upper())
     return {
         "mode": SystemState.mode,
         "allow_simulation": SystemState.mode == "simulated",
         "simulator_running": SystemState.is_simulator_running(),
+        "capture_running": SystemState.is_capture_running(),
     }
 
 
@@ -221,6 +252,136 @@ async def stop_simulator():
         try:
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(f"\n[{datetime.now(timezone.utc).isoformat()}] Simulation stopped by operator.\n")
+        except Exception:
+            pass
+    return {"status": "stopped", "was_running": was_running}
+
+
+class CaptureStartRequest(BaseModel):
+    interface: str = "auto"
+    mode: str = "auto"
+    auto_switch_mode: bool = True
+
+
+@router.post("/capture/start")
+async def start_live_capture(
+    req: Optional[CaptureStartRequest] = None,
+    interface: Optional[str] = None,
+    mode: Optional[str] = None,
+):
+    """
+    Launch live packet capture subprocess.
+    Auto-switches operating mode to 'live' if requested.
+    """
+    req_iface = (req.interface if req else None) or interface or "auto"
+    req_mode = (req.mode if req else None) or mode or "auto"
+    auto_switch = req.auto_switch_mode if req else True
+
+    if SystemState.mode != "live":
+        if auto_switch:
+            SystemState.mode = "live"
+            SystemState.stop_simulator()
+            logger.info("Auto-switched system operating mode to LIVE for packet capture.")
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail="Live capture cannot be started in SIMULATED mode. Switch mode to 'Live' first.",
+            )
+
+    if SystemState.is_capture_running():
+        return {
+            "status": "already_running",
+            "pid": SystemState.capture_proc.pid if SystemState.capture_proc else None,
+            "mode": SystemState.mode,
+            "interface": req_iface,
+            "capture_mode": req_mode,
+        }
+
+    from ..ingestion import _session_buffers
+    _session_buffers.clear()
+
+    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    project_root = os.path.dirname(backend_dir)
+    capture_script = os.path.join(project_root, "capture", "live_capture.py")
+
+    if not os.path.exists(capture_script):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Live capture script not found at {capture_script}",
+        )
+
+    venv_python = os.path.join(backend_dir, "venv", "Scripts", "python.exe")
+    python_exe = venv_python if os.path.exists(venv_python) else sys.executable
+
+    log_path = os.path.join(DB_DIR, "capture.log")
+    os.makedirs(DB_DIR, exist_ok=True)
+
+    with open(log_path, "w", encoding="utf-8") as f:
+        f.write(f"[{datetime.now(timezone.utc).isoformat()}] Project Garud Live Network Packet Sniffer\n")
+        f.write(f"Interface: {req_iface} | Mode: {req_mode}\n")
+        f.write("=" * 70 + "\n\n")
+
+    cmd = [
+        python_exe,
+        "-u",
+        capture_script,
+        "--api", "http://127.0.0.1:8000",
+        "--interface", req_iface,
+        "--mode", req_mode,
+    ]
+
+    try:
+        log_fp = open(log_path, "a", encoding="utf-8", buffering=1)
+        proc = subprocess.Popen(
+            cmd,
+            stdout=log_fp,
+            stderr=subprocess.STDOUT,
+        )
+        SystemState.capture_proc = proc
+        logger.info("Live packet capture launched (PID %d) on interface '%s'", proc.pid, req_iface)
+        return {
+            "status": "started",
+            "pid": proc.pid,
+            "mode": SystemState.mode,
+            "interface": req_iface,
+            "capture_mode": req_mode,
+        }
+    except Exception as e:
+        logger.error("Failed to launch live capture: %s", e)
+        raise HTTPException(status_code=500, detail=f"Failed to start live capture: {e}")
+
+
+@router.get("/capture/status")
+async def get_capture_status():
+    """Get real-time live capture status and stream latest terminal log lines."""
+    running = SystemState.is_capture_running()
+    logs = ""
+    log_path = os.path.join(DB_DIR, "capture.log")
+    if os.path.exists(log_path):
+        try:
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+                logs = "".join(lines[-200:])
+        except Exception as e:
+            logs = f"Error reading capture logs: {e}"
+
+    return {
+        "running": running,
+        "mode": SystemState.mode,
+        "pid": SystemState.capture_proc.pid if running and SystemState.capture_proc else None,
+        "logs": logs,
+    }
+
+
+@router.post("/capture/stop")
+async def stop_live_capture():
+    """Stop the running live packet capture."""
+    was_running = SystemState.stop_capture()
+    log_path = os.path.join(DB_DIR, "capture.log")
+    if os.path.exists(log_path):
+        try:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"\n[{datetime.now(timezone.utc).isoformat()}] Capture stopped by operator.\n")
         except Exception:
             pass
     return {"status": "stopped", "was_running": was_running}
@@ -433,6 +594,13 @@ async def archive_and_reset_cycle(db: AsyncSession, reason: str = "manual") -> d
     await db.commit()
 
     _session_buffers.clear()
+
+    try:
+        from ..network_state import tracker
+        tracker.reset()
+        logger.info("Successfully reset network_state tracker for new cycle")
+    except Exception as e:
+        logger.warning("Could not reset network_state tracker: %s", e)
 
     new_cycle_id = CycleState.initialize(force=True)
 

@@ -46,7 +46,9 @@ async def websocket_live_feed(
     register(websocket)
     try:
         while True:
-            await websocket.receive_text()
+            msg = await websocket.receive_text()
+            if msg == "ping":
+                await websocket.send_text('{"type": "pong"}')
     except WebSocketDisconnect:
         unregister(websocket)
     except Exception as e:
@@ -274,7 +276,7 @@ async def get_recent_flows(
             "flow_duration": f.flow_duration or 0.0,
             "infiltration_prob": f.infiltration_prob,
             "predicted_stage": f.predicted_stage,
-            "is_alert": bool(f.infiltration_prob is not None and f.infiltration_prob > 0.5),
+            "is_alert": bool(f.predicted_stage and f.predicted_stage != "Benign" and f.infiltration_prob is not None and f.infiltration_prob > 0.5),
             "timestamp": f.timestamp.isoformat() if f.timestamp else None,
             "_ts": f.timestamp.isoformat() if f.timestamp else None,
         }

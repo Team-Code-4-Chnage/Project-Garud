@@ -8,16 +8,28 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   X,
+  Radio,
+  Play,
+  Square,
 } from "lucide-react";
 import { apiFetch } from "../api";
 import SessionTable from "./SessionTable";
 
-export default function Dashboard({ systemMode, onSelectSession }) {
+export default function Dashboard({
+  systemMode,
+  onSelectSession,
+  captureRunning = false,
+  simulatorRunning = false,
+  onStartLiveCapture,
+  onStopLiveCapture,
+  onStartSimulator,
+}) {
   const [sessions, setSessions] = useState([]);
   const [stats, setStats] = useState({});
   const [alertStats, setAlertStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [simBannerDismissed, setSimBannerDismissed] = useState(false);
+  const [liveBannerDismissed, setLiveBannerDismissed] = useState(false);
   const [sortBy, setSortBy] = useState("last_seen");
 
   const ACTIVE_WINDOW_SECONDS = 300;
@@ -31,10 +43,25 @@ export default function Dashboard({ systemMode, onSelectSession }) {
       apiFetch("/dashboard/stats"),
       apiFetch("/alerts/stats"),
     ])
-      .then(([s, st, as]) => {
-        setSessions(s);
-        setStats(st);
-        setAlertStats(as);
+      .then(async ([s, st, as]) => {
+        let sessionList = s;
+        // If strict 300s window returned 0 sessions, fallback to full recent sessions so dashboard is never blank
+        if (
+          (!sessionList || sessionList.length === 0) &&
+          (st?.total_sessions || 0) > 0
+        ) {
+          try {
+            const fallback = await apiFetch(
+              `/sessions?limit=50&sort_by=${sortBy}${srcParam}`,
+            );
+            if (fallback && fallback.length > 0) {
+              sessionList = fallback;
+            }
+          } catch {}
+        }
+        setSessions(sessionList || []);
+        setStats(st || {});
+        setAlertStats(as || {});
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -52,6 +79,83 @@ export default function Dashboard({ systemMode, onSelectSession }) {
 
   return (
     <>
+      {systemMode === "live" && !liveBannerDismissed && (
+        <div
+          style={{
+            background: captureRunning
+              ? "linear-gradient(90deg, rgba(88, 166, 104, 0.12), rgba(30, 45, 35, 0.4))"
+              : "linear-gradient(90deg, rgba(88, 166, 104, 0.08), rgba(20, 30, 25, 0.4))",
+            border: `1px solid ${captureRunning ? "var(--severity-low)" : "rgba(88, 166, 104, 0.4)"}`,
+            borderRadius: "var(--radius)",
+            padding: "var(--sp-3) var(--sp-4)",
+            marginBottom: "var(--sp-4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "var(--sp-3)",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 260 }}>
+            <Radio
+              size={16}
+              color="var(--severity-low)"
+              strokeWidth={2.4}
+              style={{
+                animation: captureRunning ? "pulse 2s infinite" : "none",
+              }}
+            />
+            <span
+              className="mono"
+              style={{
+                fontSize: "0.82rem",
+                color: "var(--severity-low)",
+                letterSpacing: "0.02em",
+              }}
+            >
+              {captureRunning ? (
+                <>
+                  <strong>LIVE PACKET CAPTURE ACTIVE</strong> — Host network telemetry is actively streaming into the LSTM World Model.
+                </>
+              ) : (
+                <>
+                  <strong>LIVE TELEMETRY MODE</strong> — Host sniffer is currently idle. Click below to begin live traffic ingestion.
+                </>
+              )}
+            </span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {captureRunning ? (
+              <button
+                className="btn btn-sm btn-danger"
+                onClick={onStopLiveCapture}
+                style={{ fontSize: "0.72rem", padding: "4px 12px" }}
+              >
+                <Square size={11} fill="currentColor" /> STOP CAPTURE
+              </button>
+            ) : (
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => onStartLiveCapture?.()}
+                style={{ fontSize: "0.72rem", padding: "4px 14px" }}
+              >
+                <Play size={11} fill="currentColor" /> START LIVE CAPTURE
+              </button>
+            )}
+
+            <button
+              className="btn btn-sm"
+              onClick={() => setLiveBannerDismissed(true)}
+              style={{ padding: "4px 8px" }}
+              title="Dismiss banner"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        </div>
+      )}
       {systemMode === "simulated" &&
         stats.has_simulated_data &&
         !simBannerDismissed && (
@@ -79,10 +183,28 @@ export default function Dashboard({ systemMode, onSelectSession }) {
                 letterSpacing: "0.02em",
               }}
             >
-              <strong>SIMULATION ACTIVE</strong> — Synthetic network attack
-              traffic generated by <code>traffic_simulator.py</code> is actively
-              being ingested.
+              {simulatorRunning ? (
+                <>
+                  <strong>SIMULATION ACTIVE</strong> — Synthetic network attack
+                  traffic generated by <code>traffic_simulator.py</code> is actively
+                  being ingested.
+                </>
+              ) : (
+                <>
+                  <strong>SIMULATION MODE</strong> — Simulator is idle. Click below to
+                  inject synthetic MITRE attack traffic scenarios.
+                </>
+              )}
             </span>
+            {!simulatorRunning && onStartSimulator && (
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => onStartSimulator()}
+                style={{ fontSize: "0.72rem", padding: "4px 12px" }}
+              >
+                <Play size={11} fill="currentColor" /> LAUNCH SIMULATOR
+              </button>
+            )}
             <button
               className="btn btn-sm"
               onClick={() => setSimBannerDismissed(true)}
@@ -287,13 +409,31 @@ export default function Dashboard({ systemMode, onSelectSession }) {
               height: 8,
               borderRadius: "50%",
               background:
-                systemMode === "live" ? "var(--severity-low)" : "var(--c-gold)",
-              boxShadow: `0 0 8px ${systemMode === "live" ? "var(--severity-low)" : "var(--c-gold)"}`,
+                systemMode === "live"
+                  ? captureRunning
+                    ? "var(--severity-low)"
+                    : "var(--text-muted)"
+                  : simulatorRunning
+                    ? "var(--c-gold)"
+                    : "var(--text-muted)",
+              boxShadow: `0 0 8px ${
+                systemMode === "live"
+                  ? captureRunning
+                    ? "var(--severity-low)"
+                    : "transparent"
+                  : simulatorRunning
+                    ? "var(--c-gold)"
+                    : "transparent"
+              }`,
             }}
           />
           {systemMode === "live"
-            ? "Mode: Live Traffic Active"
-            : "Mode: Synthetic Simulation"}
+            ? captureRunning
+              ? "Live Sniffer: Active Ingestion"
+              : "Live Mode: Sniffer Idle"
+            : simulatorRunning
+              ? "Simulation: Generating Traffic"
+              : "Simulation: Idle"}
         </div>
       </div>
 

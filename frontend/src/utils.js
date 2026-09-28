@@ -111,13 +111,22 @@ export function stageColor(stage) {
 
 export function isAttackFlow(flow) {
   if (!flow) return false;
+  if (
+    flow.predicted_stage === "Benign" &&
+    !flow.alert &&
+    !flow.is_alert &&
+    !flow.heartbleed_alert
+  ) {
+    return false;
+  }
   if (typeof flow.is_alert === "boolean") return flow.is_alert;
-  // Only use the model's actual probability score — never guess from stage name
+  if (flow.alert || flow.heartbleed_alert) return true;
   const prob =
     flow.infiltration_prob ??
     flow.infiltration_probability ??
     0;
-  return prob > 0.5;
+  const stage = flow.predicted_stage || "";
+  return prob > 0.5 && stage !== "Benign";
 }
 
 export function severityClass(prob) {
@@ -168,4 +177,17 @@ export function formatDuration(us) {
   if (ms < 1000) return ms.toFixed(0) + "ms";
   if (ms < 60000) return (ms / 1000).toFixed(1) + "s";
   return (ms / 60000).toFixed(1) + "m";
+}
+
+export function formatIpEndpoint(ip, port) {
+  if (!ip) return "\u2014";
+  let formatted = ip;
+  // If IPv6 is excessively long, compress the middle cleanly for table presentation
+  if (ip.includes(":") && ip.length > 22) {
+    const parts = ip.split(":");
+    if (parts.length > 4) {
+      formatted = `${parts.slice(0, 2).join(":")}…${parts.slice(-2).join(":")}`;
+    }
+  }
+  return port ? `${formatted}:${port}` : formatted;
 }
