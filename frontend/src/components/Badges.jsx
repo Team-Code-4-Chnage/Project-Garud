@@ -374,13 +374,22 @@ export const WellbeingModal = memo(function WellbeingModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    setLoading(true);
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) setLoading(true);
+    });
     apiFetch("/system/cycles")
       .then((res) => {
+        if (!active) return;
         setCycles(Array.isArray(res) ? res : res?.cycles || []);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;

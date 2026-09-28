@@ -67,7 +67,7 @@ const STAGE_COLORS = {
   Infiltration: "#C94A45",
 };
 
-export function getStageColor(stage) {
+function getStageColor(stage) {
   if (!stage) return STAGE_COLORS.Benign;
   const s = String(stage).trim().toLowerCase();
   if (s === "benign" || s === "nominal") return STAGE_COLORS.Benign;
@@ -1305,7 +1305,6 @@ function NetworkForecastView() {
                 <div className="shap-bar-container">
                   {data.explanation.map((e) => {
                     const isPositive = e.contribution > 0;
-                    const dir = isPositive ? "malicious" : "benign";
                     const pct = Math.min(
                       100,
                       (Math.abs(e.contribution) / maxContr) * 100,

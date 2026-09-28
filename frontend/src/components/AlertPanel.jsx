@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Shield,
   ShieldCheck,
-  ShieldAlert,
   AlertTriangle,
   CheckCircle2,
   Search,
@@ -16,8 +15,6 @@ import {
   Terminal,
   X,
   Layers,
-  FileText,
-  ExternalLink,
 } from "lucide-react";
 import { apiFetch, apiPost } from "../api";
 import { stageClass, formatTime, formatProb } from "../utils";
@@ -76,10 +73,32 @@ export default function AlertPanel() {
   }, []);
 
   useEffect(() => {
-    refresh();
-    const iv = setInterval(refresh, 5000);
-    return () => clearInterval(iv);
-  }, [refresh]);
+    let active = true;
+    const load = async () => {
+      try {
+        const [resAlerts, resLedger] = await Promise.all([
+          apiFetch("/alerts?limit=500"),
+          apiFetch("/alerts/ledger/verify").catch(() => null),
+        ]);
+        if (!active) return;
+        setAlerts(Array.isArray(resAlerts) ? resAlerts : []);
+        if (resLedger) setLedgerStatus(resLedger);
+      } catch (e) {
+        console.error("Failed to load alerts:", e);
+      } finally {
+        if (active) {
+          setLoading(false);
+          setIsRefreshing(false);
+        }
+      }
+    };
+    load();
+    const iv = setInterval(load, 5000);
+    return () => {
+      active = false;
+      clearInterval(iv);
+    };
+  }, []);
 
   // Compute live category and severity counts from current alerts in memory
   const counts = useMemo(() => {

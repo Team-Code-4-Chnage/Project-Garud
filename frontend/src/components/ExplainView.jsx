@@ -7,11 +7,7 @@ import {
   Code2,
   TrendingUp,
   TrendingDown,
-  ShieldCheck,
-  ShieldAlert,
   Search,
-  SlidersHorizontal,
-  Info,
 } from "lucide-react";
 import { apiFetch, apiPost } from "../api";
 import {

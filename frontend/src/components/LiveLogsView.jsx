@@ -6,16 +6,12 @@ import {
   Play,
   Trash2,
   Search,
-  ShieldAlert,
-  Activity,
-  Wifi,
-  ArrowRight,
   RefreshCw,
   SlidersHorizontal,
 } from "lucide-react";
 import { formatTime, formatProb, isAttackFlow, stageClass } from "../utils";
 import { apiFetch } from "../api";
-import { DirBadge, SourceBadge, IdentityBadge } from "./Badges";
+import { DirBadge, SourceBadge } from "./Badges";
 
 function LiveLogsView({
   lines = [],
@@ -29,7 +25,7 @@ function LiveLogsView({
   const [searchQuery, setSearchQuery] = useState("");
   const [clearedBefore, setClearedBefore] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [autoScroll, setAutoScroll] = useState(true);
+  const [autoScroll, _setAutoScroll] = useState(true);
 
   useEffect(() => {
     apiFetch("/mitre/mapping")

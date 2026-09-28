@@ -100,7 +100,7 @@ function SessionTable({
   loading = false,
   sortBy = "last_seen",
   setSortBy,
-  onSelectSession,
+  _onSelectSession,
 }) {
   const [filterText, setFilterText] = useState("");
   const [groupByApp, setGroupByApp] = useState(true);

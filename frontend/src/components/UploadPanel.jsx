@@ -1,10 +1,7 @@
 import { useState, useRef } from "react";
 import {
   Upload,
-  FileText,
-  CheckCircle2,
   AlertTriangle,
-  FileCode,
 } from "lucide-react";
 import { apiUpload } from "../api";
 

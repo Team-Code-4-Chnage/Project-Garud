@@ -39,7 +39,7 @@ export default function App() {
   const [systemMode, setSystemMode] = useState("live");
   const [simulatorRunning, setSimulatorRunning] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [selectedSession, setSelectedSession] = useState(null);
+  const [_selectedSession, setSelectedSession] = useState(null);
 
   const [liveFlows, setLiveFlows] = useState([]);
   const seenFlowKeysRef = useRef(new Set());

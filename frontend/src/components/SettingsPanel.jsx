@@ -7,17 +7,10 @@ import {
   Trash2,
   Cpu,
   CheckCircle2,
-  Shield,
   Layers,
   Terminal,
-  Activity,
-  Zap,
   Sliders,
-  Database,
-  Radio,
   RefreshCw,
-  Copy,
-  Info,
 } from "lucide-react";
 import { apiFetch, apiPost } from "../api";
 import { formatFeatureName } from "../utils";
@@ -229,7 +222,13 @@ export default function SettingsPanel({
 
   // Sync simulatorRunning prop
   useEffect(() => {
-    setIsRunning(simulatorRunning);
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) setIsRunning(simulatorRunning);
+    });
+    return () => {
+      active = false;
+    };
   }, [simulatorRunning]);
 
   // Fetch db stats
