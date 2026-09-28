@@ -64,6 +64,9 @@ def fail(msg):
 # PHASE 0 -- AUTO-INSTALL PYTHON DEPENDENCIES
 # =====================================================================
 def phase0_install_deps():
+    if "-h" in sys.argv or "--help" in sys.argv:
+        return
+
     banner(0, "Prerequisites -- Auto-Install Python Packages")
 
     required = {
@@ -79,19 +82,34 @@ def phase0_install_deps():
             ok(f"{mod} already installed")
         except ImportError:
             log(f"Installing {mod}...", "WARN")
-            try:
-                subprocess.check_call(
-                    [sys.executable, "-m", "pip", "install", "-q"] + pip_spec.split(),
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                )
+            installed = False
+            # Try standard spec, then with --break-system-packages, then simple package name
+            attempts = [
+                [sys.executable, "-m", "pip", "install", "-q"] + pip_spec.split(),
+                [sys.executable, "-m", "pip", "install", "-q", "--break-system-packages"] + pip_spec.split(),
+                [sys.executable, "-m", "pip", "install", "-q", mod],
+                [sys.executable, "-m", "pip", "install", "-q", "--break-system-packages", mod],
+            ]
+            for cmd in attempts:
+                try:
+                    subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    installed = True
+                    break
+                except Exception:
+                    continue
+
+            if installed:
                 ok(f"{mod} installed")
-            except subprocess.CalledProcessError:
-                fail(f"Could not install {mod}. Run: pip install {pip_spec}")
+            else:
+                fail(f"Could not auto-install {mod}. Run manually: pip install {mod}")
                 sys.exit(1)
 
     # Verify torch loads
-    import torch
-    ok(f"PyTorch {torch.__version__} (device: {'cuda' if torch.cuda.is_available() else 'cpu'})")
+    try:
+        import torch
+        ok(f"PyTorch {torch.__version__} (device: {'cuda' if torch.cuda.is_available() else 'cpu'})")
+    except ImportError:
+        pass
 
 phase0_install_deps()
 
@@ -990,6 +1008,8 @@ Examples:
                     help="Refit scaler on new data instead of using existing")
     ap.add_argument("--combine-base", action="store_true",
                     help="Merge with real_flows.csv if it exists")
+    ap.add_argument("--data", "--dataset", default=None,
+                    help="Path to existing dataset CSV to train/retrain on (bypasses phases 1-6)")
     ap.add_argument("--output-csv", default=str(ROOT / "campaign_dataset.csv"),
                     help="Path to save generated dataset CSV")
     args = ap.parse_args()
@@ -1007,30 +1027,67 @@ Examples:
     print(f"  Platform: {platform.system()} {platform.release()}")
     print(f"  Device: {DEVICE}")
     print(f"  Mode: {'REAL LAB' if args.lab else 'SIMULATED'} + {args.mode.upper()}")
-    print(f"  Data: {args.attack_sessions} attack + {args.benign_sessions} benign sessions")
+    if args.data:
+        print(f"  Input Dataset: {args.data}")
+    else:
+        print(f"  Data: {args.attack_sessions} attack + {args.benign_sessions} benign sessions")
     print()
 
     t_start = time.time()
 
     # Phase 0 already ran at import time (deps)
 
-    # Phase 1-4: Lab setup
-    if not phase1_network(args): sys.exit(1)
-    if not phase2_vms(args): sys.exit(1)
-    if not phase3_configure(args): sys.exit(1)
-    if not phase4_validate(args): sys.exit(1)
+    if args.data:
+        banner("5-7", f"Loading Dataset: {args.data}")
+        data_p = Path(args.data)
+        if not data_p.exists():
+            fail(f"Dataset file not found: {data_p}")
+            sys.exit(1)
+        campaign_df = pd.read_csv(data_p)
+        ok(f"Loaded {len(campaign_df)} rows from {data_p.name}")
 
-    # Phase 5: Collect
-    collect_result = phase5_collect(args)
+        missing_feats = [c for c in FLOW_FEATURES if c not in campaign_df.columns]
+        if missing_feats:
+            fail(f"Dataset is missing required flow feature columns: {missing_feats[:5]}... ({len(missing_feats)} missing)")
+            sys.exit(1)
 
-    # Phase 6: Extract
-    campaign_df = phase6_extract(args, collect_result)
-    if campaign_df is None:
-        fail("No data available. Cannot proceed.")
-        sys.exit(1)
+        if "stage_label" not in campaign_df.columns:
+            fail("Dataset is missing required column: 'stage_label'")
+            sys.exit(1)
 
-    # Phase 7: Merge
-    combined = phase7_merge(args, campaign_df)
+        if "session_id" not in campaign_df.columns:
+            log("No 'session_id' found -- grouping every 10 flows as a session", "WARN")
+            campaign_df["session_id"] = np.arange(len(campaign_df)) // 10
+
+        if "timestamp" not in campaign_df.columns:
+            log("No 'timestamp' found -- assigning sequential timestamps", "WARN")
+            base_t = pd.Timestamp.now()
+            campaign_df["timestamp"] = [base_t + pd.Timedelta(seconds=i*5) for i in range(len(campaign_df))]
+        else:
+            campaign_df["timestamp"] = pd.to_datetime(campaign_df["timestamp"])
+
+        if "is_malicious" not in campaign_df.columns:
+            campaign_df["is_malicious"] = campaign_df["stage_label"].apply(lambda s: 0 if s == "Benign" else 1)
+
+        combined = campaign_df
+    else:
+        # Phase 1-4: Lab setup
+        if not phase1_network(args): sys.exit(1)
+        if not phase2_vms(args): sys.exit(1)
+        if not phase3_configure(args): sys.exit(1)
+        if not phase4_validate(args): sys.exit(1)
+
+        # Phase 5: Collect
+        collect_result = phase5_collect(args)
+
+        # Phase 6: Extract
+        campaign_df = phase6_extract(args, collect_result)
+        if campaign_df is None:
+            fail("No data available. Cannot proceed.")
+            sys.exit(1)
+
+        # Phase 7: Merge
+        combined = phase7_merge(args, campaign_df)
 
     # Phase 8: Train
     model, scaler, test_metrics = phase8_train(args, combined)
