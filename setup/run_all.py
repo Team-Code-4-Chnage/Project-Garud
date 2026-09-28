@@ -40,6 +40,27 @@ from datetime import datetime
 from pathlib import Path
 
 # =====================================================================
+# HELPERS (must be defined before phase0 which uses them at import time)
+# =====================================================================
+def ts():
+    return datetime.now().strftime("%H:%M:%S")
+
+def banner(phase, title):
+    print()
+    print(f"  {'='*60}")
+    print(f"   PHASE {phase} -- {title}")
+    print(f"  {'='*60}")
+
+def log(msg, level="INFO"):
+    print(f"  [{ts()}] [{level:4s}] {msg}")
+
+def ok(msg):
+    print(f"  [{ts()}] [ OK ] {msg}")
+
+def fail(msg):
+    print(f"  [{ts()}] [FAIL] {msg}")
+
+# =====================================================================
 # PHASE 0 -- AUTO-INSTALL PYTHON DEPENDENCIES
 # =====================================================================
 def phase0_install_deps():
@@ -126,27 +147,8 @@ PROFILES_STD = {
 
 
 # =====================================================================
-# HELPERS
+# UTILITY FUNCTIONS
 # =====================================================================
-def ts():
-    return datetime.now().strftime("%H:%M:%S")
-
-def banner(phase, title):
-    print()
-    print(f"  {'='*60}")
-    print(f"   PHASE {phase} -- {title}")
-    print(f"  {'='*60}")
-
-def log(msg, level="INFO"):
-    colors = {"INFO": "", "WARN": "", "ERR": ""}
-    print(f"  [{ts()}] [{level:4s}] {msg}")
-
-def ok(msg):
-    print(f"  [{ts()}] [ OK ] {msg}")
-
-def fail(msg):
-    print(f"  [{ts()}] [FAIL] {msg}")
-
 def has_cmd(name):
     return shutil.which(name) is not None
 
