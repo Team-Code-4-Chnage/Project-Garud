@@ -52,7 +52,7 @@ async def get_topology(
             "session_key": s.session_key,
             "src_ip": s.src_ip,
             "dst_ip": s.dst_ip,
-            "predicted_stage": s.predicted_stage,
+            "predicted_stage": s.latest_stage or "Benign",
             "latest_risk_score": prob,
             "flow_count": s.flow_count or 0,
             "source": s.source,
@@ -76,7 +76,7 @@ async def get_topology_summary(db: AsyncSession = Depends(get_db)):
             "session_key": s.session_key,
             "src_ip": s.src_ip,
             "dst_ip": s.dst_ip,
-            "predicted_stage": s.predicted_stage,
+            "predicted_stage": s.latest_stage or "Benign",
             "latest_risk_score": float(s.latest_risk_score or 0.0),
             "flow_count": s.flow_count or 0,
         }

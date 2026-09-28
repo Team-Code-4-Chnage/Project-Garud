@@ -152,3 +152,32 @@ class TestGraphEndpoints:
     def test_topology_limit_too_large_rejected(self, client):
         res = client.get("/graph/topology?limit=99999")
         assert res.status_code == 422
+
+    def test_topology_with_active_sessions(self, client):
+        import asyncio
+        from app.database import SessionDB, get_db
+
+        async def _seed():
+            gen = get_db()
+            db = await anext(gen)
+            try:
+                s = SessionDB(
+                    session_key="10.0.0.5->192.168.1.100@443",
+                    src_ip="10.0.0.5",
+                    dst_ip="192.168.1.100",
+                    latest_risk_score=0.85,
+                    latest_stage="Initial Access",
+                    flow_count=12,
+                )
+                db.add(s)
+                await db.commit()
+            finally:
+                await db.close()
+
+        asyncio.run(_seed())
+        res = client.get("/graph/topology")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["node_count"] >= 2
+        assert data["edge_count"] >= 1
+
