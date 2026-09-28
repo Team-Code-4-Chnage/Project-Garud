@@ -40,7 +40,7 @@ jobs:
           pytest tests/ -v -m "not requires_model" \
             --tb=short --junitxml=test-results.xml
         env:
-          PYTHONPATH: ${{ github.workspace }}
+          PYTHONPATH: ${{ github.workspace }}/backend:${{ github.workspace }}
 
       - name: Run Model Quality Tests
         # Allowed to fail in CI: model .pt files are large and live in artifacts/
@@ -49,7 +49,7 @@ jobs:
           pytest tests/ -v -m "requires_model" --tb=short || \
             echo "::warning::Model quality tests skipped — .pt artifacts not available in CI runner"
         env:
-          PYTHONPATH: ${{ github.workspace }}
+          PYTHONPATH: ${{ github.workspace }}/backend:${{ github.workspace }}
         continue-on-error: true
 
       - name: Upload Test Results
@@ -102,5 +102,5 @@ jobs:
 
       - name: npm audit
         run: |
-          cd frontend && npm audit --production || true
+          cd frontend && npm audit --omit=dev || true
 
