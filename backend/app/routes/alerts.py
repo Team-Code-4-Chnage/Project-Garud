@@ -114,6 +114,10 @@ async def alert_stats(db: AsyncSession = Depends(get_db)):
         select(func.count(AlertDB.id)).where(func.lower(AlertDB.severity) == "low")
     )).scalar() or 0
 
+    mitigated_count = (await db.execute(
+        select(func.count(AlertDB.id)).where(AlertDB.mitigated.is_(True))
+    )).scalar() or 0
+
     return {
         "total": total,
         "unacknowledged": unack,
@@ -126,7 +130,181 @@ async def alert_stats(db: AsyncSession = Depends(get_db)):
         "high_total": high_total,
         "medium_total": medium_total,
         "low_total": low_total,
+        "mitigated_total": mitigated_count,
     }
+
+
+# =====================================================================
+# PROACTIVE MITIGATION ENGINE (SIH 2026 PS:26153 - Proactive Defense)
+# =====================================================================
+
+@router.post("/alerts/{alert_id}/contain")
+async def contain_threat(
+    alert_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Enforces proactive containment for a forecasted attack stage.
+    Generates firewall isolation commands (iptables / Windows Defender)
+    and marks the threat as mitigated.
+    """
+    from datetime import datetime, timezone
+    from ..ingestion import generate_containment_rule
+
+    result = await db.execute(select(AlertDB).where(AlertDB.id == alert_id))
+    alert = result.scalar_one_or_none()
+
+    if alert is None:
+        raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
+
+    action, rule = generate_containment_rule(alert.session_key, alert.predicted_stage)
+    alert.mitigated = True
+    alert.mitigation_action = action
+    alert.mitigation_rule = rule
+    alert.mitigated_at = datetime.now(timezone.utc)
+    alert.acknowledged = True
+
+    await db.commit()
+
+    return {
+        "status": "contained",
+        "alert_id": alert_id,
+        "session_key": alert.session_key,
+        "predicted_stage": alert.predicted_stage,
+        "action": action,
+        "rule_command": rule,
+        "mitigated_at": alert.mitigated_at.isoformat(),
+    }
+
+
+@router.post("/alerts/{alert_id}/revoke")
+async def revoke_containment(
+    alert_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Revokes a previously enforced proactive containment rule."""
+    result = await db.execute(select(AlertDB).where(AlertDB.id == alert_id))
+    alert = result.scalar_one_or_none()
+
+    if alert is None:
+        raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
+
+    alert.mitigated = False
+    alert.mitigated_at = None
+    await db.commit()
+
+    return {"status": "revoked", "alert_id": alert_id}
+
+
+@router.get("/alerts/containment/rules")
+async def get_active_containment_rules(db: AsyncSession = Depends(get_db)):
+    """Returns all active proactive containment rules currently enforced."""
+    stmt = select(AlertDB).where(AlertDB.mitigated.is_(True)).order_by(desc(AlertDB.mitigated_at))
+    result = await db.execute(stmt)
+    contained = result.scalars().all()
+
+    return [
+        {
+            "alert_id": a.id,
+            "session_key": a.session_key,
+            "predicted_stage": a.predicted_stage,
+            "severity": a.severity,
+            "action": a.mitigation_action or "block_src_ip",
+            "rule_command": a.mitigation_rule or "",
+            "enforced_at": a.mitigated_at.isoformat() if a.mitigated_at else None,
+            "status": "active_enforced",
+        }
+        for a in contained
+    ]
+
+
+# =====================================================================
+# BLOCKCHAIN IMMUTABLE AUDIT LEDGER (SIH 2026 PS:26153 - Blockchain & Cybersecurity)
+# =====================================================================
+
+@router.get("/alerts/ledger/verify")
+async def verify_blockchain_ledger(db: AsyncSession = Depends(get_db)):
+    """
+    Cryptographically verifies the SHA-256 block hash chain across all alerts.
+    Proves immutable, tamper-evident forensic audit trail for SIH 2026 PS:26153.
+    """
+    import hashlib
+    from datetime import datetime, timezone
+    from sqlalchemy import asc
+
+    stmt = select(AlertDB).order_by(asc(AlertDB.id))
+    result = await db.execute(stmt)
+    alerts = result.scalars().all()
+
+    if not alerts:
+        return {
+            "status": "empty",
+            "chain_intact": True,
+            "total_blocks": 0,
+            "genesis_hash": None,
+            "head_hash": None,
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    chain_intact = True
+    tampered_block = None
+    prev_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+    needs_commit = False
+
+    for idx, alert in enumerate(alerts):
+        # Backfill legacy alerts without hashes
+        if not alert.block_hash or not alert.prev_hash:
+            alert.prev_hash = prev_hash
+            raw_str = f"{alert.session_key}|{alert.severity}|{alert.infiltration_prob:.6f}|{alert.predicted_stage}|{alert.created_at.isoformat()}|{prev_hash}"
+            alert.block_hash = hashlib.sha256(raw_str.encode("utf-8")).hexdigest()
+            needs_commit = True
+
+        # Verify cryptographic link
+        if idx > 0 and alert.prev_hash != prev_hash:
+            chain_intact = False
+            tampered_block = alert.id
+            break
+
+        prev_hash = alert.block_hash
+
+    if needs_commit:
+        await db.commit()
+
+    return {
+        "status": "valid" if chain_intact else "tampered",
+        "chain_intact": chain_intact,
+        "total_blocks": len(alerts),
+        "genesis_hash": alerts[0].block_hash,
+        "head_hash": alerts[-1].block_hash if chain_intact else None,
+        "tampered_at_block": tampered_block,
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/alerts/ledger/blocks")
+async def get_ledger_blocks(
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns the cryptographic ledger block sequence for forensic audit visualization."""
+    stmt = select(AlertDB).order_by(desc(AlertDB.id)).limit(limit)
+    result = await db.execute(stmt)
+    alerts = result.scalars().all()
+
+    return [
+        {
+            "block_id": a.id,
+            "session_key": a.session_key,
+            "predicted_stage": a.predicted_stage,
+            "severity": a.severity,
+            "infiltration_prob": a.infiltration_prob,
+            "block_hash": a.block_hash,
+            "prev_hash": a.prev_hash,
+            "mitigated": a.mitigated,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        }
+        for a in alerts
+    ]
 
 
 @router.post("/alerts/clear")

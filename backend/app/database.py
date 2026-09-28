@@ -121,6 +121,16 @@ class AlertDB(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     acknowledged = Column(Boolean, default=False)
 
+    # Proactive Mitigation (SIH 2026 PS:26153 - Proactive Cyber Defense)
+    mitigated = Column(Boolean, default=False)
+    mitigation_action = Column(String(64), nullable=True)
+    mitigation_rule = Column(Text, nullable=True)
+    mitigated_at = Column(DateTime, nullable=True)
+
+    # Blockchain Cryptographic Audit Ledger (SIH 2026 PS:26153 - Blockchain & Cybersecurity)
+    block_hash = Column(String(64), nullable=True)
+    prev_hash = Column(String(64), nullable=True)
+
 
 engine = create_async_engine(DATABASE_URL, echo=False)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -159,6 +169,12 @@ def _migrate_sqlite_schema(sync_conn):
         },
         "alerts": {
             "acknowledged": "BOOLEAN DEFAULT 0",
+            "mitigated": "BOOLEAN DEFAULT 0",
+            "mitigation_action": "VARCHAR(64)",
+            "mitigation_rule": "TEXT",
+            "mitigated_at": "DATETIME",
+            "block_hash": "VARCHAR(64)",
+            "prev_hash": "VARCHAR(64)",
         },
     }
 

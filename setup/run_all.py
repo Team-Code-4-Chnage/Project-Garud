@@ -197,8 +197,51 @@ CAMPAIGN_TEMPLATES = [
 ]
 
 
+class RealFlowSampler:
+    """Samples real measured flow vectors from real_flows.csv per MITRE stage."""
+
+    def __init__(self, csv_path: Path):
+        self.pools: dict[str, list[dict]] = {s: [] for s in STAGES}
+        self.loaded = False
+        if csv_path.exists():
+            print(f"    Loading real flow pool from {csv_path.name}...")
+            df = pd.read_csv(csv_path, usecols=FLOW_FEATURES + ["stage_label"], low_memory=False)
+            for stage in STAGES:
+                stage_df = df[df["stage_label"] == stage]
+                if len(stage_df) > 0:
+                    self.pools[stage] = stage_df[FLOW_FEATURES].to_dict(orient="records")
+                    print(f"      Pool [{stage:16s}]: {len(self.pools[stage]):6d} flows")
+            self.loaded = any(len(v) > 0 for v in self.pools.values())
+
+    def sample(self, stage: str, noise_factor: float = 1.0) -> dict:
+        if self.pools.get(stage):
+            base_flow = dict(random.choice(self.pools[stage]))
+            discrete = {
+                "syn_flag_cnt", "ack_flag_cnt", "fin_flag_cnt", "rst_flag_cnt",
+                "psh_flag_cnt", "urg_flag_cnt", "retransmit_cnt",
+            }
+            for k, v in base_flow.items():
+                if k not in discrete and v > 0:
+                    base_flow[k] = float(max(0.0, v * (1.0 + random.uniform(-0.05, 0.05) * noise_factor)))
+                else:
+                    base_flow[k] = float(v)
+            return base_flow
+
+        # Fallback to calibrated Gaussian profile if stage has no real flows
+        means = np.array(PROFILES_MEAN[stage], dtype=np.float64)
+        stds = np.array(PROFILES_STD[stage], dtype=np.float64) * noise_factor
+        values = np.maximum(0, np.random.normal(means, stds))
+        return dict(zip(FLOW_FEATURES, values))
+
+
+flow_sampler: RealFlowSampler | None = None
+
+
 def generate_flow(stage, noise_factor=1.0):
-    """Generate a single flow with realistic CIC-IDS-scale features for a given stage."""
+    """Generate a single flow vector (from real flow pool when available, else calibrated profiles)."""
+    global flow_sampler
+    if flow_sampler and flow_sampler.loaded:
+        return flow_sampler.sample(stage, noise_factor=noise_factor)
     means = np.array(PROFILES_MEAN[stage], dtype=np.float64)
     stds = np.array(PROFILES_STD[stage], dtype=np.float64) * noise_factor
     values = np.maximum(0, np.random.normal(means, stds))
@@ -212,8 +255,7 @@ def generate_campaign_session(template, session_id, base_time):
     for stage_name, (min_flows, max_flows) in template["stages"]:
         n_flows = random.randint(min_flows, max_flows)
         for _ in range(n_flows):
-            # Add some inter-stage noise (transition flows that blend stages)
-            noise = 1.0 + random.uniform(-0.2, 0.3)
+            noise = 1.0 + random.uniform(-0.1, 0.1)
             flow = generate_flow(stage_name, noise_factor=noise)
             flow["session_id"] = session_id
             flow["timestamp"] = base_time + pd.Timedelta(seconds=flow_idx * 2 + random.uniform(0, 1))
@@ -227,10 +269,10 @@ def generate_campaign_session(template, session_id, base_time):
 def generate_benign_session(session_id, base_time, n_flows=None):
     """Generate a pure benign traffic session."""
     if n_flows is None:
-        n_flows = random.randint(15, 50)
+        n_flows = random.randint(15, 40)
     rows = []
     for i in range(n_flows):
-        flow = generate_flow("Benign", noise_factor=1.0 + random.uniform(-0.1, 0.1))
+        flow = generate_flow("Benign", noise_factor=1.0 + random.uniform(-0.05, 0.05))
         flow["session_id"] = session_id
         flow["timestamp"] = base_time + pd.Timedelta(seconds=i * 2 + random.uniform(0, 0.5))
         flow["stage_label"] = "Benign"
@@ -242,13 +284,18 @@ def generate_benign_session(session_id, base_time, n_flows=None):
 def generate_campaign_dataset(n_attack_sessions=80, n_benign_sessions=120):
     """
     Generate a complete campaign dataset with realistic attack and benign sessions.
-
-    Returns a DataFrame with columns: session_id, timestamp, stage_label, is_malicious, + 22 FLOW_FEATURES
+    Samples from real_flows.csv whenever available.
     """
+    global flow_sampler
+    if flow_sampler is None:
+        base_path = ROOT / "real_flows.csv"
+        flow_sampler = RealFlowSampler(base_path)
+
     print("\n  Generating campaign dataset...")
     print(f"    Attack sessions:  {n_attack_sessions}")
     print(f"    Benign sessions:  {n_benign_sessions}")
     print(f"    Campaign templates: {len(CAMPAIGN_TEMPLATES)}")
+    print(f"    Flow sampling:    {'Real flow pool (real_flows.csv)' if flow_sampler.loaded else 'Calibrated profiles'}")
 
     all_rows = []
     sid = 0
@@ -571,6 +618,8 @@ def main():
     ap.add_argument("--refit-scaler", action="store_true")
     ap.add_argument("--output-csv", default=str(ROOT / "campaign_dataset.csv"), help="Where to save generated CSV")
     ap.add_argument("--combine-base", action="store_true", help="Also combine with real_flows.csv if it exists")
+    ap.add_argument("--sample-base-sessions", type=int, default=0,
+                    help="Optional: number of base sessions to stratify-sample when fine-tuning (0=use all)")
     args = ap.parse_args()
 
     print()
@@ -596,7 +645,23 @@ def main():
     if args.combine_base and base_path.exists():
         print(f"\n  [2/4] COMBINING WITH BASE DATA")
         print("  " + "=" * 56)
-        base_df = pd.read_csv(base_path, parse_dates=["timestamp"])
+        base_df = pd.read_csv(base_path, parse_dates=["timestamp"], low_memory=False)
+
+        if args.sample_base_sessions and args.sample_base_sessions > 0 and base_df["session_id"].nunique() > args.sample_base_sessions:
+            print(f"    Stratified subsampling {args.sample_base_sessions} base sessions for balanced fine-tuning...")
+            sampled_sids = set()
+            for stage in STAGES:
+                sids_for_stage = base_df[base_df["stage_label"] == stage]["session_id"].unique()
+                n_pick = min(len(sids_for_stage), max(10, args.sample_base_sessions // len(STAGES)))
+                sampled_sids.update(random.sample(list(sids_for_stage), n_pick) if len(sids_for_stage) > n_pick else list(sids_for_stage))
+            remaining = args.sample_base_sessions - len(sampled_sids)
+            if remaining > 0:
+                other_sids = [s for s in base_df["session_id"].unique() if s not in sampled_sids]
+                if other_sids:
+                    sampled_sids.update(random.sample(other_sids, min(remaining, len(other_sids))))
+            base_df = base_df[base_df["session_id"].isin(sampled_sids)].copy()
+            print(f"    Subsampled base flows: {len(base_df)} across {len(sampled_sids)} sessions")
+
         # Shift campaign session IDs to avoid collision
         max_base_sid = base_df["session_id"].max() + 1
         campaign_df["session_id"] = campaign_df["session_id"] + max_base_sid

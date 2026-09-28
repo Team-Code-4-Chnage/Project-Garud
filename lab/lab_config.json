@@ -4,7 +4,7 @@
   "runs": 3,
   "capture": {
     "dumpcap": "dumpcap",
-    "interface": "vboxnet0",
+    "interface": "VirtualBox Host-Only Ethernet Adapter",
     "_interface_note": "Linux VirtualBox host-only is usually vboxnet0; on Windows it is the 'VirtualBox Host-Only Ethernet Adapter' (run 'dumpcap -D' to list)."
   },
   "attacker": {

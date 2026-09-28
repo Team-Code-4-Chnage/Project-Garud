@@ -5,9 +5,42 @@ All paths, constants, and tunable parameters live here.
 import os
 from pathlib import Path
 
+try:
+    from dotenv import load_dotenv
+    _base = Path(__file__).resolve().parent.parent
+    load_dotenv(_base / ".env")
+    load_dotenv(_base.parent / ".env")
+except ImportError:
+    pass
+
 BASE_DIR = Path(__file__).resolve().parent.parent
-ARTIFACTS_DIR = Path(os.environ.get("ARTIFACTS_DIR", BASE_DIR / "artifacts"))
-DB_DIR = Path(os.environ.get("DB_DIR", BASE_DIR / "data"))
+
+def _resolve_dir(env_var: str, default: Path) -> Path:
+    val = os.environ.get(env_var)
+    if not val:
+        return default
+    p = Path(val)
+    if p.is_absolute() and p.exists():
+        return p
+    # If cwd is backend/ and val starts with backend/ or ./backend/
+    s = val.replace("\\", "/").lstrip("./")
+    if s.startswith("backend/"):
+        s_sub = s[len("backend/"):]
+        if (BASE_DIR / s_sub).exists():
+            return (BASE_DIR / s_sub).resolve()
+    # Check relative to cwd
+    if p.exists():
+        return p.resolve()
+    # Check relative to BASE_DIR
+    if (BASE_DIR / p).exists():
+        return (BASE_DIR / p).resolve()
+    # Check relative to parent of BASE_DIR (workspace root)
+    if (BASE_DIR.parent / p).exists():
+        return (BASE_DIR.parent / p).resolve()
+    return default
+
+ARTIFACTS_DIR = _resolve_dir("ARTIFACTS_DIR", BASE_DIR / "artifacts")
+DB_DIR = _resolve_dir("DB_DIR", BASE_DIR / "data")
 
 MODEL_PATH = ARTIFACTS_DIR / "world_model.pt"
 SCALER_PATH = ARTIFACTS_DIR / "scaler.pkl"

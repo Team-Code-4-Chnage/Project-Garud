@@ -1,24 +1,33 @@
 """
-Traffic Simulator — generates realistic CIC-IDS-style flow records and
-feeds them to the backend /ingest endpoint in real-time.
+Project Garud — Dataset-Grounded Network Attack Traffic Simulator
+SIH 2026 PS:26153 (NTRO) | Team: Code 4 Change
 
-This is NOT an attack tool. It generates feature vectors (flow statistics),
-not actual malicious packets. It simulates how the dashboard would look
-during a real attack by walking through the MITRE ATT&CK kill chain:
-  Benign → Reconnaissance → Initial Access → Lateral Movement → C2 → Exfiltration
+Feeds realistic, ground-truth flow records to the backend /ingest endpoint in real-time.
+
+Key Capabilities:
+  1. Dataset-Grounded Replay: Samples genuine feature vectors directly from real_flows.csv
+     (fallback to calibrated CIC-IDS empirical distributions if CSV is missing).
+  2. True Flow-by-Flow Progression: Emits flows sequentially (1 per cadence step)
+     allowing the 6-flow sliding window to demonstrate genuine attack forecasting
+     and early warning alerts as the window transitions from Benign into Attack.
+  3. Multi-Scenario Kill-Chain Presets: Full Kill Chain, Recon Sweep, Brute Force,
+     Lateral Spread, Exfiltration, or Pure Benign Baseline.
+  4. Rich SOC Dashboard Alignment: Realistic IP pairs, port allocations, and MITRE mapping.
 
 Usage:
-  python traffic_simulator.py                          # default: localhost:8000
-  python traffic_simulator.py --api http://render-url  # remote backend
-  python traffic_simulator.py --speed 0.5              # faster (0.5s between flows)
-  python traffic_simulator.py --sessions 5             # 5 concurrent sessions
+  python demo/traffic_simulator.py                          # default: localhost:8000, full_kill_chain
+  python demo/traffic_simulator.py --scenario full_kill_chain --speed 0.5
+  python demo/traffic_simulator.py --scenario recon_sweep --sessions 2
+  python demo/traffic_simulator.py --scenario benign_baseline --speed 0.2
 """
 import argparse
 import json
+import os
 import random
 import sys
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 if sys.platform == "win32":
     try:
@@ -30,7 +39,6 @@ if sys.platform == "win32":
 import numpy as np
 import requests
 
-
 FLOW_FEATURES = [
     "flow_duration", "tot_fwd_pkts", "tot_bwd_pkts", "fwd_pkt_len_mean",
     "bwd_pkt_len_mean", "flow_bytes_s", "flow_pkts_s", "flow_iat_mean",
@@ -41,161 +49,11 @@ FLOW_FEATURES = [
 ]
 
 SRC_IPS = [
-    "10.0.1.5", "10.0.1.12", "10.0.1.23", "10.0.1.45", "10.0.1.78",
-    "192.168.1.100", "192.168.1.150", "172.16.0.10", "172.16.0.25",
+    "10.0.1.23", "10.0.1.45", "10.0.1.78", "192.168.1.105", "172.16.0.15",
 ]
 DST_IPS = [
-    "10.0.2.1", "10.0.2.5", "10.0.2.20", "10.0.2.50", "10.0.2.100",
-    "203.0.113.50", "198.51.100.10", "192.0.2.1",
+    "10.0.2.100", "10.0.2.50", "192.168.1.200", "172.16.0.50", "203.0.113.80",
 ]
-
-STAGE_PROFILES = {
-    "Benign": {
-        "flow_duration": (50000, 30000),
-        "tot_fwd_pkts": (10, 8),
-        "tot_bwd_pkts": (8, 6),
-        "fwd_pkt_len_mean": (200, 150),
-        "bwd_pkt_len_mean": (180, 120),
-        "flow_bytes_s": (5000, 4000),
-        "flow_pkts_s": (20, 15),
-        "flow_iat_mean": (50000, 40000),
-        "flow_iat_std": (30000, 25000),
-        "fwd_iat_mean": (60000, 50000),
-        "bwd_iat_mean": (70000, 55000),
-        "syn_flag_cnt": (1, 0.5),
-        "ack_flag_cnt": (5, 3),
-        "fin_flag_cnt": (1, 0.5),
-        "rst_flag_cnt": (0, 0.2),
-        "psh_flag_cnt": (2, 1.5),
-        "urg_flag_cnt": (0, 0.1),
-        "down_up_ratio": (1.0, 0.3),
-        "pkt_size_avg": (400, 200),
-        "ttl_variance": (2, 1),
-        "tcp_win_size": (65535, 10000),
-        "retransmit_cnt": (1, 1),
-    },
-    "Reconnaissance": {
-        "flow_duration": (1000, 500),
-        "tot_fwd_pkts": (3, 2),
-        "tot_bwd_pkts": (1, 1),
-        "fwd_pkt_len_mean": (60, 20),
-        "bwd_pkt_len_mean": (40, 15),
-        "flow_bytes_s": (2000, 1500),
-        "flow_pkts_s": (80, 40),
-        "flow_iat_mean": (1000, 800),
-        "flow_iat_std": (500, 400),
-        "fwd_iat_mean": (800, 600),
-        "bwd_iat_mean": (1200, 900),
-        "syn_flag_cnt": (1.0, 0.2),
-        "ack_flag_cnt": (1, 1),
-        "fin_flag_cnt": (0, 0.3),
-        "rst_flag_cnt": (1.0, 0.4),
-        "psh_flag_cnt": (0, 0.2),
-        "urg_flag_cnt": (0, 0.1),
-        "down_up_ratio": (0.3, 0.2),
-        "pkt_size_avg": (60, 20),
-        "ttl_variance": (5, 3),
-        "tcp_win_size": (1024, 500),
-        "retransmit_cnt": (0, 0.5),
-    },
-    "Initial Access": {
-        "flow_duration": (30000, 20000),
-        "tot_fwd_pkts": (50, 30),
-        "tot_bwd_pkts": (20, 15),
-        "fwd_pkt_len_mean": (300, 200),
-        "bwd_pkt_len_mean": (100, 80),
-        "flow_bytes_s": (8000, 5000),
-        "flow_pkts_s": (40, 25),
-        "flow_iat_mean": (5000, 3000),
-        "flow_iat_std": (8000, 6000),
-        "fwd_iat_mean": (3000, 2000),
-        "bwd_iat_mean": (10000, 8000),
-        "syn_flag_cnt": (3, 2),
-        "ack_flag_cnt": (15, 10),
-        "fin_flag_cnt": (1, 1),
-        "rst_flag_cnt": (2, 2),
-        "psh_flag_cnt": (8, 4),
-        "urg_flag_cnt": (0, 0.2),
-        "down_up_ratio": (2.5, 1.5),
-        "pkt_size_avg": (350, 200),
-        "ttl_variance": (3, 2),
-        "tcp_win_size": (32768, 15000),
-        "retransmit_cnt": (5, 3),
-    },
-    "Lateral Movement": {
-        "flow_duration": (120000, 80000),
-        "tot_fwd_pkts": (30, 20),
-        "tot_bwd_pkts": (25, 15),
-        "fwd_pkt_len_mean": (500, 300),
-        "bwd_pkt_len_mean": (400, 250),
-        "flow_bytes_s": (12000, 8000),
-        "flow_pkts_s": (15, 10),
-        "flow_iat_mean": (40000, 30000),
-        "flow_iat_std": (20000, 15000),
-        "fwd_iat_mean": (35000, 25000),
-        "bwd_iat_mean": (45000, 30000),
-        "syn_flag_cnt": (2, 1),
-        "ack_flag_cnt": (20, 12),
-        "fin_flag_cnt": (1, 1),
-        "rst_flag_cnt": (1, 1),
-        "psh_flag_cnt": (5, 3),
-        "urg_flag_cnt": (0, 0.1),
-        "down_up_ratio": (3.0, 1.5),
-        "pkt_size_avg": (450, 250),
-        "ttl_variance": (4, 2),
-        "tcp_win_size": (49152, 15000),
-        "retransmit_cnt": (2, 2),
-    },
-    "C2": {
-        "flow_duration": (300000, 200000),
-        "tot_fwd_pkts": (8, 5),
-        "tot_bwd_pkts": (6, 4),
-        "fwd_pkt_len_mean": (150, 100),
-        "bwd_pkt_len_mean": (200, 150),
-        "flow_bytes_s": (1000, 800),
-        "flow_pkts_s": (5, 3),
-        "flow_iat_mean": (120000, 80000),
-        "flow_iat_std": (5000, 3000),
-        "fwd_iat_mean": (100000, 70000),
-        "bwd_iat_mean": (130000, 90000),
-        "syn_flag_cnt": (1, 0.5),
-        "ack_flag_cnt": (12, 6),
-        "fin_flag_cnt": (0, 0.3),
-        "rst_flag_cnt": (0, 0.2),
-        "psh_flag_cnt": (3, 2),
-        "urg_flag_cnt": (0, 0.1),
-        "down_up_ratio": (1.2, 0.5),
-        "pkt_size_avg": (180, 100),
-        "ttl_variance": (1, 0.5),
-        "tcp_win_size": (16384, 8000),
-        "retransmit_cnt": (1, 1),
-    },
-    "Exfiltration": {
-        "flow_duration": (60000, 40000),
-        "tot_fwd_pkts": (5, 3),
-        "tot_bwd_pkts": (3, 2),
-        "fwd_pkt_len_mean": (100, 80),
-        "bwd_pkt_len_mean": (1200, 400),
-        "flow_bytes_s": (50000, 30000),
-        "flow_pkts_s": (10, 5),
-        "flow_iat_mean": (30000, 20000),
-        "flow_iat_std": (15000, 10000),
-        "fwd_iat_mean": (25000, 18000),
-        "bwd_iat_mean": (20000, 15000),
-        "syn_flag_cnt": (1, 0.5),
-        "ack_flag_cnt": (8, 5),
-        "fin_flag_cnt": (1, 0.5),
-        "rst_flag_cnt": (0, 0.3),
-        "psh_flag_cnt": (6, 3),
-        "urg_flag_cnt": (1, 0.5),
-        "down_up_ratio": (0.2, 0.1),
-        "pkt_size_avg": (1100, 400),
-        "ttl_variance": (2, 1),
-        "tcp_win_size": (65535, 10000),
-        "retransmit_cnt": (3, 2),
-    },
-}
-
 
 RECON_PORTS = [
     21, 22, 23, 25, 53, 80, 110, 135, 139, 143,
@@ -203,32 +61,99 @@ RECON_PORTS = [
     5432, 5900, 8000, 8080, 8443, 8888, 9000,
 ]
 BENIGN_PORTS = [80, 443, 8080, 53]
-AUTH_PORTS = [22, 3389, 445]
+AUTH_PORTS = [22, 3389, 445, 80]
 LATERAL_PORTS = [445, 135, 3389, 5985, 22]
-C2_PORTS = [443, 8443, 80, 53]
-EXFIL_PORTS = [443, 80, 21, 8080]
+C2_PORTS = [443, 8443, 53]
+EXFIL_PORTS = [443, 8080, 80]
 
-BURST_SIZES = {
-    "Benign": 1,
-    "Reconnaissance": 6,
-    "Initial Access": 5,
-    "Lateral Movement": 4,
-    "C2": 2,
-    "Exfiltration": 4,
+# Empirical fallback profiles based directly on CIC-IDS dataset means
+CALIBRATED_PROFILES_MEAN = {
+    "Benign":          [11400000, 7, 7, 65, 300, 1200000, 67000, 1150000, 2500000, 2260000, 1570000, 0.04, 0.3, 0.06, 0.01, 0.26, 0.1, 0.7, 200, 60, 8192, 0.0],
+    "Reconnaissance":  [ 2070000, 4, 2, 60,  40,   15000,   120,    3000,    2000,    4000,    8000, 0.45, 0.21, 0.00, 0.05, 0.79, 0.0, 0.2,  80, 20, 1024, 0.0],
+    "Initial Access":  [ 6530000, 11, 8, 150, 120,   18000,    40,   20000,   15000,   25000,   30000, 0.12, 0.08, 0.05, 0.02, 0.92, 0.0, 0.8, 300, 40, 8192, 1.0],
+    "Lateral Movement":[78400000, 830, 600, 180, 200, 10000,    35,   30000,   20000,   35000,   40000, 0.20, 0.83, 0.10, 0.05, 0.17, 0.0, 1.5, 350, 50, 16384, 1.0],
+    "C2":              [36350000, 5, 4, 100,  90,    3000,    15,   90000,    5000,   95000,   95000, 0.00, 0.60, 0.00, 0.00, 0.28, 0.0, 1.1, 200, 20, 8192, 0.0],
+    "Exfiltration":    [119000000, 2800, 2000, 200, 1200, 80000, 25, 40000,   30000,   45000,   42000, 0.00, 1.00, 0.00, 0.00, 0.00, 0.0, 0.3, 1100, 30, 65535, 2.0],
 }
 
 
-def get_ports_for_stage(stage: str, step_idx: int, flow_idx: int = 0) -> tuple[int, int, str]:
-    """Returns (src_port, dst_port, protocol) appropriate for the MITRE kill chain stage."""
+class FlowPool:
+    """Manages ground-truth flow samples for each MITRE ATT&CK stage."""
+
+    def __init__(self, csv_path: Path | None = None):
+        self.pools: dict[str, list[dict]] = {
+            "Benign": [],
+            "Reconnaissance": [],
+            "Initial Access": [],
+            "Lateral Movement": [],
+            "C2": [],
+            "Exfiltration": [],
+        }
+        self.loaded_from_csv = False
+
+        resolved_path = None
+        candidates = [
+            csv_path,
+            Path("real_flows.csv"),
+            Path(__file__).resolve().parent.parent / "real_flows.csv",
+            Path("data/real_flows.csv"),
+        ]
+        for c in candidates:
+            if c and Path(c).exists():
+                resolved_path = Path(c)
+                break
+
+        if resolved_path:
+            try:
+                import pandas as pd
+                print(f"Loading ground-truth flows from {resolved_path.name}...")
+                cols_to_read = FLOW_FEATURES + ["stage_label"]
+                df = pd.read_csv(resolved_path, usecols=cols_to_read, low_memory=False)
+                for stage in self.pools:
+                    sub = df[df["stage_label"] == stage]
+                    if len(sub) > 0:
+                        records = sub[FLOW_FEATURES].to_dict(orient="records")
+                        self.pools[stage] = records
+                        print(f"  Pool [{stage:<16}]: {len(records):>6} real flows loaded")
+                self.loaded_from_csv = True
+            except Exception as e:
+                print(f"  Warning: Could not read {resolved_path}: {e}")
+
+        if not self.loaded_from_csv:
+            print("Notice: real_flows.csv not found; using calibrated empirical distributions.")
+
+    def get_flow(self, stage: str) -> dict:
+        """Sample a flow from the ground-truth pool, or generate from calibrated distribution."""
+        pool = self.pools.get(stage, [])
+        if pool:
+            # Pick a real flow and add slight jitter so values are not exact duplicates
+            base = random.choice(pool).copy()
+            for k in ["flow_duration", "flow_bytes_s", "flow_pkts_s", "flow_iat_mean"]:
+                if k in base:
+                    base[k] = max(0.0, float(base[k]) * (1.0 + random.uniform(-0.05, 0.05)))
+            return base
+
+        # Fallback to calibrated profile
+        means = CALIBRATED_PROFILES_MEAN.get(stage, CALIBRATED_PROFILES_MEAN["Benign"])
+        flow = {}
+        for feat, mean in zip(FLOW_FEATURES, means):
+            std = max(1.0, mean * 0.15) if mean > 0 else 0.05
+            val = max(0.0, np.random.normal(mean, std))
+            flow[feat] = round(float(val), 4)
+        return flow
+
+
+def get_ports_for_stage(stage: str, step_idx: int) -> tuple[int, int, str]:
+    """Returns (src_port, dst_port, protocol) suitable for the MITRE stage."""
     src_port = random.randint(49152, 65535)
     if stage == "Reconnaissance":
-        dst_port = RECON_PORTS[(step_idx * 11 + flow_idx) % len(RECON_PORTS)]
+        dst_port = RECON_PORTS[step_idx % len(RECON_PORTS)]
         protocol = "TCP"
     elif stage == "Initial Access":
         dst_port = AUTH_PORTS[step_idx % len(AUTH_PORTS)]
         protocol = "TCP"
     elif stage == "Lateral Movement":
-        dst_port = LATERAL_PORTS[(step_idx + flow_idx) % len(LATERAL_PORTS)]
+        dst_port = LATERAL_PORTS[step_idx % len(LATERAL_PORTS)]
         protocol = "TCP"
     elif stage == "C2":
         dst_port = random.choice(C2_PORTS)
@@ -242,212 +167,176 @@ def get_ports_for_stage(stage: str, step_idx: int, flow_idx: int = 0) -> tuple[i
     return src_port, dst_port, protocol
 
 
-def generate_flow(stage: str) -> dict:
-    """Generate a single flow record based on the stage profile."""
-    profile = STAGE_PROFILES[stage]
-    flow = {}
-    for feat in FLOW_FEATURES:
-        mean, std = profile[feat]
-        value = max(0, np.random.normal(mean, std))
-        flow[feat] = round(float(value), 4)
-    return flow
+def build_scenario_stages(scenario: str) -> list[str]:
+    """Defines the sequential stage progression for the selected scenario."""
+    if scenario == "benign_baseline":
+        return ["Benign"] * 24
+    elif scenario == "recon_sweep":
+        return ["Benign"] * 6 + ["Reconnaissance"] * 14
+    elif scenario == "brute_force":
+        return ["Benign"] * 6 + ["Reconnaissance"] * 4 + ["Initial Access"] * 12
+    elif scenario == "lateral_spread":
+        return ["Benign"] * 6 + ["Reconnaissance"] * 3 + ["Initial Access"] * 3 + ["Lateral Movement"] * 10
+    elif scenario == "exfiltration":
+        return ["Benign"] * 6 + ["C2"] * 4 + ["Exfiltration"] * 12
+    else:  # full_kill_chain (The standard APT progression)
+        return (
+            ["Benign"] * 6 +              # Fill window cleanly: zero false alarms
+            ["Reconnaissance"] * 6 +      # Port sweeps: early warning escalates
+            ["Initial Access"] * 5 +      # Web exploit / credential brute force
+            ["Lateral Movement"] * 5 +    # Pivot across internal hosts
+            ["C2"] * 4 +                  # Periodic beaconing heartbeat
+            ["Exfiltration"] * 4          # Bulk egress transfer
+        )
 
 
-def run_attack_scenario(api_url: str, speed: float, session_count: int, scenario: str = "full_kill_chain"):
-    """
-    Run a multi-session attack scenario:
-    - Generates traffic according to selected scenario preset
-    - Walks through relevant MITRE ATT&CK stages
-    """
-    print(f"\n{'='*70}", flush=True)
-    print("  PROJECT GARUD — Network Attack Traffic Simulator", flush=True)
-    print(f"  Target API: {api_url}", flush=True)
-    print(f"  Preset Scenario: {scenario.upper()}", flush=True)
-    print(f"  Concurrent Sessions: {session_count}", flush=True)
-    print(f"  Cadence Speed: {speed}s between flow batches", flush=True)
-    print(f"{'='*70}\n", flush=True)
+def run_simulator(api_url: str, speed: float, session_count: int, scenario: str, flows_file: str | None):
+    pool = FlowPool(Path(flows_file) if flows_file else None)
+
+    print(f"\n{'='*75}")
+    print("  PROJECT GARUD — Dataset-Grounded Kill-Chain Streamer")
+    print(f"  Target API:       {api_url}")
+    print(f"  Preset Scenario:  {scenario.upper()}")
+    print(f"  Concurrent Ssns:  {session_count}")
+    print(f"  Cadence Speed:    {speed}s per flow")
+    print(f"  Flow Engine:      {'Real Flow Pool (real_flows.csv)' if pool.loaded_from_csv else 'Calibrated Profiles'}")
+    print(f"{'='*75}\n")
+
+    # Set backend to simulated mode so it accepts simulation traffic
+    try:
+        requests.post(f"{api_url}/system/mode", json={"mode": "simulated"}, timeout=5)
+    except Exception:
+        pass
+
+    stage_plan = build_scenario_stages(scenario)
+    total_steps = len(stage_plan)
 
     sessions = []
     for i in range(session_count):
-        src = random.choice(SRC_IPS)
-        dst = random.choice(DST_IPS)
-
-        if scenario == "benign_baseline":
-            stages = ["Benign"] * random.randint(20, 40)
-            label = "BENIGN"
-        elif scenario == "recon_sweep":
-            stages = (
-                ["Benign"] * random.randint(2, 4) +
-                ["Reconnaissance"] * random.randint(12, 20)
-            )
-            label = "RECON"
-        elif scenario == "brute_force":
-            stages = (
-                ["Benign"] * random.randint(2, 3) +
-                ["Reconnaissance"] * random.randint(2, 3) +
-                ["Initial Access"] * random.randint(12, 22)
-            )
-            label = "BRUTE"
-        elif scenario == "lateral_spread":
-            stages = (
-                ["Benign"] * random.randint(2, 3) +
-                ["Reconnaissance"] * random.randint(2, 3) +
-                ["Initial Access"] * random.randint(2, 3) +
-                ["Lateral Movement"] * random.randint(10, 18)
-            )
-            label = "LATERAL"
-        elif scenario == "exfiltration":
-            stages = (
-                ["Benign"] * random.randint(2, 3) +
-                ["C2"] * random.randint(2, 3) +
-                ["Exfiltration"] * random.randint(12, 20)
-            )
-            label = "EXFIL"
-        else:  # full_kill_chain
-            if i < max(1, session_count // 2):
-                stages = (
-                    ["Benign"] * random.randint(3, 5) +
-                    ["Reconnaissance"] * random.randint(3, 5) +
-                    ["Initial Access"] * random.randint(2, 4) +
-                    ["Lateral Movement"] * random.randint(2, 3) +
-                    ["C2"] * random.randint(2, 4) +
-                    ["Exfiltration"] * random.randint(2, 3)
-                )
-                label = "KILLCHAIN"
-            else:
-                stages = ["Benign"] * random.randint(15, 30)
-                label = "BENIGN"
-
+        src = SRC_IPS[i % len(SRC_IPS)]
+        dst = DST_IPS[i % len(DST_IPS)]
         sessions.append({
+            "session_idx": i + 1,
             "src_ip": src,
             "dst_ip": dst,
-            "stages": stages,
-            "current_step": 0,
-            "label": label,
+            "label": f"SSN-{i+1:02d}",
         })
 
-    max_steps = max(len(s["stages"]) for s in sessions)
-    total_sent = 0
+    total_flows_sent = 0
     total_alerts = 0
+    benign_false_alarms = 0
+    stage_alert_counts: dict[str, int] = {}
 
+    start_time = time.time()
+    api_url = api_url.replace("localhost", "127.0.0.1")
+    http_session = requests.Session()
     try:
-        for _step in range(max_steps):
+        for step_idx in range(total_steps):
+            current_stage = stage_plan[step_idx]
+
             for session in sessions:
-                if session["current_step"] >= len(session["stages"]):
-                    continue
+                flow = pool.get_flow(current_stage)
+                sport, dport, proto = get_ports_for_stage(current_stage, step_idx)
 
-                stage = session["stages"][session["current_step"]]
-                burst_count = BURST_SIZES.get(stage, 1)
-                ports_contacted = []
-                last_result = None
+                flow["src_ip"] = session["src_ip"]
+                flow["dst_ip"] = session["dst_ip"]
+                flow["src_port"] = sport
+                flow["dst_port"] = dport
+                flow["protocol"] = proto
+                flow["timestamp"] = datetime.now(timezone.utc).isoformat()
+                flow["source"] = "simulated"
+                flow["stage"] = current_stage
 
-                for b_i in range(burst_count):
-                    flow = generate_flow(stage)
-                    sport, dport, proto = get_ports_for_stage(stage, session["current_step"], b_i)
-                    flow["src_ip"] = session["src_ip"]
-                    flow["dst_ip"] = session["dst_ip"]
-                    flow["src_port"] = sport
-                    flow["dst_port"] = dport
-                    flow["protocol"] = proto
-                    flow["timestamp"] = datetime.now(timezone.utc).isoformat()
-                    flow["source"] = "simulated"
-                    flow["stage"] = stage
-                    ports_contacted.append(dport)
+                try:
+                    resp = http_session.post(f"{api_url}/ingest", json=flow, timeout=8)
+                except requests.exceptions.ConnectionError:
+                    print(f"ERROR: Cannot connect to {api_url} — is backend running?")
+                    sys.exit(1)
 
-                    try:
-                        resp = requests.post(
-                            f"{api_url}/ingest",
-                            json=flow,
-                            timeout=10,
-                        )
-                        total_sent += 1
-                        if resp.status_code == 200:
-                            last_result = resp.json()
-                            if last_result.get("alert"):
-                                total_alerts += 1
-                        else:
-                            print(f"  ERROR: HTTP {resp.status_code} — {resp.text[:100]}", flush=True)
-                    except requests.exceptions.ConnectionError:
-                        print(f"  ERROR: Cannot connect to {api_url} — is the backend running?", flush=True)
-                        sys.exit(1)
-                    except requests.exceptions.Timeout:
-                        print("  WARNING: Ingestion request timed out", flush=True)
+                total_flows_sent += 1
 
-                if last_result:
-                    pred = last_result.get("prediction")
-                    alert = last_result.get("alert")
+                if resp.status_code == 200:
+                    res = resp.json()
+                    pred = res.get("prediction")
+                    alert = res.get("alert")
+                    buf_sz = res.get("buffer_size", 0)
 
-                    status = f"[{session['label']:>9}] {session['src_ip']:>15} → {session['dst_ip']:>15} | "
-                    status += f"Stage: {stage:<18} | "
-                    if burst_count > 1:
-                        port_str = f"Ports: {len(set(ports_contacted))} probed | "
-                    else:
-                        port_str = f"Port: {ports_contacted[0]} | "
-                    status += port_str
+                    elapsed = int(time.time() - start_time)
+                    ts_str = f"{elapsed // 60:02d}:{elapsed % 60:02d}"
+
+                    log_line = f"[{ts_str}] [{session['label']}: {session['src_ip']} -> {session['dst_ip']}:{dport:<5}] "
+                    log_line += f"Stage: {current_stage:<16} | "
 
                     if pred:
                         prob = pred["infiltration_probability"]
-                        pred_stage = pred["predicted_stage"]
-                        status += f"P(inf)={prob:.3f} | Pred: {pred_stage}"
+                        pred_stg = pred["predicted_stage"]
+                        log_line += f"P(inf)={prob:.4f} | Pred: {pred_stg:<16}"
+
                         if alert:
-                            status += f" | 🚨 ALERT: {alert['severity'].upper()}"
+                            total_alerts += 1
+                            sev = alert["severity"].upper()
+                            stage_alert_counts[current_stage] = stage_alert_counts.get(current_stage, 0) + 1
+                            if current_stage == "Benign":
+                                benign_false_alarms += 1
+                                log_line += f" | ⚠️  UNEXPECTED ALERT: [{sev}]"
+                            else:
+                                log_line += f" | 🚨 ALERT: [{sev}]"
+                        else:
+                            if prob > 0.35 and current_stage != "Benign":
+                                log_line += " | ⚡ EARLY WARNING (Rising Risk)"
+                            else:
+                                log_line += " | 🟢 Normal"
                     else:
-                        buf_size = last_result.get("buffer_size", "?")
-                        status += f"Buffering ({buf_size}/{6})"
+                        log_line += f"Buffering ({buf_sz}/6 flows)"
 
-                    print(status, flush=True)
-
-                session["current_step"] += 1
+                    print(log_line, flush=True)
 
             time.sleep(speed)
 
     except KeyboardInterrupt:
-        print("\n\nSimulation stopped by operator.", flush=True)
+        print("\nSimulation stopped by user.")
 
-    print(f"\n{'='*70}", flush=True)
-    print("  Simulation batch complete", flush=True)
-    print(f"  Total telemetry flows sent: {total_sent}", flush=True)
-    print(f"  Total alerts triggered: {total_alerts}", flush=True)
-    print(f"{'='*70}\n", flush=True)
+    print(f"\n{'='*75}")
+    print("  SIMULATION COMPLETE — METRICS SUMMARY")
+    print(f"  Total Telemetry Flows Sent: {total_flows_sent}")
+    print(f"  Total Alerts Generated:     {total_alerts}")
+    print(f"  False Alarms on Benign:     {benign_false_alarms} (Target: 0)")
+    print("  Alerts by Attack Stage:")
+    for stg, cnt in stage_alert_counts.items():
+        if stg != "Benign":
+            print(f"    - {stg:<18}: {cnt} alerts")
+    print(f"{'='*75}\n")
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Traffic simulator for Network Attack Forecasting demo"
+        description="Dataset-Grounded Network Attack Traffic Simulator for Project Garud"
     )
+    parser.add_argument("--api", default="http://127.0.0.1:8000", help="Backend API URL (default: http://127.0.0.1:8000)")
+    parser.add_argument("--speed", type=float, default=0.5, help="Seconds between flow batches (default: 0.5s)")
+    parser.add_argument("--sessions", type=int, default=1, help="Number of concurrent sessions (default: 1)")
     parser.add_argument(
-        "--api", default="http://localhost:8000",
-        help="Backend API URL (default: http://localhost:8000)"
-    )
-    parser.add_argument(
-        "--speed", type=float, default=1.0,
-        help="Seconds between flow batches (default: 1.0)"
-    )
-    parser.add_argument(
-        "--sessions", type=int, default=4,
-        help="Number of concurrent sessions (default: 4)"
-    )
-    parser.add_argument(
-        "--scenario", default="full_kill_chain",
+        "--scenario",
+        default="full_kill_chain",
         choices=["full_kill_chain", "recon_sweep", "brute_force", "lateral_spread", "exfiltration", "benign_baseline"],
-        help="Attack scenario preset to execute"
+        help="Scenario progression preset"
     )
+    parser.add_argument("--flows-file", default="real_flows.csv", help="Path to real_flows.csv dataset")
     args = parser.parse_args()
 
+    # Health check
     try:
         resp = requests.get(f"{args.api}/health", timeout=5)
         health = resp.json()
         if not health.get("model_loaded"):
-            print("WARNING: Backend reports model is NOT loaded!", flush=True)
-            print(f"Health: {json.dumps(health, indent=2)}", flush=True)
+            print("ERROR: Backend reports model is NOT loaded!", flush=True)
             sys.exit(1)
-        print(f"Backend healthy: model loaded on {health.get('device', 'unknown')}", flush=True)
+        print(f"Backend connected: model loaded on {health.get('device', 'cpu')} (Mode: {health.get('system_mode', 'live')})")
     except requests.exceptions.ConnectionError:
-        print(f"ERROR: Cannot connect to backend at {args.api}", flush=True)
-        print("Start the backend first: cd backend && uvicorn app.main:app --reload", flush=True)
+        print(f"ERROR: Cannot connect to backend at {args.api}. Start backend first!")
         sys.exit(1)
 
-    run_attack_scenario(args.api, args.speed, args.sessions, args.scenario)
+    run_simulator(args.api, args.speed, args.sessions, args.scenario, args.flows_file)
 
 
 if __name__ == "__main__":

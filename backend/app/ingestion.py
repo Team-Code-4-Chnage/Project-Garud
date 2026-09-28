@@ -9,6 +9,7 @@ Fixes applied:
   §11A    — RFC1918-based traffic direction classification on session create
   §5 (KillChain flapping) — max_stage_reached is monotonic (never decreases)
 """
+import hashlib
 import ipaddress
 import logging
 from collections import defaultdict
@@ -16,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .config import (
@@ -40,6 +41,80 @@ from .process_resolver import resolve_process
 from .schemas import FlowRecord
 
 logger = logging.getLogger(__name__)
+
+
+def generate_containment_rule(session_key: str, predicted_stage: str) -> tuple[str, str]:
+    """Generate firewall / containment commands for proactive mitigation (SIH 2026 PS:26153)."""
+    src_ip = session_key.split("->")[0] if "->" in session_key else session_key
+    dst_ip = session_key.split("->")[1].split("@")[0] if "->" in session_key else "target"
+
+    if predicted_stage in ("C2", "Exfiltration"):
+        action = "block_outbound"
+        rule = (
+            f"# Windows Defender (Egress Block):\n"
+            f'netsh advfirewall firewall add rule name="Garud-Block-Egress-{dst_ip}" dir=out action=block remoteip={dst_ip}\n'
+            f"# Linux iptables:\n"
+            f"iptables -A OUTPUT -d {dst_ip} -j REJECT"
+        )
+    elif predicted_stage == "Lateral Movement":
+        action = "isolate_host"
+        rule = (
+            f"# Windows Defender (Host Isolation):\n"
+            f'netsh advfirewall firewall add rule name="Garud-Isolate-{src_ip}" dir=in action=block remoteip={src_ip}\n'
+            f'netsh advfirewall firewall add rule name="Garud-Isolate-Out-{src_ip}" dir=out action=block localip={src_ip}\n'
+            f"# Linux iptables:\n"
+            f"iptables -A INPUT -s {src_ip} -j DROP\n"
+            f"iptables -A OUTPUT -s {src_ip} -j DROP"
+        )
+    else:
+        action = "block_src_ip"
+        rule = (
+            f"# Windows Defender (Inbound Block):\n"
+            f'netsh advfirewall firewall add rule name="Garud-Block-{src_ip}" dir=in action=block remoteip={src_ip}\n'
+            f"# Linux iptables:\n"
+            f"iptables -A INPUT -s {src_ip} -j DROP"
+        )
+    return action, rule
+
+
+async def _create_chained_alert(
+    db: AsyncSession,
+    session_key: str,
+    severity: str,
+    infiltration_prob: float,
+    predicted_stage: str,
+    recommended_action: str,
+    now: datetime,
+) -> AlertDB:
+    """Creates an alert with cryptographic SHA-256 blockchain hashing and proactive mitigation rule."""
+    last_hash = (
+        await db.execute(
+            select(AlertDB.block_hash)
+            .where(AlertDB.block_hash.isnot(None))
+            .order_by(desc(AlertDB.id))
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    prev_hash = last_hash or "0000000000000000000000000000000000000000000000000000000000000000"
+    mit_action, mit_rule = generate_containment_rule(session_key, predicted_stage)
+
+    raw_str = f"{session_key}|{severity}|{infiltration_prob:.6f}|{predicted_stage}|{now.isoformat()}|{prev_hash}"
+    block_hash = hashlib.sha256(raw_str.encode("utf-8")).hexdigest()
+
+    return AlertDB(
+        session_key=session_key,
+        severity=severity,
+        infiltration_prob=infiltration_prob,
+        predicted_stage=predicted_stage,
+        recommended_action=recommended_action,
+        created_at=now,
+        mitigated=False,
+        mitigation_action=mit_action,
+        mitigation_rule=mit_rule,
+        block_hash=block_hash,
+        prev_hash=prev_hash,
+    )
 
 _session_buffers: dict[str, dict] = defaultdict(
     lambda: {"flows": [], "last_updated": datetime.now(timezone.utc)}
@@ -344,13 +419,14 @@ async def ingest_single_flow(
             "Isolate host and patch OpenSSL immediately. This is a "
             "deterministic wire-format signature match, not an ML inference."
         )
-        heartbleed_alert = AlertDB(
+        heartbleed_alert = await _create_chained_alert(
+            db=db,
             session_key=session_key,
             severity="critical",
             infiltration_prob=1.0,
             predicted_stage="Exfiltration",
             recommended_action=heartbleed_action,
-            created_at=now,
+            now=now,
         )
         db.add(heartbleed_alert)
         result_data["heartbleed_alert"] = {
@@ -359,6 +435,9 @@ async def ingest_single_flow(
             "infiltration_prob": 1.0,
             "recommended_action": heartbleed_action,
             "signature": "heartbleed_cve_2014_0160",
+            "block_hash": heartbleed_alert.block_hash,
+            "prev_hash": heartbleed_alert.prev_hash,
+            "mitigation_rule": heartbleed_alert.mitigation_rule,
         }
 
     if len(buf["flows"]) >= WINDOW_SIZE:
@@ -405,13 +484,14 @@ async def ingest_single_flow(
             severity = _severity_from_prob(prob)
             action = _recommended_action(predicted_stage, session_key)
 
-            alert = AlertDB(
+            alert = await _create_chained_alert(
+                db=db,
                 session_key=session_key,
                 severity=severity,
                 infiltration_prob=prob,
                 predicted_stage=predicted_stage,
                 recommended_action=action,
-                created_at=now,
+                now=now,
             )
             db.add(alert)
             result_data["alert"] = {
@@ -420,6 +500,9 @@ async def ingest_single_flow(
                 "infiltration_prob": prob,
                 "recommended_action": action,
                 "effective_threshold": effective_threshold,
+                "block_hash": alert.block_hash,
+                "prev_hash": alert.prev_hash,
+                "mitigation_rule": alert.mitigation_rule,
             }
 
     await db.commit()

@@ -219,7 +219,44 @@ class AlertOut(BaseModel):
     created_at: datetime
     acknowledged: bool
 
+    # Proactive Cyber Defense (SIH 2026 PS:26153)
+    mitigated: bool = False
+    mitigation_action: Optional[str] = None
+    mitigation_rule: Optional[str] = None
+    mitigated_at: Optional[datetime] = None
+
+    # Blockchain Cryptographic Audit Ledger (SIH 2026 PS:26153)
+    block_hash: Optional[str] = None
+    prev_hash: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)
+
+
+class ContainmentRequest(BaseModel):
+    action: str = Field(
+        default="auto",
+        description="Containment action: 'block_src', 'isolate_host', 'block_outbound', 'auto'",
+    )
+
+
+class ContainmentRuleOut(BaseModel):
+    alert_id: int
+    session_key: str
+    action: str
+    rule_type: str
+    rule_command: str
+    enforced_at: datetime
+    status: str = "enforced"
+
+
+class LedgerVerificationOut(BaseModel):
+    status: str
+    chain_intact: bool
+    total_blocks: int
+    genesis_hash: Optional[str] = None
+    head_hash: Optional[str] = None
+    tampered_at_block: Optional[int] = None
+    verified_at: datetime
 
 
 class SingleFlowIngestResponse(BaseModel):

@@ -35,6 +35,22 @@
   "hidden_size": 256,
   "num_layers": 2,
   "lstm_dropout": 0.25,
+  "provenance": {
+    "trained_on": "C:\\Users\\umerz\\OneDrive\\Desktop\\Network_Attack_Detection\\campaign_dataset.csv",
+    "mode": "finetune",
+    "attack_sessions": 80,
+    "benign_sessions": 120,
+    "epochs": 10,
+    "best_val_f1": 0.8754,
+    "test_metrics": {
+      "f1": 0.8876,
+      "precision": 0.8748,
+      "recall": 0.9008,
+      "fpr": 0.0471
+    },
+    "generated_by": "setup/run_all.py",
+    "timestamp": "20260928_034523"
+  },
   "stage_logit_bias": {
     "Benign": 1.0,
     "Reconnaissance": 0.25,
@@ -42,31 +58,5 @@
     "Lateral Movement": -0.75,
     "C2": -0.25,
     "Exfiltration": 0.0
-  },
-  "provenance": {
-    "trained_on": "real_flows.csv",
-    "train_sessions": 1673,
-    "val_sessions": 239,
-    "test_sessions": 478,
-    "train_rows": 236272,
-    "val_rows": 33734,
-    "test_rows": 64642,
-    "git_commit": "613b028",
-    "leakage_fix": "session-level 3-way train/val/test split, scaler fit on train only, checkpoint selection uses val (never test)",
-    "synthetic_augmentation": {
-      "stages": [
-        "Exfiltration"
-      ],
-      "sessions_per_stage": 300,
-      "note": "train-only synthetic oversampling from calibrated per-stage feature profiles; test set is 100% real flows (CIC-IDS2017 and, if present, CIC-IDS2018), untouched by synthetic augmentation"
-    },
-    "class_weight_max": 6.0,
-    "stage_loss": "focal",
-    "focal_gamma": 2.0,
-    "stage_target": "current",
-    "best_val_f1": 0.8625,
-    "optimization": "AdamW + CosineAnnealingLR + ClassWeighting",
-    "stage_target_note": "stage head is trained on the stage of the window's last flow -- the flow backend/app/ingestion.py annotates with predicted_stage -- rather than the unseen next flow; the infiltration head is still trained on the next flow",
-    "stage_logit_bias_calibration": "per-class additive bias on stage logits, coordinate-ascent search on val split only (test never touched); test-set effect: macro-F1 0.7251->0.7735, Initial Access F1 0.680->0.838"
   }
 }
