@@ -36,20 +36,19 @@
   "num_layers": 2,
   "lstm_dropout": 0.25,
   "provenance": {
-    "trained_on": "C:\\Users\\umerz\\OneDrive\\Desktop\\Network_Attack_Detection\\campaign_dataset.csv",
+    "trained_on": "D:\\SIH\\GARUD\\Project-Garud\\campaign_dataset.csv",
     "mode": "finetune",
     "attack_sessions": 80,
     "benign_sessions": 120,
-    "epochs": 10,
-    "best_val_f1": 0.8754,
+    "epochs": 60,
     "test_metrics": {
-      "f1": 0.8876,
-      "precision": 0.8748,
-      "recall": 0.9008,
-      "fpr": 0.0471
+      "f1": 0.9866,
+      "precision": 0.9933,
+      "recall": 0.9801,
+      "fpr": 0.0028
     },
     "generated_by": "setup/run_all.py",
-    "timestamp": "20260928_034523"
+    "timestamp": "20260929_001537"
   },
   "stage_logit_bias": {
     "Benign": 1.0,
