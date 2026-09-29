@@ -13,12 +13,9 @@ import {
   Menu,
   X,
   HelpCircle,
-  Moon,
-  Sun,
 } from "lucide-react";
 import EagleIcon from "./components/EagleIcon";
 import { apiFetch, apiPost, createWebSocket } from "./api";
-import { useTheme } from "./theme";
 import { flowKey } from "./utils";
 import { WellbeingModal } from "./components/Badges";
 import ConfirmModal from "./components/ConfirmModal";
@@ -33,7 +30,6 @@ import { IngestPanel } from "./components/UploadPanel";
 import "./index.css";
 
 export default function App() {
-  const { isDark, setTheme } = useTheme();
   const [view, setView] = useState("dashboard");
   const [health, setHealth] = useState(null);
   const [alertCount, setAlertCount] = useState(0);
@@ -579,14 +575,6 @@ export default function App() {
             >
               {mobileMenuOpen ? <X size={16} /> : <Menu size={16} />}
             </button>
-            <div className="garud-search-box">
-              <input
-                type="text"
-                placeholder="Search IP, application, stage..."
-                aria-label="Search telemetry"
-              />
-              <span className="garud-kbd-chip">Ctrl + K</span>
-            </div>
           </div>
 
           <div className="garud-header-right">
@@ -608,10 +596,6 @@ export default function App() {
                 Cycle: #{String(currentCycle.cycle_id || '1').replace(/^cycle_/, '')}
               </span>
             )}
-
-            <span className="garud-header-chip">
-              Model: LSTM World Model
-            </span>
 
             {alertCount > 0 && (
               <span
@@ -651,35 +635,6 @@ export default function App() {
                 second: "2-digit",
               })}
             </span>
-
-            <button
-              className="garud-btn garud-btn-sm"
-              onClick={() => setTheme(isDark ? "light" : "dark")}
-              title={`Switch to ${isDark ? "Light" : "Dark"} Theme`}
-              style={{
-                fontSize: 11,
-                padding: "3px 8px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 5,
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
-                cursor: "pointer",
-              }}
-            >
-              {isDark ? <Moon size={11} color="var(--accent)" /> : <Sun size={11} color="var(--accent)" />}
-              <span>{isDark ? "DARK" : "LIGHT"}</span>
-            </button>
-
-            <button
-              className="garud-btn garud-btn-sm"
-              onClick={() => handleNavClick("settings")}
-              title="Open Settings & Appearance"
-              style={{ padding: "4px 8px" }}
-            >
-              <Settings size={13} />
-            </button>
           </div>
         </header>
 
