@@ -578,10 +578,23 @@ export default function App() {
           </div>
 
           <div className="garud-header-right">
-            <span className="garud-header-chip live-chip">
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
-              LIVE
-            </span>
+            {/* Dynamic Live/Simulation mode indicator */}
+            {captureRunning ? (
+              <span className="garud-header-chip live-chip" title="Live packet sniffer active — real network data">
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)', display: 'inline-block', animation: 'pulse 1.4s ease-in-out infinite' }} />
+                LIVE CAPTURE
+              </span>
+            ) : simulatorRunning ? (
+              <span className="garud-header-chip" title="Traffic simulator active — synthetic data" style={{ color: 'var(--accent)', borderColor: 'var(--accent-border)' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
+                SIMULATION
+              </span>
+            ) : (
+              <span className="garud-header-chip" title="No active data source" style={{ color: 'var(--text-muted)', borderColor: 'var(--border)' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--text-muted)', display: 'inline-block' }} />
+                STANDBY
+              </span>
+            )}
 
             {hostIdentity && (
               <span className="garud-header-chip" title="Protected Host Network">

@@ -326,3 +326,139 @@ async def clear_all_alerts(
     await db.commit()
     return {"status": "cleared"}
 
+
+# =====================================================================
+# AUTOMATED MITIGATION EXPORT — SIH 2026 PS:26153 (Proactive Defence)
+# =====================================================================
+
+@router.get("/alerts/block-rules/export")
+async def export_block_rules(
+    format: str = Query("sh", description="Export format: 'sh' (iptables shell script) or 'json'"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate automated firewall block rules for all active high-risk IPs.
+
+    SIH 2026 PS:26153 — demonstrates proactive, automated mitigation:
+    Downloads a ready-to-execute iptables/nftables shell script or JSON
+    payload that can be fed directly into a SIEM/SOAR pipeline.
+    """
+    from datetime import datetime, timezone
+
+    from fastapi.responses import PlainTextResponse
+
+    # Fetch all unmitigated, unacknowledged critical/high alerts
+    stmt = (
+        select(AlertDB)
+        .where(
+            AlertDB.acknowledged.is_(False),
+            func.lower(AlertDB.severity).in_(["critical", "high"]),
+        )
+        .order_by(desc(AlertDB.created_at))
+        .limit(100)
+    )
+    result = await db.execute(stmt)
+    alerts = result.scalars().all()
+
+    # Also include all currently contained (mitigated) sessions
+    stmt2 = select(AlertDB).where(AlertDB.mitigated.is_(True)).order_by(desc(AlertDB.mitigated_at)).limit(50)
+    result2 = await db.execute(stmt2)
+    contained = result2.scalars().all()
+
+    def _extract_ip(session_key: str) -> str | None:
+        """Extract source IP from session key format 'src_ip:port->dst_ip:port'."""
+        if not session_key:
+            return None
+        try:
+            src = session_key.split("->")[0]
+            ip = src.rsplit(":", 1)[0].strip()
+            if ip and not ip.startswith(("127.", "0.", "::1")):
+                return ip
+        except Exception:
+            pass
+        return None
+
+    now_ts = datetime.now(timezone.utc).isoformat()
+    block_ips: dict[str, dict] = {}
+
+    for a in alerts:
+        ip = _extract_ip(a.session_key)
+        if ip and ip not in block_ips:
+            block_ips[ip] = {
+                "ip": ip,
+                "stage": a.predicted_stage,
+                "severity": a.severity,
+                "probability": round(a.infiltration_prob or 0.0, 4),
+                "alert_id": a.id,
+                "reason": "unacknowledged_high_risk",
+            }
+
+    for a in contained:
+        ip = _extract_ip(a.session_key)
+        if ip and ip not in block_ips:
+            block_ips[ip] = {
+                "ip": ip,
+                "stage": a.predicted_stage,
+                "severity": a.severity,
+                "probability": round(a.infiltration_prob or 0.0, 4),
+                "alert_id": a.id,
+                "reason": "active_containment",
+            }
+
+    if format.lower() == "json":
+        return {
+            "generated_at": now_ts,
+            "rule_count": len(block_ips),
+            "system": "Project Garud — SIH 2026 PS:26153",
+            "rules": list(block_ips.values()),
+        }
+
+    # Generate iptables shell script
+    lines = [
+        "#!/usr/bin/env bash",
+        "# ============================================================",
+        "# Project Garud — Automated Mitigation Block Rules",
+        f"# Generated: {now_ts}",
+        "# SIH 2026 PS:26153 — AI-based Network Attack Forecasting",
+        "# ============================================================",
+        "# USAGE: sudo bash block_rules.sh",
+        "# WARNING: Review rules before applying to production systems.",
+        "",
+        "set -euo pipefail",
+        "",
+        f"echo '[Garud] Applying {len(block_ips)} firewall block rules...'",
+        "",
+    ]
+
+    if not block_ips:
+        lines += [
+            "echo '[Garud] No active high-risk IPs to block. System is clean.'",
+            "exit 0",
+        ]
+    else:
+        for entry in block_ips.values():
+            ip = entry["ip"]
+            stage = entry["stage"]
+            severity = entry["severity"].upper()
+            prob = entry["probability"]
+            lines += [
+                f"# [{severity}] Stage: {stage} | P(attack)={prob:.2%} | Alert #{entry['alert_id']}",
+                f"iptables -I INPUT  -s {ip} -j DROP 2>/dev/null || true",
+                f"iptables -I OUTPUT -d {ip} -j DROP 2>/dev/null || true",
+                f"iptables -I FORWARD -s {ip} -j DROP 2>/dev/null || true",
+                f"echo '[Garud] Blocked: {ip} ({stage})'",
+                "",
+            ]
+        lines += [
+            f"echo '[Garud] Done. {len(block_ips)} IPs blocked. Run: iptables -L -n | grep DROP'",
+        ]
+
+    script_content = "\n".join(lines)
+    headers = {
+        "Content-Disposition": f"attachment; filename=\"garud_block_rules_{now_ts[:10]}.sh\"",
+        "Content-Type": "text/x-shellscript",
+    }
+    return PlainTextResponse(content=script_content, headers=headers)
+
+
+
