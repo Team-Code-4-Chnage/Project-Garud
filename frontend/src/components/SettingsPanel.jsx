@@ -1095,9 +1095,9 @@ export default function SettingsPanel({
                     padding: "3px 10px",
                     borderRadius: "var(--radius-sm)",
                     background: isRunning
-                      ? "rgba(88, 166, 104, 0.15)"
-                      : "rgba(58, 50, 40, 0.5)",
-                    border: `1px solid ${isRunning ? "rgba(88, 166, 104, 0.4)" : "var(--border-dark)"}`,
+                      ? "var(--success-soft)"
+                      : "var(--bg-raised)",
+                    border: `1px solid ${isRunning ? "var(--success)" : "var(--border)"}`,
                     color: isRunning
                       ? "var(--severity-low)"
                       : "var(--text-muted)",
@@ -1368,8 +1368,8 @@ export default function SettingsPanel({
                 <div
                   ref={logContainerRef}
                   style={{
-                    background: "rgba(20, 16, 12, 0.95)",
-                    border: "1px solid var(--border-dark)",
+                    background: "var(--bg-inset)",
+                    border: "1px solid var(--border)",
                     borderRadius: "var(--radius-sm)",
                     padding: "10px 14px",
                     height: "180px",

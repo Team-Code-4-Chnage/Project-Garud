@@ -643,16 +643,12 @@ export default function ExplainView({ featureList }) {
           className="panel"
           style={{
             padding: "12px 16px",
-            background: isDark
-              ? (isWarningState
-                  ? "linear-gradient(135deg, rgba(38, 22, 22, 0.7) 0%, rgba(26, 18, 16, 0.9) 100%)"
-                  : "linear-gradient(135deg, rgba(20, 32, 24, 0.7) 0%, rgba(18, 26, 20, 0.9) 100%)")
-              : (isWarningState
-                  ? "var(--danger-soft)"
-                  : "var(--success-soft)"),
+            background: isWarningState
+              ? "var(--danger-soft)"
+              : "var(--success-soft)",
             border: isWarningState
-              ? (isDark ? "1px solid rgba(201, 74, 69, 0.4)" : "1px solid var(--danger-border)")
-              : (isDark ? "1px solid rgba(88, 166, 104, 0.4)" : "1px solid var(--success)"),
+              ? "1px solid var(--danger-border)"
+              : "1px solid var(--border)",
           }}
         >
           <span style={{ fontSize: "0.68rem", color: isDark ? "var(--text-muted)" : "var(--text-secondary)", display: "block", fontWeight: 600 }}>
@@ -726,22 +722,12 @@ export default function ExplainView({ featureList }) {
       <div
         className="panel"
         style={{
-          background: isDark
-            ? (isWarningState
-                ? "linear-gradient(135deg, rgba(38, 22, 22, 0.7) 0%, rgba(26, 18, 16, 0.9) 100%)"
-                : "linear-gradient(135deg, rgba(20, 32, 24, 0.7) 0%, rgba(18, 26, 20, 0.9) 100%)")
-            : "var(--bg-surface)",
+          background: "var(--bg-surface)",
           border: isWarningState
-            ? (isDark ? "1px solid rgba(201, 74, 69, 0.45)" : "1px solid var(--danger-border)")
-            : (isDark ? "1px solid rgba(88, 166, 104, 0.45)" : "1px solid var(--border)"),
+            ? "1px solid var(--danger-border)"
+            : "1px solid var(--border)",
           padding: "22px 26px",
-          boxShadow: isDark
-            ? (isWarningState
-                ? "0 4px 24px rgba(201, 74, 69, 0.12)"
-                : "0 4px 24px rgba(88, 166, 104, 0.08)")
-            : (isWarningState
-                ? "0 2px 12px rgba(229, 57, 47, 0.08)"
-                : "0 2px 12px rgba(0, 0, 0, 0.04)"),
+          boxShadow: "var(--shadow-md)",
         }}
       >
         <div
@@ -752,7 +738,7 @@ export default function ExplainView({ featureList }) {
             flexWrap: "wrap",
             gap: 12,
             marginBottom: 16,
-            borderBottom: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid var(--border)",
+            borderBottom: "1px solid var(--border)",
             paddingBottom: 14,
           }}
         >
@@ -848,8 +834,8 @@ export default function ExplainView({ featureList }) {
                 gridTemplateColumns: "50px 1fr auto",
                 gap: 16,
                 alignItems: "center",
-                background: isDark ? "rgba(18, 15, 12, 0.7)" : "var(--bg-raised)",
-                border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid var(--border)",
+                background: "var(--bg-raised)",
+                border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
                 padding: "14px 18px",
               }}
@@ -861,16 +847,12 @@ export default function ExplainView({ featureList }) {
                   fontSize: "1.3rem",
                   fontWeight: 900,
                   color: isWarningState ? "var(--c-red)" : "var(--severity-low)",
-                  background: isDark
-                    ? (isWarningState
-                        ? "rgba(201, 74, 69, 0.12)"
-                        : "rgba(88, 166, 104, 0.12)")
-                    : (isWarningState
-                        ? "var(--danger-soft)"
-                        : "var(--success-soft)"),
+                  background: isWarningState
+                    ? "var(--danger-soft)"
+                    : "var(--success-soft)",
                   border: isWarningState
-                    ? (isDark ? "1px solid rgba(201, 74, 69, 0.3)" : "1px solid var(--danger-border)")
-                    : (isDark ? "1px solid rgba(88, 166, 104, 0.3)" : "1px solid var(--success)"),
+                    ? "1px solid var(--danger-border)"
+                    : "1px solid var(--border)",
                   borderRadius: 4,
                   height: 42,
                   display: "flex",
@@ -1056,8 +1038,8 @@ export default function ExplainView({ featureList }) {
           {method === "attention" && (sessionExplanation?.temporal_weights || systemData?.temporal_weights) && (
             <div
               style={{
-                background: isDark ? "var(--bg-dark)" : "var(--bg-inset)",
-                border: isDark ? "1px solid var(--border-dark)" : "1px solid var(--border)",
+                background: "var(--bg-inset)",
+                border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
                 padding: "12px 16px",
                 marginBottom: 16,
@@ -1127,7 +1109,7 @@ export default function ExplainView({ featureList }) {
                 style={{
                   fontSize: "0.68rem",
                   padding: "2px 8px",
-                  color: attributionFilter === "threat" ? "var(--c-dark-base)" : "var(--c-red)",
+                  color: attributionFilter === "threat" ? "#020E0F" : "var(--c-red)",
                 }}
               >
                 Threat Drivers ({activeAttributions.filter((a) => a.importance > 0).length})
@@ -1138,7 +1120,7 @@ export default function ExplainView({ featureList }) {
                 style={{
                   fontSize: "0.68rem",
                   padding: "2px 8px",
-                  color: attributionFilter === "benign" ? "var(--c-dark-base)" : "var(--severity-low)",
+                  color: attributionFilter === "benign" ? "#020E0F" : "var(--severity-low)",
                 }}
               >
                 Benign Mitigators ({activeAttributions.filter((a) => a.importance < 0).length})
@@ -1160,8 +1142,8 @@ export default function ExplainView({ featureList }) {
           {/* Diverging Attribution Chart */}
           <div
             style={{
-              background: isDark ? "var(--bg-dark)" : "var(--bg-inset)",
-              border: isDark ? "1px solid var(--border-dark)" : "1px solid var(--border)",
+              background: "var(--bg-inset)",
+              border: "1px solid var(--border)",
               borderRadius: "var(--radius-sm)",
               padding: "12px 16px",
             }}
@@ -1172,7 +1154,7 @@ export default function ExplainView({ featureList }) {
                 gridTemplateColumns: "240px 1fr 110px",
                 gap: "12px",
                 paddingBottom: "8px",
-                borderBottom: isDark ? "1px solid rgba(58, 50, 40, 0.5)" : "1px solid var(--border)",
+                borderBottom: "1px solid var(--border)",
                 fontSize: "0.68rem",
                 color: "var(--text-muted)",
                 fontWeight: 700,
@@ -1210,7 +1192,7 @@ export default function ExplainView({ featureList }) {
                       alignItems: "center",
                       padding: "6px 8px",
                       borderRadius: "var(--radius-sm)",
-                      background: idx % 2 === 0 ? (isDark ? "rgba(36, 31, 24, 0.4)" : "var(--bg-raised)") : "transparent",
+                      background: idx % 2 === 0 ? "var(--bg-raised)" : "transparent",
                     }}
                   >
                     <div>
@@ -1218,7 +1200,7 @@ export default function ExplainView({ featureList }) {
                         style={{
                           fontSize: "0.82rem",
                           fontWeight: 700,
-                          color: isThreat ? "var(--text-primary)" : (isDark ? "var(--text-muted)" : "var(--text-secondary)"),
+                          color: isThreat ? "var(--text-primary)" : "var(--text-secondary)",
                           display: "block",
                           whiteSpace: "nowrap",
                           textOverflow: "ellipsis",
@@ -1238,10 +1220,10 @@ export default function ExplainView({ featureList }) {
                       style={{
                         position: "relative",
                         height: "16px",
-                        background: isDark ? "rgba(26, 22, 16, 0.8)" : "var(--bg-surface)",
+                        background: "var(--bg-surface)",
                         borderRadius: "var(--radius-sm)",
                         overflow: "hidden",
-                        border: isDark ? "1px solid rgba(58, 50, 40, 0.6)" : "1px solid var(--border)",
+                        border: "1px solid var(--border)",
                       }}
                     >
                       <div
@@ -1251,7 +1233,7 @@ export default function ExplainView({ featureList }) {
                           top: 0,
                           bottom: 0,
                           width: "2px",
-                          background: isDark ? "rgba(214, 179, 106, 0.35)" : "var(--accent)",
+                          background: "var(--accent)",
                           zIndex: 2,
                         }}
                       />
@@ -1345,13 +1327,13 @@ export default function ExplainView({ featureList }) {
                 onClick={() => drilldownSession(ep)}
                 style={{
                   background: isSelected
-                    ? (isDark ? "rgba(214, 179, 106, 0.12)" : "var(--accent-soft)")
-                    : (isDark ? "rgba(18, 15, 12, 0.65)" : "var(--bg-raised)"),
+                    ? "var(--accent-soft)"
+                    : "var(--bg-raised)",
                   border: isSelected
-                    ? "1px solid var(--c-gold)"
+                    ? "1px solid var(--accent)"
                     : isThreat
-                      ? (isDark ? "1px solid rgba(201, 74, 69, 0.35)" : "1px solid var(--danger-border)")
-                      : (isDark ? "1px solid var(--border-dark)" : "1px solid var(--border)"),
+                      ? "1px solid var(--danger-border)"
+                      : "1px solid var(--border)",
                   borderRadius: "var(--radius-sm)",
                   padding: "10px 14px",
                   cursor: "pointer",

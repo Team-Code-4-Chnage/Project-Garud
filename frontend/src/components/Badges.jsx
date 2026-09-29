@@ -236,10 +236,10 @@ export const SourceBadge = memo(function SourceBadge({ src }) {
         fontSize: "0.68rem",
         color: cfg.color,
         fontWeight: 600,
-        background: "rgba(58, 50, 40, 0.4)",
+        background: "var(--bg-raised)",
         padding: "2px 6px",
         borderRadius: "var(--radius-sm)",
-        border: "1px solid var(--border-muted)",
+        border: "1px solid var(--border)",
         letterSpacing: "0.04em",
       }}
     >

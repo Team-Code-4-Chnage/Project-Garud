@@ -643,8 +643,8 @@ export default function AlertPanel() {
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
                 width: "100%",
-                background: "var(--c-dark-base)",
-                border: "1px solid var(--border-dark)",
+                background: "var(--bg-inset)",
+                border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
                 padding: "6px 10px 6px 30px",
                 color: "var(--text-primary)",
@@ -1202,8 +1202,8 @@ export default function AlertPanel() {
               {/* Alert Details Strip */}
               <div
                 style={{
-                  background: "var(--c-dark-base)",
-                  border: "1px solid var(--border-dark)",
+                  background: "var(--bg-inset)",
+                  border: "1px solid var(--border)",
                   borderRadius: "var(--radius-sm)",
                   padding: "10px 14px",
                   display: "grid",
@@ -1472,7 +1472,7 @@ export default function AlertPanel() {
                   gap: 12,
                 }}
               >
-                <div className="card" style={{ padding: "10px 14px", background: "var(--c-dark-base)" }}>
+                <div className="card" style={{ padding: "10px 14px", background: "var(--bg-inset)" }}>
                   <div style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>CHAIN INTEGRITY STATUS</div>
                   <div
                     style={{
@@ -1500,14 +1500,14 @@ export default function AlertPanel() {
                   </div>
                 </div>
 
-                <div className="card" style={{ padding: "10px 14px", background: "var(--c-dark-base)" }}>
+                <div className="card" style={{ padding: "10px 14px", background: "var(--bg-inset)" }}>
                   <div style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>TOTAL SEALED BLOCKS</div>
                   <div className="mono" style={{ fontSize: "1.2rem", fontWeight: 700, marginTop: 4 }}>
                     {ledgerStatus?.total_blocks || ledgerBlocks.length}
                   </div>
                 </div>
 
-                <div className="card" style={{ padding: "10px 14px", background: "var(--c-dark-base)" }}>
+                <div className="card" style={{ padding: "10px 14px", background: "var(--bg-inset)" }}>
                   <div style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>GENESIS BLOCK HASH</div>
                   <div
                     className="mono"
@@ -1519,7 +1519,7 @@ export default function AlertPanel() {
                   </div>
                 </div>
 
-                <div className="card" style={{ padding: "10px 14px", background: "var(--c-dark-base)" }}>
+                <div className="card" style={{ padding: "10px 14px", background: "var(--bg-inset)" }}>
                   <div style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>LATEST HEAD HASH</div>
                   <div
                     className="mono"

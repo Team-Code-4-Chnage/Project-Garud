@@ -263,11 +263,11 @@ function CustomForecastTooltip({ active, payload }) {
   return (
     <div
       style={{
-        background: "#181410",
+        background: "var(--bg-popover)",
         border: `1.5px solid ${stageCol}`,
         borderRadius: 4,
         padding: "10px 14px",
-        boxShadow: "0 6px 18px rgba(0, 0, 0, 0.65)",
+        boxShadow: "var(--shadow-popover)",
         minWidth: 190,
       }}
     >
@@ -486,7 +486,7 @@ function NetworkForecastView() {
             alignItems: "center",
             gap: 6,
             padding: "4px 10px",
-            background: "var(--bg-dark)",
+            background: "var(--bg-raised)",
             border: "1px solid var(--border)",
             borderRadius: "var(--radius-sm)",
             color: "var(--text-secondary)",
@@ -611,7 +611,7 @@ function NetworkForecastView() {
         className="panel"
         style={{
           borderLeft: `5px solid ${stateMeta.color}`,
-          background: "var(--bg-panel)",
+          background: "var(--bg-surface)",
           overflow: "hidden",
         }}
       >
@@ -634,7 +634,7 @@ function NetworkForecastView() {
                 width: 44,
                 height: 44,
                 borderRadius: "var(--radius-sm)",
-                background: "var(--bg-dark)",
+                background: "var(--bg-raised)",
                 border: `1.5px solid ${stateMeta.color}`,
                 display: "flex",
                 alignItems: "center",
@@ -665,7 +665,7 @@ function NetworkForecastView() {
                     padding: "2px 8px",
                     borderRadius: "var(--radius-sm)",
                     background: stateMeta.color,
-                    color: "#12100C",
+                    color: "#020E0F",
                     fontWeight: 800,
                     fontSize: "0.68rem",
                   }}
@@ -697,7 +697,7 @@ function NetworkForecastView() {
               display: "flex",
               alignItems: "center",
               gap: 20,
-              background: "var(--bg-dark)",
+              background: "var(--bg-raised)",
               padding: "10px 16px",
               borderRadius: "var(--radius-sm)",
               border: "1px solid var(--border)",
@@ -896,7 +896,7 @@ function NetworkForecastView() {
                       ? `linear-gradient(135deg, ${phaseCol}2e, ${phaseCol}0a)`
                       : isPassed
                         ? `${phaseCol}14`
-                        : "var(--bg-dark)",
+                        : "var(--bg-raised)",
                     border: isCurrent
                       ? `1.5px solid ${phaseCol}`
                       : isPassed
@@ -1090,23 +1090,23 @@ function NetworkForecastView() {
               </defs>
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="#3A3228"
+                stroke="var(--border)"
                 opacity={0.6}
               />
               <XAxis
                 dataKey="minute"
-                tick={{ fontSize: 10, fill: "#B8B0A3" }}
-                stroke="#3A3228"
+                tick={{ fontSize: 10, fill: "var(--text-muted)" }}
+                stroke="var(--border)"
               />
               <YAxis
                 domain={[0, 1]}
                 tickFormatter={(v) => `${Math.round(v * 100)}%`}
-                tick={{ fontSize: 10, fill: "#B8B0A3" }}
-                stroke="#3A3228"
+                tick={{ fontSize: 10, fill: "var(--text-muted)" }}
+                stroke="var(--border)"
               />
               <Tooltip content={<CustomForecastTooltip />} />
               <Legend
-                wrapperStyle={{ color: "#B8B0A3", fontSize: 11, paddingTop: 8 }}
+                wrapperStyle={{ color: "var(--text-secondary)", fontSize: 11, paddingTop: 8 }}
               />
               <ReferenceLine
                 y={cur.threshold}
@@ -1145,7 +1145,7 @@ function NetworkForecastView() {
                       cy={cy}
                       r={isAlert ? 5.5 : 3.5}
                       fill={col}
-                      stroke="#12100C"
+                      stroke="var(--bg-surface)"
                       strokeWidth={1.5}
                     />
                   );
@@ -1161,7 +1161,7 @@ function NetworkForecastView() {
                 dot={{
                   r: 4.5,
                   fill: "#C94A45",
-                  stroke: "#1A1610",
+                  stroke: "var(--bg-surface)",
                   strokeWidth: 1.5,
                 }}
                 connectNulls={false}
@@ -1186,7 +1186,7 @@ function NetworkForecastView() {
                       cy={cy}
                       r={4}
                       fill={col}
-                      stroke="#12100C"
+                      stroke="var(--bg-surface)"
                       strokeWidth={1.5}
                     />
                   );
@@ -1488,7 +1488,7 @@ function NetworkForecastView() {
           >
             <div
               style={{
-                background: "var(--bg-dark)",
+                background: "var(--bg-raised)",
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
                 padding: "12px 14px",
@@ -1525,7 +1525,7 @@ function NetworkForecastView() {
 
             <div
               style={{
-                background: "var(--bg-dark)",
+                background: "var(--bg-raised)",
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
                 padding: "12px 14px",
@@ -1562,7 +1562,7 @@ function NetworkForecastView() {
 
             <div
               style={{
-                background: "var(--bg-dark)",
+                background: "var(--bg-raised)",
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
                 padding: "12px 14px",
@@ -1599,7 +1599,7 @@ function NetworkForecastView() {
 
             <div
               style={{
-                background: "var(--bg-dark)",
+                background: "var(--bg-raised)",
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
                 padding: "12px 14px",
@@ -1687,7 +1687,7 @@ function NetworkForecastView() {
                           padding: "2px 6px",
                           borderRadius: 3,
                           background: "var(--severity-low)",
-                          color: "#12100C",
+                          color: "#020E0F",
                           fontWeight: 800,
                         }}
                       >
@@ -1720,7 +1720,7 @@ function NetworkForecastView() {
           <div
             style={{
               padding: "12px 14px",
-              background: "var(--bg-dark)",
+              background: "var(--bg-raised)",
               border: "1px solid var(--border)",
               borderRadius: "var(--radius-sm)",
             }}

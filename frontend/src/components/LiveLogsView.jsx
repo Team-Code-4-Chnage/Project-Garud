@@ -210,8 +210,8 @@ function LiveLogsView({
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
                 width: "100%",
-                background: "var(--c-dark-base)",
-                border: "1px solid var(--border-dark)",
+                background: "var(--bg-inset)",
+                border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
                 padding: "3px 8px 3px 24px",
                 color: "var(--text-primary)",
@@ -268,8 +268,8 @@ function LiveLogsView({
           alignItems: "center",
           gap: 6,
           padding: "6px 12px",
-          background: "rgba(26, 22, 16, 0.95)",
-          borderBottom: "1px solid var(--border-dark)",
+          background: "var(--bg-surface)",
+          borderBottom: "1px solid var(--border)",
           overflowX: "auto",
           fontSize: "0.72rem",
           fontFamily: "var(--font-mono)",
@@ -351,7 +351,7 @@ function LiveLogsView({
                 borderRadius: "var(--radius-sm)",
                 background: isActive ? c.color : "transparent",
                 color: isActive ? "#010B0C" : c.color,
-                border: `1px solid ${isActive ? c.color : "rgba(184, 176, 163, 0.2)"}`,
+                border: `1px solid ${isActive ? c.color : "var(--border)"}`,
                 fontWeight: 700,
                 fontSize: "0.68rem",
                 cursor: "pointer",
@@ -363,8 +363,8 @@ function LiveLogsView({
               <span
                 style={{
                   background: isActive
-                    ? "rgba(26, 22, 16, 0.3)"
-                    : "rgba(255, 255, 255, 0.08)",
+                    ? "rgba(0, 0, 0, 0.35)"
+                    : "var(--bg-inset)",
                   padding: "1px 5px",
                   borderRadius: 3,
                   fontSize: "0.62rem",
