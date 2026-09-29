@@ -860,8 +860,8 @@ export default function SettingsPanel({
                         : "1px solid var(--border-dark)",
                     background:
                       systemMode === "live"
-                        ? "rgba(88, 166, 104, 0.08)"
-                        : "var(--bg-dark)",
+                        ? "var(--success-soft)"
+                        : "var(--bg-raised)",
                     cursor: "pointer",
                     transition: "all 0.15s ease",
                   }}
@@ -1003,8 +1003,8 @@ export default function SettingsPanel({
                         : "1px solid var(--border-dark)",
                     background:
                       systemMode === "simulated"
-                        ? "rgba(214, 179, 106, 0.08)"
-                        : "var(--bg-dark)",
+                        ? "var(--accent-soft)"
+                        : "var(--bg-raised)",
                     cursor: "pointer",
                     transition: "all 0.15s ease",
                   }}
@@ -1191,8 +1191,8 @@ export default function SettingsPanel({
                         onClick={() => setScenario(sc.id)}
                         style={{
                           background: isSelected
-                            ? "rgba(214, 179, 106, 0.08)"
-                            : "var(--bg-dark)",
+                            ? "var(--accent-soft)"
+                            : "var(--bg-raised)",
                           border: `1px solid ${isSelected ? "var(--c-gold)" : "var(--border-dark)"}`,
                           borderRadius: "var(--radius-sm)",
                           padding: "10px 14px",
@@ -1256,9 +1256,9 @@ export default function SettingsPanel({
                   gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
                   gap: 14,
                   padding: "12px 14px",
-                  background: "var(--bg-dark)",
+                  background: "var(--bg-raised)",
                   borderRadius: "var(--radius-sm)",
-                  border: "1px solid var(--border-dark)",
+                  border: "1px solid var(--border)",
                   marginBottom: 16,
                 }}
               >
@@ -1566,8 +1566,8 @@ export default function SettingsPanel({
                 <div
                   key={f.key}
                   style={{
-                    background: "var(--bg-dark)",
-                    border: "1px solid var(--border-dark)",
+                    background: "var(--bg-raised)",
+                    border: "1px solid var(--border)",
                     borderRadius: "var(--radius-sm)",
                     padding: "10px 12px",
                     display: "flex",

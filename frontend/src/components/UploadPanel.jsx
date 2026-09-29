@@ -201,9 +201,10 @@ export default function UploadPanel() {
                   <div
                     style={{
                       marginTop: "var(--sp-3)",
-                      background: "var(--bg-dark)",
+                      background: "var(--bg-inset)",
+                      border: "1px solid var(--border)",
                       padding: "var(--sp-3)",
-                      borderRadius: "var(--radius)",
+                      borderRadius: "var(--radius-sm)",
                     }}
                   >
                     <span

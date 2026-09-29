@@ -226,7 +226,7 @@ function SessionTable({
               onChange={(e) => setFilterText(e.target.value)}
               style={{
                 width: "100%",
-                background: "var(--bg-dark)",
+                background: "var(--bg-inset)",
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
                 padding: "4px 8px 4px 26px",
@@ -333,8 +333,8 @@ function SessionTable({
                         <span
                           className="mono text-xs"
                           style={{
-                            color: "var(--c-gold)",
-                            background: "var(--bg-dark)",
+                            color: "var(--accent)",
+                            background: "var(--bg-inset)",
                             borderRadius: "var(--radius-sm)",
                             padding: "1px 6px",
                             fontWeight: 700,
