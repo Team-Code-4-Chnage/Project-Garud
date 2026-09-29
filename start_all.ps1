@@ -47,6 +47,13 @@ if ($backendPort) {
 Write-Host ""
 
 # 2. Start Frontend (Port 5173)
+if (-not (Test-Path "$ROOT\frontend\node_modules\leaflet")) {
+    Write-Host "[2/4] Installing missing frontend dependencies..." -ForegroundColor Yellow
+    Push-Location "$ROOT\frontend"
+    npm install --silent
+    Pop-Location
+}
+
 $frontendPort = Get-NetTCPConnection -LocalPort 5173 -State Listen -ErrorAction SilentlyContinue
 if ($frontendPort) {
     Write-Host "[2/4] Frontend is already running on http://localhost:5173" -ForegroundColor Green
