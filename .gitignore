@@ -73,3 +73,7 @@ demo/*.bak
 
 # ─── Render / Cloud deploy (not used for SIH) ──────────────────────────────────
 render.yaml
+
+# ─── AI-generated images / one-off root scripts ─────────────────────────────────
+ChatGPT*.png
+pipeline_fixed.py

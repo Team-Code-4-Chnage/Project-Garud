@@ -128,7 +128,6 @@ def compute_empirical_threat(st_row):
     psh_ratio = float(st_row.get("f_psh_ratio", 0))
     intl_flow_ratio = float(st_row.get("n_intl_flow_ratio", 0))
     outb_bytes = float(st_row.get("n_outbound_bytes", 0))
-    inb_bytes = float(st_row.get("n_inbound_bytes", 0))
     in_out_byte_ratio = float(st_row.get("n_in_out_byte_ratio", 0))
 
     scores = {}

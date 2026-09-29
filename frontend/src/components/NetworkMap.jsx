@@ -691,7 +691,7 @@ export default function NetworkMap({ onSelectSession, height = 310 }) {
     // Clean Directed Flow Edges:
     // Route internal flows through Gateway switch for clean SOC topology
     const displayEdges = [];
-    const internalSet = new Set(internalNodes.map((n) => n.id));
+    const _internalSet = new Set(internalNodes.map((n) => n.id));
     const addedPairs = new Set();
 
     // 1. Internal Hosts -> Gateway
@@ -754,7 +754,7 @@ export default function NetworkMap({ onSelectSession, height = 310 }) {
     });
 
     return { nodeCoords, width, canvasHeight, displayEdges };
-  }, [visibleNodes, viewMode, graphData.edges]);
+  }, [visibleNodes, viewMode, graphData.edges, graphData.nodes]);
 
   const toggleFullscreen = () => {
     setIsFullscreen((prev) => {
