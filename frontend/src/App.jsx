@@ -105,7 +105,10 @@ export default function App() {
             const key = flowKey(data);
             if (seenFlowKeysRef.current.has(key)) return;
             setLiveFlows((prev) => {
-              const next = [{ ...data, _ts: new Date().toISOString() }, ...prev];
+              const next = [
+                { ...data, _ts: new Date().toISOString() },
+                ...prev,
+              ];
               const trimmed = next.length > 500 ? next.slice(0, 500) : next;
               seenFlowKeysRef.current = new Set(trimmed.map(flowKey));
               return trimmed;
@@ -256,7 +259,8 @@ export default function App() {
   const handleStartNewCycle = () => {
     setModalConfig({
       title: "START FRESH CYCLE",
-      message: "Start a fresh cycle? Active sessions and flows will be safely archived to disk.",
+      message:
+        "Start a fresh cycle? Active sessions and flows will be safely archived to disk.",
       confirmLabel: "ARCHIVE & START",
       isDestructive: false,
       onConfirm: async () => {
@@ -373,7 +377,8 @@ export default function App() {
   const handlePurgeSimulated = () => {
     setModalConfig({
       title: "PURGE SIMULATION DATA",
-      message: "Are you sure? This will delete all simulated flows, sessions, and alerts from the database. Live capture data will NOT be touched.",
+      message:
+        "Are you sure? This will delete all simulated flows, sessions, and alerts from the database. Live capture data will NOT be touched.",
       confirmLabel: "PURGE SIMULATION",
       isDestructive: true,
       onConfirm: async () => {
@@ -397,8 +402,6 @@ export default function App() {
       },
     });
   };
-
-
 
   return (
     <div className="garud-app">
@@ -440,7 +443,10 @@ export default function App() {
                   <span className="garud-nav-item-left">
                     <Terminal size={15} /> Live Event Logs
                   </span>
-                  <span className="garud-status-indicator live" style={{ width: 5, height: 5 }} />
+                  <span
+                    className="garud-status-indicator live"
+                    style={{ width: 5, height: 5 }}
+                  />
                 </button>
                 <button
                   className={`garud-nav-item ${view === "alerts" ? "active" : ""}`}
@@ -449,7 +455,9 @@ export default function App() {
                   <span className="garud-nav-item-left">
                     <AlertTriangle size={15} /> Incident Alerts
                   </span>
-                  {alertCount > 0 && <span className="garud-nav-badge">{alertCount}</span>}
+                  {alertCount > 0 && (
+                    <span className="garud-nav-badge">{alertCount}</span>
+                  )}
                 </button>
                 <button
                   className={`garud-nav-item ${view === "network" ? "active" : ""}`}
@@ -513,28 +521,53 @@ export default function App() {
           <div className="garud-system-status-title">SYSTEM STATUS</div>
           <div className="garud-status-row">
             <span className="garud-status-name">
-              <span className={`garud-status-indicator ${captureRunning ? "live" : "idle"}`} />
+              <span
+                className={`garud-status-indicator ${captureRunning ? "live" : "idle"}`}
+              />
               Packet Capture
             </span>
-            <span className="garud-status-val" style={{ color: captureRunning ? "var(--success)" : "var(--text-muted)" }}>
+            <span
+              className="garud-status-val"
+              style={{
+                color: captureRunning ? "var(--success)" : "var(--text-muted)",
+              }}
+            >
               {captureRunning ? "LIVE" : "IDLE"}
             </span>
           </div>
           <div className="garud-status-row">
             <span className="garud-status-name">
-              <span className={`garud-status-indicator ${health?.model_loaded ? "online" : "offline"}`} />
+              <span
+                className={`garud-status-indicator ${health?.model_loaded ? "online" : "offline"}`}
+              />
               Model (LSTM)
             </span>
-            <span className="garud-status-val" style={{ color: health?.model_loaded ? "var(--success)" : "var(--danger)" }}>
+            <span
+              className="garud-status-val"
+              style={{
+                color: health?.model_loaded
+                  ? "var(--success)"
+                  : "var(--danger)",
+              }}
+            >
               {health?.model_loaded ? "ONLINE" : "OFFLINE"}
             </span>
           </div>
           <div className="garud-status-row">
             <span className="garud-status-name">
-              <span className={`garud-status-indicator ${health?.db_connected ? "connected" : "offline"}`} />
+              <span
+                className={`garud-status-indicator ${health?.db_connected ? "connected" : "offline"}`}
+              />
               Database
             </span>
-            <span className="garud-status-val" style={{ color: health?.db_connected ? "var(--success)" : "var(--danger)" }}>
+            <span
+              className="garud-status-val"
+              style={{
+                color: health?.db_connected
+                  ? "var(--success)"
+                  : "var(--danger)",
+              }}
+            >
               {health?.db_connected ? "CONNECTED" : "OFFLINE"}
             </span>
           </div>
@@ -543,16 +576,26 @@ export default function App() {
               <span className="garud-status-indicator ready" />
               MITRE Mapping
             </span>
-            <span className="garud-status-val" style={{ color: "var(--success)" }}>
+            <span
+              className="garud-status-val"
+              style={{ color: "var(--success)" }}
+            >
               READY
             </span>
           </div>
           <div className="garud-status-row">
             <span className="garud-status-name">
-              <span className={`garud-status-indicator ${simulatorRunning ? "live" : "idle"}`} />
+              <span
+                className={`garud-status-indicator ${simulatorRunning ? "live" : "idle"}`}
+              />
               Simulation
             </span>
-            <span className="garud-status-val" style={{ color: simulatorRunning ? "var(--accent)" : "var(--text-muted)" }}>
+            <span
+              className="garud-status-val"
+              style={{
+                color: simulatorRunning ? "var(--accent)" : "var(--text-muted)",
+              }}
+            >
               {simulatorRunning ? "RUNNING" : "IDLE"}
             </span>
           </div>
@@ -580,40 +623,95 @@ export default function App() {
           <div className="garud-header-right">
             {/* Dynamic Live/Simulation mode indicator */}
             {captureRunning ? (
-              <span className="garud-header-chip live-chip" title="Live packet sniffer active — real network data">
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)', display: 'inline-block', animation: 'pulse 1.4s ease-in-out infinite' }} />
+              <span
+                className="garud-header-chip live-chip"
+                title="Live packet sniffer active — real network data"
+              >
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: "var(--success)",
+                    display: "inline-block",
+                    animation: "pulse 1.4s ease-in-out infinite",
+                  }}
+                />
                 LIVE CAPTURE
               </span>
             ) : simulatorRunning ? (
-              <span className="garud-header-chip" title="Traffic simulator active — synthetic data" style={{ color: 'var(--accent)', borderColor: 'var(--accent-border)' }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
+              <span
+                className="garud-header-chip"
+                title="Traffic simulator active — synthetic data"
+                style={{
+                  color: "var(--accent)",
+                  borderColor: "var(--accent-border)",
+                }}
+              >
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: "var(--accent)",
+                    display: "inline-block",
+                  }}
+                />
                 SIMULATION
               </span>
             ) : (
-              <span className="garud-header-chip" title="No active data source" style={{ color: 'var(--text-muted)', borderColor: 'var(--border)' }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--text-muted)', display: 'inline-block' }} />
+              <span
+                className="garud-header-chip"
+                title="No active data source"
+                style={{
+                  color: "var(--text-muted)",
+                  borderColor: "var(--border)",
+                }}
+              >
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: "var(--text-muted)",
+                    display: "inline-block",
+                  }}
+                />
                 STANDBY
               </span>
             )}
 
             {hostIdentity && (
-              <span className="garud-header-chip" title="Protected Host Network">
+              <span
+                className="garud-header-chip"
+                title="Protected Host Network"
+              >
                 <Laptop size={12} color="var(--success)" />
                 <span>Host: {hostIdentity.hostname || "LOCAL"}</span>
-                <span style={{ color: "var(--text-muted)" }}>[{hostIdentity.primary_ip || "127.0.0.1"}]</span>
+                <span style={{ color: "var(--text-muted)" }}>
+                  [{hostIdentity.primary_ip || "127.0.0.1"}]
+                </span>
               </span>
             )}
 
             {currentCycle && (
-              <span className="garud-header-chip" title={`Current Cycle: ${currentCycle.cycle_id}`}>
-                Cycle: #{String(currentCycle.cycle_id || '1').replace(/^cycle_/, '')}
+              <span
+                className="garud-header-chip"
+                title={`Current Cycle: ${currentCycle.cycle_id}`}
+              >
+                Cycle: #
+                {String(currentCycle.cycle_id || "1").replace(/^cycle_/, "")}
               </span>
             )}
 
             {alertCount > 0 && (
               <span
                 className="garud-header-chip"
-                style={{ color: "var(--danger)", borderColor: "var(--danger-border)", cursor: "pointer" }}
+                style={{
+                  color: "var(--danger)",
+                  borderColor: "var(--danger-border)",
+                  cursor: "pointer",
+                }}
                 onClick={() => handleNavClick("alerts")}
               >
                 Alerts: {alertCount}
@@ -655,11 +753,14 @@ export default function App() {
           {view === "dashboard" && (
             <Dashboard
               systemMode={systemMode}
+              liveFlows={liveFlows}
               onSelectSession={onSelectSession}
               onNavigate={handleNavClick}
             />
           )}
-          {(view === "network" || view === "forecast") && <NetworkForecastView />}
+          {(view === "network" || view === "forecast") && (
+            <NetworkForecastView />
+          )}
           {view === "alerts" && <AlertsView />}
           {view === "live_logs" && (
             <LiveLogsView

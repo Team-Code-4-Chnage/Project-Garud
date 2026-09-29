@@ -76,11 +76,15 @@ def build_session_graph(sessions: list[dict[str, Any]]) -> dict[str, Any]:
         prob = float(s.get("latest_risk_score") or s.get("infiltration_probability") or 0.0)
         flow_count = int(s.get("flow_count") or 0)
         session_key = s.get("session_key") or f"{src}->{dst}"
+        app_name = s.get("app_name") or s.get("process_name") or "Network Flow"
+        protocol = s.get("protocol") or "TCP"
+        src_port = s.get("src_port")
+        dst_port = s.get("dst_port")
 
         kill_chain_summary[stage] += 1
 
         # ── Update nodes ──────────────────────────────────────────────────────
-        for ip, role in [(src, "source"), (dst, "destination")]:
+        for ip, role, peer_ip in [(src, "source", dst), (dst, "destination", src)]:
             if ip not in nodes:
                 nodes[ip] = {
                     "id": ip,
@@ -89,9 +93,21 @@ def build_session_graph(sessions: list[dict[str, Any]]) -> dict[str, Any]:
                     "session_count": 0,
                     "max_stage": "Benign",
                     "max_stage_severity": 0,
+                    "apps": set(),
+                    "sessions": [],
                 }
             n = nodes[ip]
             n["session_count"] += 1
+            if app_name and app_name.lower() not in ("unknown", "network flow"):
+                n["apps"].add(app_name)
+            n["sessions"].append({
+                "session_key": session_key,
+                "peer_ip": peer_ip,
+                "stage": stage,
+                "risk": round(prob, 4),
+                "app": app_name,
+                "protocol": protocol,
+            })
             if prob > n["max_risk"]:
                 n["max_risk"] = round(prob, 6)
             if _stage_severity(stage) > n["max_stage_severity"]:
@@ -106,10 +122,20 @@ def build_session_graph(sessions: list[dict[str, Any]]) -> dict[str, Any]:
             "probability": round(prob, 6),
             "session_key": session_key,
             "flow_count": flow_count,
+            "app_name": app_name,
+            "protocol": protocol,
+            "src_port": src_port,
+            "dst_port": dst_port,
         })
 
     node_list = [
-        {**v, "max_risk": round(v["max_risk"], 4)} for v in nodes.values()
+        {
+            **v,
+            "max_risk": round(v["max_risk"], 4),
+            "apps": sorted(list(v["apps"])),
+            "sessions": v["sessions"][:12],  # Keep top recent sessions
+        }
+        for v in nodes.values()
     ]
     high_risk = [n["id"] for n in node_list if n["max_risk"] > 0.7]
 

@@ -87,11 +87,14 @@ def get_host_identity() -> dict:
         if not primary_ip:
             primary_ip = "127.0.0.1"
 
+    from .geoip import get_device_location
+
     return {
         "hostname": hostname,
         "primary_ip": primary_ip,
         "local_ips": sorted(list(local_ips)),
         "interfaces": interfaces,
+        "location": get_device_location(),
     }
 
 

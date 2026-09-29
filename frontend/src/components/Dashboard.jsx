@@ -19,8 +19,12 @@ const KILL_CHAIN_STAGES = [
   { id: "Exfiltration", label: "EXFILTRATION", code: "T1041" },
 ];
 
-export default function Dashboard({ _systemMode = "live", onSelectSession, onNavigate }) {
-
+export default function Dashboard({
+  _systemMode = "live",
+  liveFlows = [],
+  onSelectSession,
+  onNavigate,
+}) {
   // Core Data States
   const [stats, setStats] = useState({});
   const [alertStats, setAlertStats] = useState({});
@@ -76,7 +80,8 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
     if (forecastData?.current?.risk_score != null) {
       return Number(forecastData.current.risk_score);
     }
-    const maxSessionRisk = riskySessions.length > 0 ? (riskySessions[0].latest_risk_score || 0) : 0;
+    const maxSessionRisk =
+      riskySessions.length > 0 ? riskySessions[0].latest_risk_score || 0 : 0;
     return maxSessionRisk;
   }, [forecastData, riskySessions]);
 
@@ -87,7 +92,7 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
     return "Benign";
   }, [forecastData]);
 
-  const isElevated = currentRisk >= (forecastData?.current?.threshold || 0.40);
+  const isElevated = currentRisk >= (forecastData?.current?.threshold || 0.4);
   const activeAlertsCount = alertStats.unacknowledged || alertStats.total || 0;
   const criticalCount = alertStats.critical || 0;
   const warningCount = alertStats.high || alertStats.medium || 0;
@@ -96,9 +101,17 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
   const stageIndex = useMemo(() => {
     const s = String(currentStage).toLowerCase();
     if (s.includes("recon") || s.includes("scan")) return 0;
-    if (s.includes("initial") || s.includes("access") || s.includes("brute") || s.includes("dos") || s.includes("web")) return 1;
+    if (
+      s.includes("initial") ||
+      s.includes("access") ||
+      s.includes("brute") ||
+      s.includes("dos") ||
+      s.includes("web")
+    )
+      return 1;
     if (s.includes("lateral") || s.includes("pivot")) return 2;
-    if (s.includes("c2") || s.includes("bot") || s.includes("command")) return 3;
+    if (s.includes("c2") || s.includes("bot") || s.includes("command"))
+      return 3;
     if (s.includes("exfil") || s.includes("infilt")) return 4;
     return -1; // Benign
   }, [currentStage]);
@@ -163,7 +176,9 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
         {/* Left: Operational Overview / Threat Banner + 4 KPI Strip */}
         <div className="garud-threat-banner">
           {/* Big Threat Status Banner */}
-          <div className={`garud-threat-hero ${isElevated ? "elevated" : "nominal"}`}>
+          <div
+            className={`garud-threat-hero ${isElevated ? "elevated" : "nominal"}`}
+          >
             <div className="garud-threat-left">
               <div className="garud-threat-icon-box">
                 {isElevated ? (
@@ -178,7 +193,8 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
                 </div>
                 <div className="garud-threat-subtitle">
                   {isElevated
-                    ? forecastData?.current?.estimated_time_desc || "Attack progression forecasted in next windows"
+                    ? forecastData?.current?.estimated_time_desc ||
+                      "Attack progression forecasted in next windows"
                     : "Zero malicious velocity detected; baseline network behavior nominal"}
                 </div>
               </div>
@@ -186,9 +202,7 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
 
             <div className="garud-threat-right">
               <div className="garud-threat-score-label">Current Risk Score</div>
-              <div className="garud-threat-score">
-                {currentRisk.toFixed(2)}
-              </div>
+              <div className="garud-threat-score">{currentRisk.toFixed(2)}</div>
               {/* 10-Segment Risk Bar Gauge */}
               <div className="garud-risk-meter">
                 {Array.from({ length: 10 }).map((_, i) => {
@@ -219,9 +233,7 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
                 <span className="garud-kpi-value">
                   {(stats.total_sessions || 0).toLocaleString()}
                 </span>
-                <span className="garud-kpi-trend up">
-                  &uarr; 12%
-                </span>
+                <span className="garud-kpi-trend up">&uarr; 12%</span>
               </div>
             </div>
 
@@ -235,9 +247,7 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
                 <span className="garud-kpi-value">
                   {(stats.total_flows || 0).toLocaleString()}
                 </span>
-                <span className="garud-kpi-trend up">
-                  &uarr; 8%
-                </span>
+                <span className="garud-kpi-trend up">&uarr; 8%</span>
               </div>
             </div>
 
@@ -245,12 +255,24 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
             <div className="garud-kpi-tile">
               <div className="garud-kpi-header">
                 <span className="garud-kpi-label">ACTIVE ALERTS</span>
-                <Bell size={13} color={activeAlertsCount > 0 ? "var(--danger)" : "var(--text-muted)"} />
+                <Bell
+                  size={13}
+                  color={
+                    activeAlertsCount > 0
+                      ? "var(--danger)"
+                      : "var(--text-muted)"
+                  }
+                />
               </div>
               <div className="garud-kpi-val-row">
                 <span
                   className="garud-kpi-value"
-                  style={{ color: activeAlertsCount > 0 ? "var(--danger)" : "var(--success)" }}
+                  style={{
+                    color:
+                      activeAlertsCount > 0
+                        ? "var(--danger)"
+                        : "var(--success)",
+                  }}
                 >
                   {activeAlertsCount}
                 </span>
@@ -269,13 +291,19 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
               <div className="garud-kpi-val-row">
                 <span
                   className="garud-kpi-value"
-                  style={{ color: (stats.at_risk_count || 0) > 0 ? "var(--accent)" : "var(--text-primary)" }}
+                  style={{
+                    color:
+                      (stats.at_risk_count || 0) > 0
+                        ? "var(--accent)"
+                        : "var(--text-primary)",
+                  }}
                 >
-                  {stats.at_risk_count || (riskySessions.filter(s => (s.latest_risk_score || 0) > 0.4).length)}
+                  {stats.at_risk_count ||
+                    riskySessions.filter(
+                      (s) => (s.latest_risk_score || 0) > 0.4,
+                    ).length}
                 </span>
-                <span className="garud-kpi-trend warn">
-                  &uarr; 4
-                </span>
+                <span className="garud-kpi-trend warn">&uarr; 4</span>
               </div>
             </div>
           </div>
@@ -286,9 +314,7 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
           <div className="garud-card-header">
             <div className="garud-card-title-group">
               <div className="garud-card-indicator-bar" />
-              <h2 className="garud-card-title">
-                PREDICTED ATTACK TRAJECTORY
-              </h2>
+              <h2 className="garud-card-title">PREDICTED ATTACK TRAJECTORY</h2>
               <span className="garud-card-subtitle">(MITRE KILL CHAIN)</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -323,15 +349,23 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
                   return (
                     <div key={stg.id} className="garud-stepper-step">
                       {idx < KILL_CHAIN_STAGES.length - 1 && (
-                        <div className={`garud-step-line ${isCompleted ? "completed" : ""}`} />
+                        <div
+                          className={`garud-step-line ${isCompleted ? "completed" : ""}`}
+                        />
                       )}
                       <div
                         className={`garud-step-node ${
-                          isCompleted ? "completed" : isCurrent ? "current" : "predicted"
+                          isCompleted
+                            ? "completed"
+                            : isCurrent
+                              ? "current"
+                              : "predicted"
                         }`}
                       />
                       <span className="garud-step-label">{stg.label}</span>
-                      <span className={`garud-step-status-pill ${pillClass}`}>{statusText}</span>
+                      <span className={`garud-step-status-pill ${pillClass}`}>
+                        {statusText}
+                      </span>
                     </div>
                   );
                 })}
@@ -340,41 +374,60 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
               {/* Trajectory Details Meta */}
               <div className="garud-stepper-details">
                 <div className="garud-stepper-meta-col">
-                  <span className="garud-stepper-meta-label">CURRENT STAGE</span>
+                  <span className="garud-stepper-meta-label">
+                    CURRENT STAGE
+                  </span>
                   <span
                     className="garud-stepper-meta-val"
-                    style={{ color: isElevated ? "var(--danger)" : "var(--success)" }}
+                    style={{
+                      color: isElevated ? "var(--danger)" : "var(--success)",
+                    }}
                   >
                     {currentStage}
                   </span>
                   <span className="garud-stepper-meta-code">
-                    {stageIndex >= 0 ? `${KILL_CHAIN_STAGES[stageIndex].code} Active Operation` : "Nominal Telemetry"}
+                    {stageIndex >= 0
+                      ? `${KILL_CHAIN_STAGES[stageIndex].code} Active Operation`
+                      : "Nominal Telemetry"}
                   </span>
                 </div>
 
                 <div className="garud-stepper-meta-col">
-                  <span className="garud-stepper-meta-label">PREDICTED NEXT STAGE</span>
-                  <span className="garud-stepper-meta-val" style={{ color: "var(--accent)" }}>
-                    {stageIndex >= 0 && stageIndex < KILL_CHAIN_STAGES.length - 1
+                  <span className="garud-stepper-meta-label">
+                    PREDICTED NEXT STAGE
+                  </span>
+                  <span
+                    className="garud-stepper-meta-val"
+                    style={{ color: "var(--accent)" }}
+                  >
+                    {stageIndex >= 0 &&
+                    stageIndex < KILL_CHAIN_STAGES.length - 1
                       ? KILL_CHAIN_STAGES[stageIndex + 1].label
                       : stageIndex === KILL_CHAIN_STAGES.length - 1
-                      ? "Breach Complete"
-                      : "Nominal Baseline"}
+                        ? "Breach Complete"
+                        : "Nominal Baseline"}
                   </span>
                   <span className="garud-stepper-meta-code">
-                    {stageIndex >= 0 && stageIndex < KILL_CHAIN_STAGES.length - 1
+                    {stageIndex >= 0 &&
+                    stageIndex < KILL_CHAIN_STAGES.length - 1
                       ? `${KILL_CHAIN_STAGES[stageIndex + 1].code} Remote Services`
                       : "No attack anticipated"}
                   </span>
                 </div>
 
                 <div className="garud-stepper-meta-col">
-                  <span className="garud-stepper-meta-label">EST. TIME TO ATTACK</span>
+                  <span className="garud-stepper-meta-label">
+                    EST. TIME TO ATTACK
+                  </span>
                   <span className="garud-stepper-meta-val">
-                    {forecastData?.current?.estimated_time_to_attack || "Stable (Nominal)"}
+                    {forecastData?.current?.estimated_time_to_attack ||
+                      "Stable (Nominal)"}
                   </span>
                   <span className="garud-stepper-meta-code">
-                    CONFIDENCE: {forecastData?.current?.risk_score != null ? `${Math.round(currentRisk * 100)}%` : "82%"}
+                    CONFIDENCE:{" "}
+                    {forecastData?.current?.risk_score != null
+                      ? `${Math.round(currentRisk * 100)}%`
+                      : "82%"}
                   </span>
                 </div>
               </div>
@@ -388,21 +441,26 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
           ============================================================ */}
       <div className="garud-hero-row">
         {/* Left: Hero Forecast Chart */}
-        <ForecastChart forecastData={forecastData} onSelectSession={onSelectSession} />
+        <ForecastChart
+          forecastData={forecastData}
+          onSelectSession={onSelectSession}
+        />
 
         {/* Right: Live Network Map */}
         <div className="garud-card" style={{ flex: 1, minWidth: 0 }}>
           <div className="garud-card-header">
             <div className="garud-card-title-group">
               <div className="garud-card-indicator-bar info" />
-              <h2 className="garud-card-title">
-                LIVE NETWORK MAP
-              </h2>
+              <h2 className="garud-card-title">LIVE NETWORK MAP</h2>
               <span className="garud-card-subtitle">(ACTIVE FLOWS)</span>
             </div>
           </div>
           <div className="garud-card-body" style={{ padding: 0 }}>
-            <NetworkMap onSelectSession={onSelectSession} height={280} />
+            <NetworkMap
+              liveFlows={liveFlows}
+              onSelectSession={onSelectSession}
+              height={280}
+            />
           </div>
         </div>
       </div>
@@ -446,13 +504,21 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
                 <tbody>
                   {recentAlerts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: "center", padding: "24px 0", color: "var(--text-muted)" }}>
+                      <td
+                        colSpan={6}
+                        style={{
+                          textAlign: "center",
+                          padding: "24px 0",
+                          color: "var(--text-muted)",
+                        }}
+                      >
                         No unacknowledged alerts. Network defense nominal.
                       </td>
                     </tr>
                   ) : (
                     recentAlerts.slice(0, 5).map((alert, idx) => {
-                      const alertRisk = alert.risk_score != null ? alert.risk_score : 0.65;
+                      const alertRisk =
+                        alert.risk_score != null ? alert.risk_score : 0.65;
                       const isHigh = alertRisk >= 0.7;
                       return (
                         <tr
@@ -460,23 +526,42 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
                           className={isHigh ? "active-row" : ""}
                         >
                           <td style={{ color: "var(--text-secondary)" }}>
-                            {alert.timestamp ? new Date(alert.timestamp).toLocaleTimeString() : "03:56:11"}
+                            {alert.timestamp
+                              ? new Date(alert.timestamp).toLocaleTimeString()
+                              : "03:56:11"}
                           </td>
-                          <td style={{ fontWeight: 600, color: isHigh ? "var(--danger)" : "var(--accent)" }}>
+                          <td
+                            style={{
+                              fontWeight: 600,
+                              color: isHigh ? "var(--danger)" : "var(--accent)",
+                            }}
+                          >
                             {alert.stage || "Reconnaissance"}
                           </td>
                           <td title={`${alert.src_ip} -> ${alert.dst_ip}`}>
-                            {alert.src_ip ? `${alert.src_ip.substring(0, 12)}…` : "192.168.0.29"} &rarr;{" "}
-                            {alert.dst_ip ? `${alert.dst_ip.substring(0, 12)}…` : "23.55.244.120"}
+                            {alert.src_ip
+                              ? `${alert.src_ip.substring(0, 12)}…`
+                              : "192.168.0.29"}{" "}
+                            &rarr;{" "}
+                            {alert.dst_ip
+                              ? `${alert.dst_ip.substring(0, 12)}…`
+                              : "23.55.244.120"}
                           </td>
                           <td style={{ color: "var(--text-secondary)" }}>
                             {alert.application || "Unknown"}
                           </td>
-                          <td style={{ fontWeight: 700, color: isHigh ? "var(--danger)" : "var(--accent)" }}>
+                          <td
+                            style={{
+                              fontWeight: 700,
+                              color: isHigh ? "var(--danger)" : "var(--accent)",
+                            }}
+                          >
                             {alertRisk.toFixed(2)}
                           </td>
                           <td>
-                            <span className={`garud-pill ${isHigh ? "active" : "monitor"}`}>
+                            <span
+                              className={`garud-pill ${isHigh ? "active" : "monitor"}`}
+                            >
                               {isHigh ? "ACTIVE" : "MONITOR"}
                             </span>
                           </td>
@@ -495,9 +580,7 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
           <div className="garud-card-header">
             <div className="garud-card-title-group">
               <div className="garud-card-indicator-bar" />
-              <h2 className="garud-card-title">
-                TOP PREDICTED-RISK FLOWS
-              </h2>
+              <h2 className="garud-card-title">TOP PREDICTED-RISK FLOWS</h2>
             </div>
           </div>
           <div className="garud-card-body">
@@ -533,7 +616,11 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
                     key={`risk-flow-${idx}`}
                     className="garud-risk-flow-item"
                     style={{ cursor: "pointer" }}
-                    onClick={() => item.session && onSelectSession && onSelectSession(item.session)}
+                    onClick={() =>
+                      item.session &&
+                      onSelectSession &&
+                      onSelectSession(item.session)
+                    }
                   >
                     <span className="garud-risk-flow-ip" title={item.key}>
                       {item.key}
@@ -543,17 +630,25 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
                         className="garud-risk-flow-bar"
                         style={{
                           width: `${Math.round(riskVal * 100)}%`,
-                          background: isThreat ? "var(--danger)" : "var(--accent)",
+                          background: isThreat
+                            ? "var(--danger)"
+                            : "var(--accent)",
                         }}
                       />
                     </div>
                     <span
                       className="garud-risk-flow-val"
-                      style={{ color: isThreat ? "var(--danger)" : "var(--accent)" }}
+                      style={{
+                        color: isThreat ? "var(--danger)" : "var(--accent)",
+                      }}
                     >
                       {riskVal.toFixed(2)}
                     </span>
-                    <span style={{ color: isThreat ? "var(--danger)" : "var(--success)" }}>
+                    <span
+                      style={{
+                        color: isThreat ? "var(--danger)" : "var(--success)",
+                      }}
+                    >
                       {isThreat ? "↗" : "↘"}
                     </span>
                   </div>
@@ -568,9 +663,7 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
           <div className="garud-card-header">
             <div className="garud-card-title-group">
               <div className="garud-card-indicator-bar" />
-              <h2 className="garud-card-title">
-                FEATURE CONTRIBUTION
-              </h2>
+              <h2 className="garud-card-title">FEATURE CONTRIBUTION</h2>
             </div>
             {onNavigate && (
               <button
@@ -582,11 +675,17 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
               </button>
             )}
           </div>
-          <div className="garud-card-body" style={{ justifyContent: "space-between" }}>
+          <div
+            className="garud-card-body"
+            style={{ justifyContent: "space-between" }}
+          >
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {featureContributions.map((feat, idx) => {
                 const isPos = feat.direction === "positive";
-                const barWidth = Math.min(Math.round(Math.abs(feat.val) * 350), 100);
+                const barWidth = Math.min(
+                  Math.round(Math.abs(feat.val) * 350),
+                  100,
+                );
                 return (
                   <div key={`feat-${idx}`} className="garud-feature-row">
                     <span className="garud-feature-name" title={feat.name}>
@@ -598,8 +697,12 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
                         style={{ width: `${barWidth}%` }}
                       />
                     </div>
-                    <span className={`garud-feature-score ${isPos ? "positive" : "negative"}`}>
-                      {feat.val >= 0 ? `+${feat.val.toFixed(3)}` : feat.val.toFixed(3)}
+                    <span
+                      className={`garud-feature-score ${isPos ? "positive" : "negative"}`}
+                    >
+                      {feat.val >= 0
+                        ? `+${feat.val.toFixed(3)}`
+                        : feat.val.toFixed(3)}
                     </span>
                   </div>
                 );
@@ -623,7 +726,8 @@ export default function Dashboard({ _systemMode = "live", onSelectSession, onNav
             >
               <Info size={14} color="var(--accent)" style={{ flexShrink: 0 }} />
               <span>
-                Top contributing features based on real attribution from the world model.
+                Top contributing features based on real attribution from the
+                world model.
               </span>
             </div>
           </div>

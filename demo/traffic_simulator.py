@@ -49,10 +49,18 @@ FLOW_FEATURES = [
 ]
 
 SRC_IPS = [
-    "10.0.1.23", "10.0.1.45", "10.0.1.78", "192.168.1.105", "172.16.0.15",
+    "185.220.101.5",   # External Tor / Adversary Scanner (Frankfurt, Germany)
+    "194.26.29.112",   # External Brute Force Origin (Amsterdam, Netherlands)
+    "45.33.32.156",    # External C2 Server (Dallas, USA)
+    "192.168.0.24",    # Defended Internal Host (Pune NOC, India)
+    "10.0.1.45",       # Internal Asset (Pune NOC, India)
 ]
 DST_IPS = [
-    "10.0.2.100", "10.0.2.50", "192.168.1.200", "172.16.0.50", "203.0.113.80",
+    "192.168.0.24",    # Defended Primary Host (Pune, India)
+    "10.0.1.45",       # Internal Server (Pune, India)
+    "45.33.32.156",    # External C2 Server (Dallas, USA)
+    "198.51.100.88",   # External Exfiltration Drop (Frankfurt, Germany)
+    "104.199.241.202", # External Web/Cloud Endpoint (San Francisco, USA)
 ]
 
 RECON_PORTS = [
@@ -238,8 +246,28 @@ def run_simulator(api_url: str, speed: float, session_count: int, scenario: str,
                 flow = pool.get_flow(current_stage)
                 sport, dport, proto = get_ports_for_stage(current_stage, step_idx)
 
-                flow["src_ip"] = session["src_ip"]
-                flow["dst_ip"] = session["dst_ip"]
+                # Route IPs based on MITRE kill-chain progression:
+                if current_stage == "Reconnaissance":
+                    flow_src = "185.220.101.5"      # Frankfurt Adversary Scanner
+                    flow_dst = "192.168.0.24"       # Pune Defender NOC
+                elif current_stage == "Initial Access":
+                    flow_src = "194.26.29.112"      # Amsterdam Brute Force Origin
+                    flow_dst = "192.168.0.24"       # Pune Defender NOC
+                elif current_stage == "Lateral Movement":
+                    flow_src = "192.168.0.24"       # Compromised Host in Pune
+                    flow_dst = "10.0.1.45"          # Internal Database Target in Pune
+                elif current_stage == "C2":
+                    flow_src = "192.168.0.24"       # Compromised Host
+                    flow_dst = "45.33.32.156"       # Dallas C2 Controller
+                elif current_stage == "Exfiltration":
+                    flow_src = "192.168.0.24"       # Data Egress Host
+                    flow_dst = "198.51.100.88"      # Zurich / Frankfurt Drop Server
+                else:  # Benign nominal traffic
+                    flow_src = "192.168.0.24"
+                    flow_dst = "104.199.241.202" if (step_idx % 2 == 0) else "34.54.84.110"
+
+                flow["src_ip"] = flow_src
+                flow["dst_ip"] = flow_dst
                 flow["src_port"] = sport
                 flow["dst_port"] = dport
                 flow["protocol"] = proto

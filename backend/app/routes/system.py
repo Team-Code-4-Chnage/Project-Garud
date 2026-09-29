@@ -682,6 +682,32 @@ async def get_archived_cycle_detail(cycle_id: str):
         raise HTTPException(status_code=500, detail=f"Error reading cycle: {e}")
 
 
+class DeviceLocationPayload(BaseModel):
+    latitude: float
+    longitude: float
+    city: Optional[str] = None
+    region: Optional[str] = None
+    country: Optional[str] = None
+    country_code: Optional[str] = None
+    flag: Optional[str] = None
+
+
+@router.post("/device-location")
+async def set_device_location(loc: DeviceLocationPayload):
+    """Dynamically set the device's live location from browser GPS / IP resolution."""
+    from ..geoip import update_device_location, get_device_location
+    update_device_location(
+        lat=loc.latitude,
+        lon=loc.longitude,
+        city=loc.city,
+        region=loc.region,
+        country=loc.country,
+        country_code=loc.country_code,
+        flag=loc.flag,
+    )
+    return {"status": "updated", "location": get_device_location()}
+
+
 @router.get("/host-identity")
 async def get_host_network_identity():
     """Retrieve local machine hostname, active adapters, and local IPs."""
