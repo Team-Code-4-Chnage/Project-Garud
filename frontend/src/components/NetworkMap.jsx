@@ -1983,50 +1983,6 @@ export default function NetworkMap({
               <Network size={12} /> TOPOLOGY
             </button>
           </div>
-
-          {/* Quick Simulation Trigger Pill */}
-          {systemMode === "simulated" || simulating ? (
-            <button
-              onClick={handleStopSimulation}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "3px 9px",
-                background: "rgba(246, 69, 65, 0.18)",
-                border: "1px solid #F64541",
-                borderRadius: "var(--radius-sm)",
-                color: "#F64541",
-                cursor: "pointer",
-                fontWeight: 700,
-                fontSize: "0.66rem",
-              }}
-              title="Stop simulation and return to live packet capture"
-            >
-              <Activity size={11} className="pulse-fast" /> SIMULATING KILL
-              CHAIN &bull; [STOP]
-            </button>
-          ) : (
-            <button
-              onClick={() => handleTriggerSimulation("full_kill_chain")}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "3px 9px",
-                background: "rgba(246, 177, 68, 0.15)",
-                border: "1px solid #F6B144",
-                borderRadius: "var(--radius-sm)",
-                color: "#F6B144",
-                cursor: "pointer",
-                fontWeight: 700,
-                fontSize: "0.66rem",
-              }}
-              title="Launch dataset-grounded APT kill chain from external adversary IPs"
-            >
-              <Play size={10} fill="#F6B144" /> SIMULATE KILL CHAIN
-            </button>
-          )}
         </div>
 
         {/* Center: Search Box */}

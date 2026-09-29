@@ -77,3 +77,4 @@ render.yaml
 # ─── AI-generated images / one-off root scripts ─────────────────────────────────
 ChatGPT*.png
 pipeline_fixed.py
+backend/data/forecaster.db-journal
