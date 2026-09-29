@@ -1,25 +1,24 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Activity,
   AlertTriangle,
   Upload,
-  Eye,
   MonitorDot,
   Settings,
   BarChart3,
   Terminal,
-  Wifi,
   Laptop,
   RotateCcw,
   HeartPulse,
   Network,
   Menu,
   X,
+  HelpCircle,
 } from "lucide-react";
 import EagleIcon from "./components/EagleIcon";
 import { apiFetch, apiPost, createWebSocket } from "./api";
-import { formatTime, flowKey } from "./utils";
+import { flowKey } from "./utils";
 import { WellbeingModal } from "./components/Badges";
+import ConfirmModal from "./components/ConfirmModal";
 import Dashboard from "./components/Dashboard";
 import NetworkForecastView from "./components/NetworkForecastView";
 import { AlertsView } from "./components/AlertPanel";
@@ -48,6 +47,7 @@ export default function App() {
   const [hostIdentity, setHostIdentity] = useState(null);
   const [currentCycle, setCurrentCycle] = useState(null);
   const [wellbeingOpen, setWellbeingOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState(null);
 
   const handleNavClick = (newView) => {
     setView(newView);
@@ -152,12 +152,10 @@ export default function App() {
   const handleClearLiveLogs = useCallback(() => {
     setLiveFlows([]);
     seenFlowKeysRef.current = new Set();
-    sessionStorage.setItem("garud_logs_cleared_at", new Date().toISOString());
   }, []);
 
   const handleReloadRecentLogs = useCallback(async () => {
     try {
-      sessionStorage.removeItem("garud_logs_cleared_at");
       const recent = await apiFetch("/flows/recent?limit=100");
       if (Array.isArray(recent) && recent.length > 0) {
         setLiveFlows(recent);
@@ -169,10 +167,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // If the operator explicitly cleared logs in this session, keep it cleared
-    const clearedAt = sessionStorage.getItem("garud_logs_cleared_at");
-    if (clearedAt) return;
-
     apiFetch("/flows/recent?limit=100")
       .then((recent) => {
         if (Array.isArray(recent) && recent.length > 0) {
@@ -200,6 +194,12 @@ export default function App() {
           setSimulatorRunning(m.simulator_running);
         if (typeof m?.capture_running === "boolean")
           setCaptureRunning(m.capture_running);
+        // Automatically ensure live packet capture is running by default in live mode
+        if (m?.mode === "live" && !m?.capture_running) {
+          apiPost("/system/capture/start", {})
+            .then(() => setCaptureRunning(true))
+            .catch(() => {});
+        }
       })
       .catch(() => {});
   }, []);
@@ -253,24 +253,34 @@ export default function App() {
     return () => clearInterval(iv);
   }, [fetchSystemMode, fetchHostAndCycle]);
 
-  const handleStartNewCycle = async () => {
-    if (
-      !window.confirm(
-        "Start a fresh cycle? Active sessions and flows will be safely archived to disk.",
-      )
-    ) {
-      return;
-    }
-    try {
-      const res = await apiPost("/system/cycle/start", {});
-      setLiveFlows([]);
-      fetchHostAndCycle();
-      alert(
-        `Archived ${res.archived_flows} flows (${res.archived_sessions} sessions). Fresh cycle started!`,
-      );
-    } catch (e) {
-      alert(e.message || "Failed to start new cycle");
-    }
+  const handleStartNewCycle = () => {
+    setModalConfig({
+      title: "START FRESH CYCLE",
+      message: "Start a fresh cycle? Active sessions and flows will be safely archived to disk.",
+      confirmLabel: "ARCHIVE & START",
+      isDestructive: false,
+      onConfirm: async () => {
+        try {
+          const res = await apiPost("/system/cycle/start", {});
+          setLiveFlows([]);
+          fetchHostAndCycle();
+          setModalConfig({
+            title: "CYCLE STARTED",
+            message: `Archived ${res.archived_flows} flows (${res.archived_sessions} sessions). Fresh cycle started!`,
+            confirmLabel: "CLOSE",
+            isAlert: true,
+          });
+        } catch (e) {
+          setModalConfig({
+            title: "CYCLE ERROR",
+            message: e.message || "Failed to start new cycle",
+            confirmLabel: "CLOSE",
+            isAlert: true,
+            isDestructive: true,
+          });
+        }
+      },
+    });
   };
 
   const handleToggleMode = async (newMode) => {
@@ -299,7 +309,13 @@ export default function App() {
       }
       return res;
     } catch (e) {
-      alert(e.message || "Failed to start live capture");
+      setModalConfig({
+        title: "CAPTURE NOTICE",
+        message: e.message || "Failed to start live capture",
+        confirmLabel: "CLOSE",
+        isAlert: true,
+        isDestructive: true,
+      });
       throw e;
     }
   };
@@ -309,7 +325,13 @@ export default function App() {
       await apiPost("/system/capture/stop", {});
       setCaptureRunning(false);
     } catch (e) {
-      alert(e.message || "Failed to stop live capture");
+      setModalConfig({
+        title: "CAPTURE NOTICE",
+        message: e.message || "Failed to stop live capture",
+        confirmLabel: "CLOSE",
+        isAlert: true,
+        isDestructive: true,
+      });
     }
   };
 
@@ -322,7 +344,13 @@ export default function App() {
       }
       return res;
     } catch (e) {
-      alert(e.message || "Failed to start simulator");
+      setModalConfig({
+        title: "SIMULATOR NOTICE",
+        message: e.message || "Failed to start simulator",
+        confirmLabel: "CLOSE",
+        isAlert: true,
+        isDestructive: true,
+      });
       throw e;
     }
   };
@@ -332,371 +360,366 @@ export default function App() {
       await apiPost("/system/simulator/stop", {});
       setSimulatorRunning(false);
     } catch (e) {
-      alert(e.message || "Failed to stop simulator");
+      setModalConfig({
+        title: "SIMULATOR NOTICE",
+        message: e.message || "Failed to stop simulator",
+        confirmLabel: "CLOSE",
+        isAlert: true,
+        isDestructive: true,
+      });
     }
   };
 
-  const handlePurgeSimulated = async () => {
-    if (
-      !window.confirm(
-        "Are you sure? This will delete all simulated flows, sessions, and alerts from the database. Live capture data will NOT be touched.",
-      )
-    ) {
-      return;
-    }
-    try {
-      const res = await apiPost("/system/purge-simulated", {});
-      alert(
-        `Purged ${res.deleted_flows} simulated flows, ${res.deleted_sessions} sessions, and ${res.deleted_alerts} alerts.`,
-      );
-    } catch (e) {
-      alert(e.message || "Failed to purge data");
-    }
+  const handlePurgeSimulated = () => {
+    setModalConfig({
+      title: "PURGE SIMULATION DATA",
+      message: "Are you sure? This will delete all simulated flows, sessions, and alerts from the database. Live capture data will NOT be touched.",
+      confirmLabel: "PURGE SIMULATION",
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          const res = await apiPost("/system/purge-simulated", {});
+          setModalConfig({
+            title: "PURGE COMPLETE",
+            message: `Purged ${res.deleted_flows} simulated flows, ${res.deleted_sessions} sessions, and ${res.deleted_alerts} alerts.`,
+            confirmLabel: "CLOSE",
+            isAlert: true,
+          });
+        } catch (e) {
+          setModalConfig({
+            title: "PURGE FAILED",
+            message: e.message || "Failed to purge data",
+            confirmLabel: "CLOSE",
+            isAlert: true,
+            isDestructive: true,
+          });
+        }
+      },
+    });
   };
 
-  const viewLabels = {
-    dashboard: "Dashboard",
-    live_logs: "Live Event Stream",
-    alerts: "Incident Alerts",
-    network: "Network Forecast",
-    explain: "Explainable AI (XAI)",
-    reports: "Forensic Audit Reports",
-    ingest: "Telemetry Ingestion",
-    settings: "Settings & Simulation Lab",
-  };
 
-  const systemStatus =
-    health?.status === "ok"
-      ? "nominal"
-      : health?.status === "offline"
-        ? "offline"
-        : "degraded";
 
   return (
-    <div className="app-layout">
+    <div className="garud-app">
       {mobileMenuOpen && (
         <div
-          className="sidebar-backdrop"
+          className="garud-drawer-backdrop"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
-      <nav className={`sidebar ${mobileMenuOpen ? "mobile-open" : ""}`}>
-        <div className="sidebar-brand">
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 4,
-            }}
-          >
-            <EagleIcon size={22} color="var(--c-gold)" />
-            <h1>PROJECT GARUD</h1>
+
+      {/* Sidebar */}
+      <nav className={`garud-sidebar ${mobileMenuOpen ? "mobile-open" : ""}`}>
+        <div>
+          <div className="garud-sidebar-brand">
+            <div className="garud-brand-title">
+              <EagleIcon size={20} color="var(--accent)" />
+              <span>PROJECT GARUD</span>
+            </div>
+            <span className="garud-brand-sub">PS26153 &bull; INDIA</span>
+            <span className="garud-brand-desc">AI ATTACK FORECASTING SOC</span>
           </div>
-          <span>GOVERNMENT OF INDIA &bull; PS26153</span>
-          <span
-            style={{
-              color: "var(--c-gold)",
-              fontSize: "0.72rem",
-              fontWeight: 800,
-              letterSpacing: "0.04em",
-              marginTop: 2,
-            }}
-          >
-            CYBER ATTACK WORLD MODEL &bull; EARLY WARNING SOC
-          </span>
+
+          <div className="garud-nav-scroll">
+            <div>
+              <div className="garud-nav-group-label">SYSTEM MODULES</div>
+              <div className="garud-nav-list">
+                <button
+                  className={`garud-nav-item ${view === "dashboard" ? "active" : ""}`}
+                  onClick={() => handleNavClick("dashboard")}
+                >
+                  <span className="garud-nav-item-left">
+                    <MonitorDot size={15} /> Dashboard
+                  </span>
+                </button>
+                <button
+                  className={`garud-nav-item ${view === "live_logs" ? "active" : ""}`}
+                  onClick={() => handleNavClick("live_logs")}
+                >
+                  <span className="garud-nav-item-left">
+                    <Terminal size={15} /> Live Event Logs
+                  </span>
+                  <span className="garud-status-indicator live" style={{ width: 5, height: 5 }} />
+                </button>
+                <button
+                  className={`garud-nav-item ${view === "alerts" ? "active" : ""}`}
+                  onClick={() => handleNavClick("alerts")}
+                >
+                  <span className="garud-nav-item-left">
+                    <AlertTriangle size={15} /> Incident Alerts
+                  </span>
+                  {alertCount > 0 && <span className="garud-nav-badge">{alertCount}</span>}
+                </button>
+                <button
+                  className={`garud-nav-item ${view === "network" ? "active" : ""}`}
+                  onClick={() => handleNavClick("network")}
+                >
+                  <span className="garud-nav-item-left">
+                    <Network size={15} /> Network Forecast
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div className="garud-nav-group-label">THREAT INTELLIGENCE</div>
+              <div className="garud-nav-list">
+                <button
+                  className={`garud-nav-item ${view === "explain" ? "active" : ""}`}
+                  onClick={() => handleNavClick("explain")}
+                >
+                  <span className="garud-nav-item-left">
+                    <HelpCircle size={15} /> Explain
+                  </span>
+                </button>
+                <button
+                  className={`garud-nav-item ${view === "reports" ? "active" : ""}`}
+                  onClick={() => handleNavClick("reports")}
+                >
+                  <span className="garud-nav-item-left">
+                    <BarChart3 size={15} /> Forensic Reports
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div className="garud-nav-group-label">DATA & TELEMETRY</div>
+              <div className="garud-nav-list">
+                <button
+                  className={`garud-nav-item ${view === "ingest" ? "active" : ""}`}
+                  onClick={() => handleNavClick("ingest")}
+                >
+                  <span className="garud-nav-item-left">
+                    <Upload size={15} /> Ingest Captures
+                  </span>
+                </button>
+                <button
+                  className={`garud-nav-item ${view === "settings" ? "active" : ""}`}
+                  onClick={() => handleNavClick("settings")}
+                >
+                  <span className="garud-nav-item-left">
+                    <Settings size={15} /> Settings & Lab
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="nav-section">
-          <div className="nav-label">SYSTEM MODULES</div>
-          <button
-            className={`nav-item ${view === "dashboard" ? "active" : ""}`}
-            onClick={() => handleNavClick("dashboard")}
-          >
-            <MonitorDot size={15} /> Dashboard
-          </button>
-          <button
-            className={`nav-item ${view === "live_logs" ? "active" : ""}`}
-            onClick={() => handleNavClick("live_logs")}
-          >
-            <Terminal size={15} /> Live Event Logs
-            <span className="nav-live-dot" />
-          </button>
-          <button
-            className={`nav-item ${view === "alerts" ? "active" : ""}`}
-            onClick={() => handleNavClick("alerts")}
-          >
-            <AlertTriangle size={15} /> Incident Alerts
-            {alertCount > 0 && <span className="nav-badge">{alertCount}</span>}
-          </button>
-          <button
-            className={`nav-item ${view === "network" ? "active" : ""}`}
-            onClick={() => handleNavClick("network")}
-          >
-            <Network size={15} /> Network Forecast
-          </button>
-        </div>
+        {/* Sidebar Footer with Live System Status */}
+        <div className="garud-sidebar-footer">
+          <div className="garud-system-status-title">SYSTEM STATUS</div>
+          <div className="garud-status-row">
+            <span className="garud-status-name">
+              <span className={`garud-status-indicator ${captureRunning ? "live" : "idle"}`} />
+              Packet Capture
+            </span>
+            <span className="garud-status-val" style={{ color: captureRunning ? "var(--success)" : "var(--text-muted)" }}>
+              {captureRunning ? "LIVE" : "IDLE"}
+            </span>
+          </div>
+          <div className="garud-status-row">
+            <span className="garud-status-name">
+              <span className={`garud-status-indicator ${health?.model_loaded ? "online" : "offline"}`} />
+              Model (LSTM)
+            </span>
+            <span className="garud-status-val" style={{ color: health?.model_loaded ? "var(--success)" : "var(--danger)" }}>
+              {health?.model_loaded ? "ONLINE" : "OFFLINE"}
+            </span>
+          </div>
+          <div className="garud-status-row">
+            <span className="garud-status-name">
+              <span className={`garud-status-indicator ${health?.db_connected ? "connected" : "offline"}`} />
+              Database
+            </span>
+            <span className="garud-status-val" style={{ color: health?.db_connected ? "var(--success)" : "var(--danger)" }}>
+              {health?.db_connected ? "CONNECTED" : "OFFLINE"}
+            </span>
+          </div>
+          <div className="garud-status-row">
+            <span className="garud-status-name">
+              <span className="garud-status-indicator ready" />
+              MITRE Mapping
+            </span>
+            <span className="garud-status-val" style={{ color: "var(--success)" }}>
+              READY
+            </span>
+          </div>
+          <div className="garud-status-row">
+            <span className="garud-status-name">
+              <span className={`garud-status-indicator ${simulatorRunning ? "live" : "idle"}`} />
+              Simulation
+            </span>
+            <span className="garud-status-val" style={{ color: simulatorRunning ? "var(--accent)" : "var(--text-muted)" }}>
+              {simulatorRunning ? "RUNNING" : "IDLE"}
+            </span>
+          </div>
 
-        <div className="nav-section">
-          <div className="nav-label">THREAT INTELLIGENCE</div>
-          <button
-            className={`nav-item ${view === "explain" ? "active" : ""}`}
-            onClick={() => handleNavClick("explain")}
-          >
-            <Eye size={15} /> Explainability (XAI)
-          </button>
-          <button
-            className={`nav-item ${view === "reports" ? "active" : ""}`}
-            onClick={() => handleNavClick("reports")}
-          >
-            <BarChart3 size={15} /> Forensic Reports
-          </button>
-        </div>
-
-        <div className="nav-section">
-          <div className="nav-label">DATA & TELEMETRY</div>
-          <button
-            className={`nav-item ${view === "ingest" ? "active" : ""}`}
-            onClick={() => handleNavClick("ingest")}
-          >
-            <Upload size={15} /> Ingest Captures
-          </button>
-          <button
-            className={`nav-item ${view === "settings" ? "active" : ""}`}
-            onClick={() => handleNavClick("settings")}
-          >
-            <Settings size={15} /> Settings & Lab
-          </button>
-        </div>
-
-        <div className="sidebar-status">
-          <div className="sidebar-status-label">DEFENSE READINESS</div>
-          <div
-            className={`sidebar-status-value ${
-              systemStatus !== "nominal"
-                ? systemStatus
-                : alertCount > 0
-                  ? "critical"
-                  : "nominal"
-            }`}
-          >
-            <span className="status-block">&#9632;</span>
-            {systemStatus === "offline"
-              ? "OFFLINE"
-              : systemStatus === "degraded"
-                ? "DEGRADED"
-                : alertCount > 0
-                  ? `DEFENSE ELEVATED (${alertCount})`
-                  : "DEFENSE NOMINAL"}
+          <div className="garud-sidebar-bottom-meta">
+            <div>GARUD v1.0 &bull; SIH 2026 | PS26153</div>
+            <div>National Security Operational SOC</div>
           </div>
         </div>
       </nav>
 
-      <header className="header">
-        <div className="header-left">
-          <button
-            className="mobile-menu-btn"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle navigation menu"
-          >
-            {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
-          <span
-            className="header-breadcrumb"
-            style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
-          >
-            <EagleIcon size={16} color="var(--c-gold)" />
-            <span>
-              SYSTEM VIEW &rsaquo;{" "}
-              <span className="view-name">
-                {viewLabels[view] || view.toUpperCase()}
-              </span>
+      {/* Main Shell (Header + Viewport) */}
+      <div className="garud-main-shell">
+        <header className="garud-header">
+          <div className="garud-header-left">
+            <button
+              className="garud-mobile-menu-btn"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle navigation menu"
+            >
+              {mobileMenuOpen ? <X size={16} /> : <Menu size={16} />}
+            </button>
+            <div className="garud-search-box">
+              <input
+                type="text"
+                placeholder="Search IP, application, stage..."
+                aria-label="Search telemetry"
+              />
+              <span className="garud-kbd-chip">Ctrl + K</span>
+            </div>
+          </div>
+
+          <div className="garud-header-right">
+            <span className="garud-header-chip live-chip">
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
+              LIVE
             </span>
-          </span>
-        </div>
-        <div className="header-right">
-          {hostIdentity && (
-            <div
-              className="host-badge-chip"
-              title={`Protected Host Network Adapters: ${hostIdentity.interfaces?.map((i) => `${i.name} (${i.ip})`).join(", ")}`}
-              style={{ cursor: "default", userSelect: "none" }}
-            >
-              <Laptop size={12} color="var(--severity-low)" />
+
+            {hostIdentity && (
+              <span className="garud-header-chip" title="Protected Host Network">
+                <Laptop size={12} color="var(--success)" />
+                <span>Host: {hostIdentity.hostname || "LOCAL"}</span>
+                <span style={{ color: "var(--text-muted)" }}>[{hostIdentity.primary_ip || "127.0.0.1"}]</span>
+              </span>
+            )}
+
+            {currentCycle && (
+              <span className="garud-header-chip" title={`Current Cycle: ${currentCycle.cycle_id}`}>
+                Cycle: #{String(currentCycle.cycle_id || '1').replace(/^cycle_/, '')}
+              </span>
+            )}
+
+            <span className="garud-header-chip">
+              Model: LSTM World Model
+            </span>
+
+            {alertCount > 0 && (
               <span
-                style={{
-                  color: "var(--text-muted)",
-                  fontSize: "0.68rem",
-                  fontWeight: 700,
-                }}
+                className="garud-header-chip"
+                style={{ color: "var(--danger)", borderColor: "var(--danger-border)", cursor: "pointer" }}
+                onClick={() => handleNavClick("alerts")}
               >
-                HOST:
+                Alerts: {alertCount}
               </span>
-              <span style={{ fontWeight: 700 }}>
-                {hostIdentity.hostname || "LOCAL"}
-              </span>
-              <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>
-                [{hostIdentity.primary_ip || "127.0.0.1"}]
-              </span>
-            </div>
-          )}
+            )}
 
-          {currentCycle && (
-            <div
-              className="cycle-chip"
-              title={`Started at ${formatTime(currentCycle.started_at)}`}
+            <button
+              className="garud-btn garud-btn-sm"
+              onClick={handleStartNewCycle}
+              title="Archive current cycle & start fresh"
+              style={{ fontSize: 11, padding: "3px 8px" }}
             >
-              <Activity size={11} />
-              <span>{currentCycle.cycle_id?.substring(0, 18)}</span>
-            </div>
+              <RotateCcw size={11} /> New Cycle
+            </button>
+
+            <button
+              className="garud-btn garud-btn-sm"
+              onClick={() => setWellbeingOpen(true)}
+              title="View network wellbeing audit history"
+              style={{ fontSize: 11, padding: "3px 8px" }}
+            >
+              <HeartPulse size={11} color="var(--accent)" /> Wellbeing
+            </button>
+
+            <span className="garud-header-clock">
+              {clock.toLocaleString([], {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
+            </span>
+
+            <button
+              className="garud-btn garud-btn-sm"
+              onClick={() => handleNavClick("settings")}
+              title="Open Settings & Appearance"
+              style={{ padding: "4px 8px" }}
+            >
+              <Settings size={13} />
+            </button>
+          </div>
+        </header>
+
+        <main className="garud-content-viewport">
+          {view === "dashboard" && (
+            <Dashboard
+              systemMode={systemMode}
+              onSelectSession={onSelectSession}
+              onNavigate={handleNavClick}
+            />
           )}
-
-          <button
-            className="btn btn-sm"
-            onClick={handleStartNewCycle}
-            title="Archive current cycle & start fresh"
-            style={{
-              fontSize: "0.68rem",
-              padding: "3px 10px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 5,
-            }}
-          >
-            <RotateCcw size={11} /> New Cycle
-          </button>
-
-          <button
-            className="btn btn-sm"
-            onClick={() => setWellbeingOpen(true)}
-            title="View network wellbeing audit history"
-            style={{
-              fontSize: "0.68rem",
-              padding: "3px 10px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 5,
-            }}
-          >
-            <HeartPulse size={11} color="var(--c-gold)" /> Wellbeing Audit
-          </button>
-
-          <div
-            className="header-indicator"
-            title={
-              wsConnected
-                ? "Real-time WebSocket telemetry connected"
-                : "WebSocket disconnected, reconnecting..."
-            }
-          >
-            <span
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: wsConnected
-                  ? "var(--severity-low)"
-                  : "var(--c-red)",
-                boxShadow: `0 0 6px ${wsConnected ? "var(--severity-low)" : "var(--c-red)"}`,
-                display: "inline-block",
-              }}
+          {(view === "network" || view === "forecast") && <NetworkForecastView />}
+          {view === "alerts" && <AlertsView />}
+          {view === "live_logs" && (
+            <LiveLogsView
+              lines={liveFlows}
+              connected={wsConnected}
+              onClear={handleClearLiveLogs}
+              onReloadRecent={handleReloadRecentLogs}
+              systemMode={systemMode}
+              captureRunning={captureRunning}
             />
-            {wsConnected ? "Feed: Live" : "Feed: Offline"}
-          </div>
-          <div className="header-indicator">
-            <span
-              className={`dot ${systemStatus === "nominal" ? "" : systemStatus}`}
+          )}
+          {view === "explain" && <ExplainView featureList={featureList} />}
+          {view === "reports" && <ReportsView />}
+          {view === "ingest" && <IngestPanel />}
+          {view === "settings" && (
+            <SettingsView
+              health={health}
+              systemMode={systemMode}
+              onToggleMode={handleToggleMode}
+              simulatorRunning={simulatorRunning}
+              onStartSimulator={handleStartSimulator}
+              onStopSimulator={handleStopSimulator}
+              captureRunning={captureRunning}
+              onStartLiveCapture={handleStartLiveCapture}
+              onStopLiveCapture={handleStopLiveCapture}
+              onPurgeSimulated={handlePurgeSimulated}
             />
-            {health?.model_loaded
-              ? `Model: ${health.device?.toUpperCase() || "CPU"}`
-              : "Model: Loading"}
-          </div>
-          <div className="header-indicator">
-            <Wifi size={10} />
-            {alertCount > 0 ? `Alerts: ${alertCount}` : "Alerts: 0"}
-          </div>
-          <span className="header-clock">
-            {clock.toLocaleString([], {
-              year: "numeric",
-              month: "2-digit",
-              day: "2-digit",
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            })}
-          </span>
-        </div>
-      </header>
+          )}
+        </main>
+      </div>
 
-      <main className="main-content">
-        {view === "dashboard" && (
-          <Dashboard
-            systemMode={systemMode}
-            onSelectSession={onSelectSession}
-          />
-        )}
-        {(view === "network" || view === "forecast") && <NetworkForecastView />}
-        {view === "alerts" && <AlertsView />}
-        {view === "live_logs" && (
-          <LiveLogsView
-            lines={liveFlows}
-            connected={wsConnected}
-            onClear={handleClearLiveLogs}
-            onReloadRecent={handleReloadRecentLogs}
-            systemMode={systemMode}
-            captureRunning={captureRunning}
-            simulatorRunning={simulatorRunning}
-            onStartLiveCapture={handleStartLiveCapture}
-            onStopLiveCapture={handleStopLiveCapture}
-            onStartSimulator={handleStartSimulator}
-          />
-        )}
-        {view === "explain" && <ExplainView featureList={featureList} />}
-        {view === "reports" && <ReportsView />}
-        {view === "ingest" && <IngestPanel />}
-        {view === "settings" && (
-          <SettingsView
-            health={health}
-            systemMode={systemMode}
-            onToggleMode={handleToggleMode}
-            simulatorRunning={simulatorRunning}
-            onStartSimulator={handleStartSimulator}
-            onStopSimulator={handleStopSimulator}
-            captureRunning={captureRunning}
-            onStartLiveCapture={handleStartLiveCapture}
-            onStopLiveCapture={handleStopLiveCapture}
-            onPurgeSimulated={handlePurgeSimulated}
-          />
-        )}
-      </main>
+      {modalConfig && (
+        <ConfirmModal
+          isOpen={Boolean(modalConfig)}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          confirmLabel={modalConfig.confirmLabel}
+          cancelLabel={modalConfig.cancelLabel}
+          isDestructive={modalConfig.isDestructive}
+          isAlert={modalConfig.isAlert}
+          onConfirm={() => {
+            if (modalConfig.onConfirm) modalConfig.onConfirm();
+            else setModalConfig(null);
+          }}
+          onCancel={() => setModalConfig(null)}
+        />
+      )}
 
       <WellbeingModal
         isOpen={wellbeingOpen}
         onClose={() => setWellbeingOpen(false)}
       />
-
-      <footer className="footer">
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <EagleIcon size={14} color="var(--c-gold)" />
-          <span>
-            Project Garud v1.0 &bull; SIH 2026 PS26153 (Team Code 4 Change)
-          </span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span>
-            LSTM World Model &bull; {health?.features_count || 22} Features
-            &bull; Temporal Window={health?.stages?.length || 6}
-          </span>
-          <span
-            style={{
-              color: "var(--c-gold)",
-              fontWeight: 700,
-              letterSpacing: "0.05em",
-            }}
-          >
-            National Security Operational SOC
-          </span>
-        </div>
-      </footer>
     </div>
   );
 }

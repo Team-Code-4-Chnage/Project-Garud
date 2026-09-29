@@ -19,11 +19,13 @@ import {
 import { apiFetch, apiPost } from "../api";
 import { stageClass, formatTime, formatProb } from "../utils";
 import { IdentityBadge } from "./Badges";
+import ConfirmModal from "./ConfirmModal";
 
 export default function AlertPanel() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [modalConfig, setModalConfig] = useState(null);
 
   // Filters
   const [severityFilter, setSeverityFilter] = useState("all");
@@ -137,15 +139,22 @@ export default function AlertPanel() {
     return c;
   }, [alerts]);
 
-  const handleClearAll = async () => {
-    if (!window.confirm("Purge all incident alerts from database?")) return;
-    try {
-      await apiPost("/alerts/clear?confirm=yes", {});
-      setAlerts([]);
-      fetchLedgerStatus();
-    } catch (e) {
-      console.error("Failed to clear alerts:", e);
-    }
+  const handleClearAll = () => {
+    setModalConfig({
+      title: "PURGE ALL ALERTS",
+      message: "Are you sure you want to purge all incident alerts from the database? This action is irreversible.",
+      confirmLabel: "PURGE ALERTS",
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await apiPost("/alerts/clear?confirm=yes", {});
+          setAlerts([]);
+          fetchLedgerStatus();
+        } catch (e) {
+          console.error("Failed to clear alerts:", e);
+        }
+      },
+    });
   };
 
   const handleResetFilters = () => {
@@ -232,32 +241,51 @@ export default function AlertPanel() {
       });
       fetchLedgerStatus();
     } catch (e) {
-      alert(e.message || "Failed to enforce proactive containment");
+      setModalConfig({
+        title: "CONTAINMENT NOTICE",
+        message: e.message || "Failed to enforce proactive containment",
+        confirmLabel: "CLOSE",
+        isAlert: true,
+        isDestructive: true,
+      });
     } finally {
       setContainmentLoading(false);
     }
   };
 
-  const handleRevokeContainment = async (alertId) => {
-    if (!window.confirm("Revoke this proactive containment rule? Traffic will be re-allowed.")) return;
-    try {
-      await apiPost(`/alerts/${alertId}/revoke`, {});
-      setAlerts((prev) =>
-        prev.map((a) =>
-          a.id === alertId
-            ? { ...a, mitigated: false, mitigated_at: null }
-            : a,
-        ),
-      );
-      if (selectedRuleAlert && selectedRuleAlert.id === alertId) {
-        setSelectedRuleAlert(null);
-      }
-      if (activeRulesModalOpen) {
-        loadActiveRules();
-      }
-    } catch (e) {
-      alert(e.message || "Failed to revoke containment");
-    }
+  const handleRevokeContainment = (alertId) => {
+    setModalConfig({
+      title: "REVOKE CONTAINMENT",
+      message: "Revoke this proactive containment rule? Traffic will be re-allowed across network adapters.",
+      confirmLabel: "REVOKE RULE",
+      isDestructive: false,
+      onConfirm: async () => {
+        try {
+          await apiPost(`/alerts/${alertId}/revoke`, {});
+          setAlerts((prev) =>
+            prev.map((a) =>
+              a.id === alertId
+                ? { ...a, mitigated: false, mitigated_at: null }
+                : a,
+            ),
+          );
+          if (selectedRuleAlert && selectedRuleAlert.id === alertId) {
+            setSelectedRuleAlert(null);
+          }
+          if (activeRulesModalOpen) {
+            loadActiveRules();
+          }
+        } catch (e) {
+          setModalConfig({
+            title: "REVOCATION FAILED",
+            message: e.message || "Failed to revoke containment",
+            confirmLabel: "CLOSE",
+            isAlert: true,
+            isDestructive: true,
+          });
+        }
+      },
+    });
   };
 
   const loadActiveRules = async () => {
@@ -1668,6 +1696,23 @@ export default function AlertPanel() {
             </div>
           </div>
         </div>
+      )}
+
+      {modalConfig && (
+        <ConfirmModal
+          isOpen={Boolean(modalConfig)}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          confirmLabel={modalConfig.confirmLabel}
+          cancelLabel={modalConfig.cancelLabel}
+          isDestructive={modalConfig.isDestructive}
+          isAlert={modalConfig.isAlert}
+          onConfirm={() => {
+            if (modalConfig.onConfirm) modalConfig.onConfirm();
+            else setModalConfig(null);
+          }}
+          onCancel={() => setModalConfig(null)}
+        />
       )}
     </div>
   );

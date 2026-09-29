@@ -19,11 +19,7 @@ function LiveLogsView({
   onClear,
   onReloadRecent,
   systemMode = "live",
-  captureRunning = false,
-  simulatorRunning = false,
-  onStartLiveCapture,
-  onStopLiveCapture,
-  onStartSimulator,
+  _captureRunning = false,
 }) {
   const containerRef = useRef(null);
   const [mitre, setMitre] = useState({});
@@ -135,13 +131,25 @@ function LiveLogsView({
               gap: 6,
               padding: "2px 8px",
               background: connected
-                ? "rgba(88, 166, 104, 0.15)"
+                ? systemMode === "live"
+                  ? "rgba(88, 166, 104, 0.15)"
+                  : "rgba(214, 179, 106, 0.15)"
                 : "rgba(201, 74, 69, 0.15)",
-              border: `1px solid ${connected ? "rgba(88, 166, 104, 0.4)" : "rgba(201, 74, 69, 0.4)"}`,
+              border: `1px solid ${
+                connected
+                  ? systemMode === "live"
+                    ? "rgba(88, 166, 104, 0.4)"
+                    : "rgba(214, 179, 106, 0.4)"
+                  : "rgba(201, 74, 69, 0.4)"
+              }`,
               borderRadius: "var(--radius-sm)",
               fontSize: "0.72rem",
               fontWeight: 700,
-              color: connected ? "var(--severity-low)" : "var(--c-red)",
+              color: connected
+                ? systemMode === "live"
+                  ? "var(--severity-low)"
+                  : "var(--c-gold)"
+                : "var(--c-red)",
             }}
           >
             <span
@@ -149,11 +157,25 @@ function LiveLogsView({
                 width: 7,
                 height: 7,
                 borderRadius: "50%",
-                background: connected ? "var(--severity-low)" : "var(--c-red)",
-                boxShadow: `0 0 6px ${connected ? "var(--severity-low)" : "var(--c-red)"}`,
+                background: connected
+                  ? systemMode === "live"
+                    ? "var(--severity-low)"
+                    : "var(--c-gold)"
+                  : "var(--c-red)",
+                boxShadow: `0 0 6px ${
+                  connected
+                    ? systemMode === "live"
+                      ? "var(--severity-low)"
+                      : "var(--c-gold)"
+                    : "var(--c-red)"
+                }`,
               }}
             />
-            {connected ? "Live Telemetry Feed" : "Offline (Reconnecting)"}
+            {connected
+              ? systemMode === "live"
+                ? "Live Telemetry Feed"
+                : "Simulated Event Feed"
+              : "Offline (Reconnecting)"}
           </div>
 
           <span className="terminal-title">
@@ -211,92 +233,7 @@ function LiveLogsView({
             {isPaused ? "RESUME" : "PAUSE"}
           </button>
 
-          {systemMode === "live" && (
-            captureRunning ? (
-              <button
-                className="btn btn-sm btn-danger"
-                onClick={onStopLiveCapture}
-                style={{
-                  fontSize: "0.72rem",
-                  padding: "3px 10px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                }}
-                title="Stop background live packet capture"
-              >
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: "#fff",
-                    display: "inline-block",
-                  }}
-                />
-                STOP CAPTURE
-              </button>
-            ) : (
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={() => onStartLiveCapture?.()}
-                style={{
-                  fontSize: "0.72rem",
-                  padding: "3px 10px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                }}
-                title="Start live packet capture from network adapters"
-              >
-                <Play size={11} /> START LIVE CAPTURE
-              </button>
-            )
-          )}
 
-          {systemMode === "simulated" && (
-            simulatorRunning ? (
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                  padding: "3px 8px",
-                  borderRadius: "var(--radius-sm)",
-                  background: "rgba(214, 179, 106, 0.15)",
-                  border: "1px solid rgba(214, 179, 106, 0.4)",
-                  color: "var(--c-gold)",
-                  fontSize: "0.72rem",
-                  fontWeight: 700,
-                }}
-              >
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: "var(--c-gold)",
-                  }}
-                />
-                SIMULATOR RUNNING
-              </span>
-            ) : (
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={() => onStartSimulator?.()}
-                style={{
-                  fontSize: "0.72rem",
-                  padding: "3px 10px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                }}
-                title="Start attack traffic simulator"
-              >
-                <Play size={11} /> START SIMULATOR
-              </button>
-            )
-          )}
 
           <button
             className="btn btn-sm btn-outline"
@@ -367,37 +304,37 @@ function LiveLogsView({
           {
             id: "benign",
             label: "BENIGN",
-            color: "#58A668",
+            color: "#34D399",
             count: categoryCounts.benign,
           },
           {
             id: "recon",
             label: "RECON",
-            color: "#5294E2",
+            color: "#39DFEB",
             count: categoryCounts.recon,
           },
           {
             id: "initial",
             label: "INITIAL ACCESS",
-            color: "#D6B36A",
+            color: "#F6B144",
             count: categoryCounts.initial,
           },
           {
             id: "lateral",
             label: "LATERAL MOVE",
-            color: "#DE934B",
+            color: "#E8873A",
             count: categoryCounts.lateral,
           },
           {
             id: "c2",
             label: "C2 CHANNEL",
-            color: "#D1643F",
+            color: "#E5633E",
             count: categoryCounts.c2,
           },
           {
             id: "exfil",
             label: "EXFILTRATION",
-            color: "#C94A45",
+            color: "#F64541",
             count: categoryCounts.exfil,
           },
         ].map((c) => {
@@ -413,7 +350,7 @@ function LiveLogsView({
                 padding: "3px 8px",
                 borderRadius: "var(--radius-sm)",
                 background: isActive ? c.color : "transparent",
-                color: isActive ? "#1A1610" : c.color,
+                color: isActive ? "#010B0C" : c.color,
                 border: `1px solid ${isActive ? c.color : "rgba(184, 176, 163, 0.2)"}`,
                 fontWeight: 700,
                 fontSize: "0.68rem",
@@ -460,16 +397,21 @@ function LiveLogsView({
             {lines.length === 0 ? (
               connected ? (
                 <>
-                  <ShieldCheck size={32} color="var(--severity-low)" />
+                  <ShieldCheck
+                    size={32}
+                    color={systemMode === "live" ? "var(--severity-low)" : "var(--c-gold)"}
+                  />
                   <p
                     style={{
                       marginTop: "10px",
-                      color: "var(--severity-low)",
+                      color: systemMode === "live" ? "var(--severity-low)" : "var(--c-gold)",
                       fontWeight: 700,
                       fontSize: "0.95rem",
                     }}
                   >
-                    Live Telemetry Nominal &bull; Awaiting Ingested Packets
+                    {systemMode === "live"
+                      ? "Live Telemetry Operational • Listening on Network Adapters"
+                      : "Simulation Mode • Awaiting Ingested Attack Telemetry"}
                   </p>
                   <p
                     style={{
@@ -478,8 +420,9 @@ function LiveLogsView({
                       marginTop: "4px",
                     }}
                   >
-                    World Model is listening for real-time traffic flows from
-                    network interfaces or simulator.
+                    {systemMode === "live"
+                      ? "World Model is actively monitoring real-time network traffic from host processes."
+                      : "Configure and launch MITRE attack scenarios via Settings & Lab."}
                   </p>
                   <div
                     style={{
@@ -490,20 +433,7 @@ function LiveLogsView({
                       flexWrap: "wrap",
                     }}
                   >
-                    {systemMode === "live" && !captureRunning && (
-                      <button
-                        className="btn btn-sm btn-primary"
-                        onClick={() => onStartLiveCapture?.()}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
-                      >
-                        <Play size={12} /> Start Live Capture
-                      </button>
-                    )}
-                    {systemMode === "live" && captureRunning && (
+                    {systemMode === "live" && (
                       <div
                         style={{
                           display: "inline-flex",
@@ -520,19 +450,6 @@ function LiveLogsView({
                         />
                         Live Sniffer Active &bull; Streaming Host Telemetry...
                       </div>
-                    )}
-                    {systemMode === "simulated" && !simulatorRunning && (
-                      <button
-                        className="btn btn-sm btn-primary"
-                        onClick={() => onStartSimulator?.()}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
-                      >
-                        <Play size={12} /> Launch Attack Simulator
-                      </button>
                     )}
                     {onReloadRecent && (
                       <button

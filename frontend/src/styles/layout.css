@@ -1,0 +1,453 @@
+/* ============================================================
+   PROJECT GARUD — APP LAYOUT & SHELL
+   Responsive Grid & Flex Constraints (Zero Horizontal Overflow)
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: 100%;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--font-base);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Main Application Frame */
+.garud-app {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg-page);
+}
+
+/* Sidebar */
+.garud-sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  height: 100%;
+  background-color: var(--bg-chrome);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  z-index: 100;
+  transition: transform var(--transition-normal), width var(--transition-normal);
+  user-select: none;
+}
+
+.garud-sidebar-brand {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.garud-brand-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-heading);
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+  text-transform: uppercase;
+}
+
+.garud-brand-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-top: 3px;
+  display: block;
+}
+
+.garud-brand-desc {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-top: 2px;
+  display: block;
+}
+
+.garud-nav-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.garud-nav-group-label {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  padding: 0 8px 4px;
+}
+
+.garud-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.garud-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  text-align: left;
+}
+
+.garud-nav-item:hover {
+  background: var(--bg-raised);
+  color: var(--text-primary);
+}
+
+.garud-nav-item.active {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border-color: rgba(246, 177, 68, 0.35);
+  font-weight: 600;
+}
+
+[data-theme="light"] .garud-nav-item.active {
+  background: #FEF3D8;
+  border-color: rgba(253, 178, 58, 0.5);
+  color: var(--accent-text);
+}
+
+.garud-nav-item-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.garud-nav-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--danger);
+  color: #FFFFFF;
+}
+
+.garud-sidebar-footer {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+
+.garud-system-status-title {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.garud-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  line-height: 1.8;
+  font-family: var(--font-mono);
+}
+
+.garud-status-name {
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.garud-status-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.garud-status-indicator.live,
+.garud-status-indicator.online,
+.garud-status-indicator.connected,
+.garud-status-indicator.ready {
+  background: var(--success);
+  box-shadow: 0 0 5px var(--success);
+}
+
+.garud-status-indicator.idle {
+  background: var(--text-muted);
+}
+
+.garud-status-indicator.degraded {
+  background: var(--warning);
+}
+
+.garud-status-indicator.offline,
+.garud-status-indicator.critical {
+  background: var(--danger);
+  box-shadow: 0 0 5px var(--danger);
+}
+
+.garud-status-val {
+  font-weight: 600;
+}
+
+.garud-sidebar-bottom-meta {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* App Main Body (Header + Content + Footer) */
+.garud-main-shell {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-page);
+  overflow: hidden;
+}
+
+/* Top Navigation Bar */
+.garud-header {
+  height: var(--header-h);
+  background-color: var(--bg-chrome);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  gap: 12px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.garud-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.garud-mobile-menu-btn {
+  display: none;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 5px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+
+.garud-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  width: 280px;
+  min-width: 160px;
+  transition: border-color var(--transition-fast), width var(--transition-fast);
+}
+
+.garud-search-box:focus-within {
+  border-color: var(--border-focus);
+}
+
+.garud-search-box input {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 12px;
+  width: 100%;
+  outline: none;
+}
+
+.garud-search-box input::placeholder {
+  color: var(--text-muted);
+}
+
+.garud-kbd-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+.garud-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.garud-header-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.garud-header-chip.live-chip {
+  background: var(--success-soft);
+  border-color: rgba(48, 192, 123, 0.35);
+  color: var(--success);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.garud-header-clock {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* Main Viewport Content */
+.garud-content-viewport {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 14px 16px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Dashboard Grid Architecture */
+.garud-dashboard-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Responsive Media Queries */
+@media (max-width: 1200px) {
+  :root {
+    --sidebar-w: 64px;
+  }
+  .garud-sidebar-brand .garud-brand-sub,
+  .garud-sidebar-brand .garud-brand-desc,
+  .garud-brand-title span,
+  .garud-nav-group-label,
+  .garud-nav-item span,
+  .garud-sidebar-footer {
+    display: none;
+  }
+  .garud-nav-item {
+    justify-content: center;
+    padding: 10px;
+  }
+}
+
+@media (max-width: 900px) {
+  .garud-mobile-menu-btn {
+    display: flex;
+  }
+  .garud-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 240px;
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-popover);
+  }
+  .garud-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  .garud-sidebar-brand .garud-brand-sub,
+  .garud-sidebar-brand .garud-brand-desc,
+  .garud-brand-title span,
+  .garud-nav-group-label,
+  .garud-nav-item span,
+  .garud-sidebar-footer {
+    display: block;
+  }
+}
+
+/* Drawer Backdrop */
+.garud-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(2px);
+  z-index: 99;
+}

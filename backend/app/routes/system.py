@@ -106,14 +106,22 @@ async def set_system_mode(req: ModeUpdateRequest):
         )
 
     SystemState.mode = new_mode
+    network_tracker.mode = new_mode
     if new_mode == "live":
         stopped = SystemState.stop_simulator()
         if stopped:
             logger.info("Switched to LIVE mode — stopped background simulator.")
+        network_tracker.reset("simulated")
+        if not SystemState.is_capture_running():
+            try:
+                await start_live_capture()
+            except Exception as e:
+                logger.warning("Could not auto-launch live capture on mode switch: %s", e)
     elif new_mode == "simulated":
         stopped = SystemState.stop_capture()
         if stopped:
             logger.info("Switched to SIMULATED mode — stopped background live capture.")
+        network_tracker.reset("simulated")
 
     logger.info("System operating mode changed to: %s", new_mode.upper())
     return {

@@ -200,6 +200,7 @@ class FeatureAttribution(BaseModel):
     feature: str
     importance: float
     direction: str
+    delta: Optional[float] = None
 
 
 class ExplainResponse(BaseModel):
@@ -207,6 +208,7 @@ class ExplainResponse(BaseModel):
     infiltration_probability: float
     predicted_stage: str
     method_used: str = "shap"
+    temporal_weights: Optional[list[float]] = None
 
 
 class AlertOut(BaseModel):

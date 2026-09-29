@@ -1,0 +1,1051 @@
+/* ============================================================
+   PROJECT GARUD — SHARED COMPONENT DESIGN SYSTEM
+   Retro Technical SOC Styling
+   ============================================================ */
+
+/* Generic Card Anatomy */
+.garud-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition-fast);
+}
+
+.garud-card:hover {
+  border-color: var(--border-strong);
+}
+
+.garud-card-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 38px;
+}
+
+.garud-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.garud-card-indicator-bar {
+  width: 3px;
+  height: 14px;
+  border-radius: 1px;
+  background-color: var(--accent);
+  flex-shrink: 0;
+}
+
+.garud-card-indicator-bar.danger {
+  background-color: var(--danger);
+}
+
+.garud-card-indicator-bar.info {
+  background-color: var(--info);
+}
+
+.garud-card-title {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.garud-card-subtitle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.garud-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.garud-card-body {
+  padding: 12px 14px;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================
+   KPI & OPERATIONAL OVERVIEW COMPONENTS
+   ============================================================ */
+.garud-overview-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .garud-overview-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Network Threat Status Big Card */
+.garud-threat-banner {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.garud-threat-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+}
+
+.garud-threat-hero.elevated {
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
+}
+
+.garud-threat-hero.nominal {
+  background: var(--success-soft);
+  border-color: rgba(48, 192, 123, 0.25);
+}
+
+.garud-threat-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.garud-threat-icon-box {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+.garud-threat-title {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  color: var(--danger);
+}
+
+.garud-threat-hero.nominal .garud-threat-title {
+  color: var(--success);
+}
+
+.garud-threat-subtitle {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.garud-threat-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.garud-threat-score {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--danger);
+  line-height: 1;
+}
+
+.garud-threat-hero.nominal .garud-threat-score {
+  color: var(--success);
+}
+
+.garud-threat-score-label {
+  font-family: var(--font-heading);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* 10-Segment Risk Meter */
+.garud-risk-meter {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.garud-risk-block {
+  width: 8px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--border-strong);
+  transition: background var(--transition-fast);
+}
+
+.garud-risk-block.active.green {
+  background: var(--success);
+}
+
+.garud-risk-block.active.amber {
+  background: var(--warning);
+}
+
+.garud-risk-block.active.red {
+  background: var(--danger);
+}
+
+/* 4-KPI Strip inside Left Column */
+.garud-kpi-subgrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .garud-kpi-subgrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.garud-kpi-tile {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+  position: relative;
+}
+
+.garud-kpi-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.garud-kpi-label {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.garud-kpi-val-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.garud-kpi-value {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.garud-kpi-trend {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.garud-kpi-trend.up {
+  color: var(--success);
+}
+
+.garud-kpi-trend.warn {
+  color: var(--warning);
+}
+
+.garud-kpi-trend.down {
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   PREDICTED ATTACK TRAJECTORY (KILL CHAIN STEPPER)
+   ============================================================ */
+.garud-stepper-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.garud-stepper-track {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
+  padding: 10px 6px 4px;
+}
+
+.garud-stepper-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+  flex: 1;
+}
+
+.garud-step-node {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 2px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-normal);
+  position: relative;
+}
+
+.garud-step-node.completed {
+  border-color: var(--success);
+  background: var(--success);
+}
+
+.garud-step-node.current {
+  border-color: var(--danger);
+  background: var(--bg-surface);
+  box-shadow: 0 0 0 4px var(--danger-soft);
+}
+
+.garud-step-node.current::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+.garud-step-node.predicted {
+  border-color: var(--text-muted);
+  border-style: dashed;
+}
+
+.garud-step-line {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--border);
+  z-index: 1;
+}
+
+.garud-step-line.completed {
+  background: var(--success);
+}
+
+.garud-step-label {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-top: 6px;
+  text-align: center;
+}
+
+.garud-step-status-pill {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 2px;
+  margin-top: 3px;
+  text-transform: uppercase;
+}
+
+.garud-step-status-pill.completed {
+  background: var(--success-soft);
+  color: var(--success);
+  border: 1px solid rgba(48, 192, 123, 0.3);
+}
+
+.garud-step-status-pill.current {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+}
+
+.garud-step-status-pill.predicted {
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+/* Stepper Intelligence Box */
+.garud-stepper-details {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 10px 12px;
+}
+
+@media (max-width: 768px) {
+  .garud-stepper-details {
+    grid-template-columns: 1fr;
+  }
+}
+
+.garud-stepper-meta-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.garud-stepper-meta-label {
+  font-family: var(--font-heading);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.garud-stepper-meta-val {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+
+.garud-stepper-meta-code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* ============================================================
+   HERO ROW 2: FORECAST & NETWORK MAP
+   ============================================================ */
+.garud-hero-row {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .garud-hero-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Forecast Header & Controls */
+.garud-forecast-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.garud-select-control {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border-radius: var(--radius-xs);
+  padding: 2px 6px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* Chart Canvas Container */
+.garud-chart-container {
+  width: 100%;
+  min-width: 0;
+  height: 250px;
+  position: relative;
+}
+
+.garud-chart-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.garud-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.garud-legend-line {
+  width: 14px;
+  height: 2px;
+  display: inline-block;
+}
+
+.garud-legend-line.observed {
+  background: var(--observed);
+}
+
+.garud-legend-line.forecast {
+  background: var(--forecast);
+  border-top: 2px dashed var(--forecast);
+  height: 0;
+}
+
+.garud-legend-line.threshold {
+  background: var(--threshold);
+  border-top: 2px dashed var(--threshold);
+  height: 0;
+}
+
+.garud-legend-band {
+  width: 12px;
+  height: 8px;
+  background: var(--forecast-band);
+  border-radius: 1px;
+  display: inline-block;
+}
+
+/* ============================================================
+   NETWORK TOPOLOGY MAP (SVG CONSOLE)
+   ============================================================ */
+.garud-map-wrapper {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: 310px;
+  background-color: var(--map-bg);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+.garud-map-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  z-index: 10;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-height: 34px;
+}
+
+.garud-map-view-pills {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-raised);
+  padding: 2px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.garud-map-pill-btn {
+  background: transparent;
+  border: none;
+  font-family: var(--font-heading);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 2px 7px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.garud-map-pill-btn:hover {
+  color: var(--text-primary);
+}
+
+.garud-map-pill-btn.active {
+  background: var(--bg-surface);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.garud-map-canvas-area {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.garud-map-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 15;
+}
+
+.garud-map-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.garud-map-btn:hover {
+  background: var(--bg-raised);
+  border-color: var(--border-strong);
+}
+
+/* Horizontal Legend (embedded cleanly in footer, never blocking canvas) */
+.garud-map-footer-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.garud-map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.garud-map-legend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.garud-map-legend-dot.internal { background: var(--node-internal); }
+.garud-map-legend-dot.external { background: var(--node-external); }
+.garud-map-legend-dot.suspicious { background: var(--node-suspicious); }
+.garud-map-legend-dot.malicious { background: var(--node-malicious); }
+
+/* HUD Intelligence Card - Compact Tactical Readout at Bottom-Left */
+.garud-map-hud-card {
+  position: absolute;
+  bottom: 10px;
+  left: 12px;
+  background: var(--bg-popover);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-xs);
+  padding: 7px 11px;
+  width: 230px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.30);
+  z-index: 25;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  backdrop-filter: blur(8px);
+}
+
+.garud-map-hud-card.nominal {
+  border-color: var(--border-strong);
+}
+
+.garud-map-hud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+  margin-bottom: 5px;
+}
+
+.garud-map-hud-title {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 190px;
+}
+
+.garud-map-hud-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  line-height: 1.6;
+}
+
+/* Map Footer Bar */
+.garud-map-footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-muted);
+  user-select: none;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.garud-map-footer-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   ROW 4: ALERTS, TOP FLOWS, EXPLAINABILITY
+   ============================================================ */
+.garud-trio-row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.9fr 0.9fr;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 1200px) {
+  .garud-trio-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Data Tables */
+.garud-table-container {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.garud-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+
+.garud-table th {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.garud-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.garud-table tr:hover td {
+  background: var(--bg-raised);
+}
+
+.garud-table tr.active-row td {
+  background: var(--danger-soft);
+}
+
+/* Status Pills */
+.garud-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  display: inline-block;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.garud-pill.active {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+}
+
+.garud-pill.monitor {
+  background: var(--warning-soft);
+  color: var(--warning);
+  border: 1px solid rgba(246, 177, 68, 0.35);
+}
+
+.garud-pill.closed {
+  background: var(--success-soft);
+  color: var(--success);
+  border: 1px solid rgba(48, 192, 123, 0.35);
+}
+
+/* Segmented Tabs Control */
+.garud-segmented {
+  display: flex;
+  align-items: center;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 2px;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.garud-segment-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-xs);
+  padding: 3px 6px;
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.garud-segment-btn.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Top Risky Flows List */
+.garud-risk-flow-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  gap: 8px;
+}
+
+.garud-risk-flow-ip {
+  flex: 1;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.garud-risk-flow-bar-wrap {
+  width: 70px;
+  height: 6px;
+  background: var(--border-strong);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.garud-risk-flow-bar {
+  height: 100%;
+  border-radius: 1px;
+}
+
+.garud-risk-flow-val {
+  font-weight: 700;
+  width: 32px;
+  text-align: right;
+}
+
+/* Feature Attribution Bars */
+.garud-feature-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.garud-feature-name {
+  width: 120px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.garud-feature-meter-box {
+  flex: 1;
+  height: 6px;
+  background: var(--border-strong);
+  border-radius: 1px;
+  overflow: hidden;
+  position: relative;
+}
+
+.garud-feature-fill {
+  height: 100%;
+  border-radius: 1px;
+}
+
+.garud-feature-fill.positive {
+  background: var(--danger);
+}
+
+.garud-feature-fill.amber {
+  background: var(--warning);
+}
+
+.garud-feature-fill.negative {
+  background: var(--success);
+}
+
+.garud-feature-score {
+  width: 44px;
+  text-align: right;
+  font-weight: 700;
+}
+
+.garud-feature-score.positive {
+  color: var(--danger);
+}
+
+.garud-feature-score.negative {
+  color: var(--success);
+}
+
+/* Standard Buttons */
+.garud-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-xs);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.garud-btn:hover {
+  background: var(--bg-raised);
+  border-color: var(--border-strong);
+}
+
+.garud-btn-sm {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.garud-btn-primary {
+  background: var(--accent);
+  color: #000000;
+  border-color: var(--accent);
+}
+
+.garud-btn-primary:hover {
+  background: #E5A137;
+}
+
+.garud-btn-danger {
+  background: var(--danger);
+  color: #FFFFFF;
+  border-color: var(--danger);
+}
+
+.garud-btn-danger:hover {
+  background: #D93B37;
+}

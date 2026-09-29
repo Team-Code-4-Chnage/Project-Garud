@@ -629,6 +629,7 @@ async def ingest_single_flow(
             "prediction" if result_data["prediction"] else "flow_ingested"
         )
         await broadcast({
+            "id": db_record.id,
             "type": event_type,
             "session_key": session_key,
             "src_ip": flow.src_ip,

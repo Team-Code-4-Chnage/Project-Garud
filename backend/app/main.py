@@ -69,6 +69,15 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Security: API_KEY enforcement active.")
 
+    # Auto-start live packet sniffer in background by default
+    try:
+        from .routes.system import SystemState, start_live_capture
+        if SystemState.mode == "live" and not SystemState.is_capture_running():
+            logger.info("Auto-starting live network packet sniffer by default...")
+            await start_live_capture()
+    except Exception as e:
+        logger.warning("Could not auto-start live capture on startup: %s", e)
+
     logger.info("=" * 60)
     logger.info("Service ready — all systems operational")
     logger.info("=" * 60)
@@ -76,6 +85,12 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("Shutting down... archiving active cycle to disk...")
+    try:
+        from .routes.system import SystemState
+        SystemState.stop_capture()
+        SystemState.stop_simulator()
+    except Exception:
+        pass
     try:
         from .database import async_session
         from .routes.system import archive_and_reset_cycle

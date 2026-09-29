@@ -301,3 +301,94 @@ def explain_window_shap(
         "predicted_stage": pred["predicted_stage"],
         "method_used": method_used,
     }
+
+
+def explain_window_attention(window: np.ndarray, top_k: int = 10) -> dict:
+    """
+    Temporal Recurrence / Attention Attribution: computes importance weights across
+    timesteps (t-5..t) and the most influential features driving sequence representation.
+    """
+    _ensure_loaded()
+    model = artifacts.model
+    device = artifacts.device
+
+    x = torch.tensor(window, dtype=torch.float32).unsqueeze(0).to(device)
+    x.requires_grad_(True)
+
+    next_state, inf_logit, stage_logits = model(x)
+    inf_logit.backward()
+    grads = x.grad.detach().cpu().numpy()[0]
+    input_vals = x.detach().cpu().numpy()[0]
+
+    # Temporal saliency: relative contribution per timestep t-5 .. t
+    temporal_raw = np.abs(grads * input_vals).mean(axis=1)
+    t_sum = temporal_raw.sum()
+    temporal_weights = (temporal_raw / t_sum) if t_sum > 0 else (np.ones(6) / 6.0)
+
+    # Feature-level attribution
+    feat_weights = np.abs(grads * input_vals).mean(axis=0)
+    indices = np.argsort(feat_weights)[::-1][:top_k]
+    from .config import FLOW_FEATURES
+
+    result = []
+    for idx in indices:
+        val = float(feat_weights[idx])
+        direction = "malicious" if grads[:, idx].mean() > 0 else "benign"
+        result.append({
+            "feature": FLOW_FEATURES[idx],
+            "importance": round(val, 6),
+            "direction": direction,
+        })
+
+    pred = predict_single(window)
+    return {
+        "attributions": result,
+        "infiltration_probability": pred["infiltration_probability"],
+        "predicted_stage": pred["predicted_stage"],
+        "method_used": "attention",
+        "temporal_weights": [round(float(w), 4) for w in temporal_weights],
+    }
+
+
+def explain_window_state_delta(window: np.ndarray, top_k: int = 10) -> dict:
+    """
+    State Delta Attribution: computes feature drift (final timestep vs initial timestep)
+    weighted by model sensitivity, highlighting features with the sharpest dynamic shifts.
+    """
+    _ensure_loaded()
+    model = artifacts.model
+    device = artifacts.device
+
+    x = torch.tensor(window, dtype=torch.float32).unsqueeze(0).to(device)
+    x.requires_grad_(True)
+
+    next_state, inf_logit, stage_logits = model(x)
+    inf_logit.backward()
+    grads = x.grad.detach().cpu().numpy()[0]
+    input_vals = x.detach().cpu().numpy()[0]
+
+    # Delta between final step and initial step in 6-flow window
+    delta = input_vals[-1] - input_vals[0]
+    sens = grads.mean(axis=0)
+    impact = delta * sens
+
+    indices = np.argsort(np.abs(impact))[::-1][:top_k]
+    from .config import FLOW_FEATURES
+
+    result = []
+    for idx in indices:
+        val = float(impact[idx])
+        result.append({
+            "feature": FLOW_FEATURES[idx],
+            "importance": round(val, 6),
+            "direction": "malicious" if val > 0 else "benign",
+            "delta": round(float(delta[idx]), 4),
+        })
+
+    pred = predict_single(window)
+    return {
+        "attributions": result,
+        "infiltration_probability": pred["infiltration_probability"],
+        "predicted_stage": pred["predicted_stage"],
+        "method_used": "state_delta",
+    }

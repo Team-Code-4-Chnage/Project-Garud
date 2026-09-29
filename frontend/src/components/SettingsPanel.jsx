@@ -11,9 +11,15 @@ import {
   Terminal,
   Sliders,
   RefreshCw,
+  Palette,
+  Shield,
+  Info,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { apiFetch, apiPost } from "../api";
 import { formatFeatureName } from "../utils";
+import { useTheme } from "../theme";
 
 const SCENARIOS = [
   {
@@ -191,7 +197,40 @@ export default function SettingsPanel({
   onStartLiveCapture,
   onStopLiveCapture,
 }) {
-  const [activeTab, setActiveTab] = useState("lab");
+  const { theme, setTheme } = useTheme();
+  const [activeTab, setActiveTab] = useState("appearance");
+  const [density, setDensity] = useState(() => {
+    try {
+      return localStorage.getItem("garud-density") || "comfortable";
+    } catch {
+      return "comfortable";
+    }
+  });
+  const [reducedMotion, setReducedMotion] = useState(() => {
+    try {
+      return localStorage.getItem("garud-motion") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [riskThreshold, setRiskThreshold] = useState(0.40);
+
+  const handleDensityChange = (d) => {
+    setDensity(d);
+    try {
+      localStorage.setItem("garud-density", d);
+      document.documentElement.setAttribute("data-density", d);
+    } catch {}
+  };
+
+  const handleMotionChange = (m) => {
+    setReducedMotion(m);
+    try {
+      localStorage.setItem("garud-motion", String(m));
+      document.documentElement.setAttribute("data-motion", m ? "reduced" : "normal");
+    } catch {}
+  };
+
   const [scenario, setScenario] = useState("full_kill_chain");
   const [speed, setSpeed] = useState(1.0);
   const [sessions, setSessions] = useState(4);
@@ -403,7 +442,23 @@ export default function SettingsPanel({
           </div>
         </div>
 
-        <div className="tab-group" style={{ margin: 0 }}>
+        <div className="tab-group" style={{ margin: 0, flexWrap: "wrap" }}>
+          <button
+            className={`tab-btn ${activeTab === "appearance" ? "active" : ""}`}
+            onClick={() => setActiveTab("appearance")}
+            style={{ fontSize: "0.72rem", padding: "4px 12px" }}
+          >
+            <Palette size={12} style={{ marginRight: 6 }} />
+            Appearance & Theme
+          </button>
+          <button
+            className={`tab-btn ${activeTab === "detection" ? "active" : ""}`}
+            onClick={() => setActiveTab("detection")}
+            style={{ fontSize: "0.72rem", padding: "4px 12px" }}
+          >
+            <Shield size={12} style={{ marginRight: 6 }} />
+            Detection & Threshold
+          </button>
           <button
             className={`tab-btn ${activeTab === "lab" ? "active" : ""}`}
             onClick={() => setActiveTab("lab")}
@@ -428,8 +483,249 @@ export default function SettingsPanel({
             <Layers size={12} style={{ marginRight: 6 }} />
             Feature Dictionary (22)
           </button>
+          <button
+            className={`tab-btn ${activeTab === "about" ? "active" : ""}`}
+            onClick={() => setActiveTab("about")}
+            style={{ fontSize: "0.72rem", padding: "4px 12px" }}
+          >
+            <Info size={12} style={{ marginRight: 6 }} />
+            About Garud
+          </button>
         </div>
       </div>
+
+      {/* TAB: Appearance & Theme (Only Place Where Theme is Switched) */}
+      {activeTab === "appearance" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          {/* Card 1: Theme Selection */}
+          <div className="panel" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <Palette size={16} color="var(--accent)" />
+              <strong style={{ fontSize: "0.9rem", color: "var(--text-primary)" }}>
+                Interface Theme
+              </strong>
+            </div>
+            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: 16, lineHeight: 1.4 }}>
+              Select between the Dark technical operations console and the Light warm technical paper control-room interface. Theme is strictly managed here and persisted in local storage.
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {/* Dark Theme Button */}
+              <button
+                type="button"
+                onClick={() => setTheme("dark")}
+                style={{
+                  background: "#010B0C",
+                  border: theme === "dark" ? "2px solid #F6B144" : "1px solid rgba(231,240,244,0.18)",
+                  borderRadius: 6,
+                  padding: "16px 12px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 8,
+                  cursor: "pointer",
+                  color: "#E7F0F4",
+                  boxShadow: theme === "dark" ? "0 0 12px rgba(246,177,68,0.25)" : "none",
+                  transition: "all 150ms ease",
+                }}
+              >
+                <Moon size={22} color={theme === "dark" ? "#F6B144" : "#9AA6AA"} />
+                <span style={{ fontFamily: "var(--font-heading)", fontSize: "0.95rem", fontWeight: 700, letterSpacing: "0.05em" }}>
+                  DARK THEME
+                </span>
+                <span style={{ fontSize: "0.7rem", color: "#9AA6AA", textAlign: "center" }}>
+                  Near-black technical palette &bull; High-contrast SOC console
+                </span>
+                {theme === "dark" && (
+                  <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#F6B144", marginTop: 4 }}>
+                    ACTIVE THEME
+                  </span>
+                )}
+              </button>
+
+              {/* Light Theme Button */}
+              <button
+                type="button"
+                onClick={() => setTheme("light")}
+                style={{
+                  background: "#FAF7F1",
+                  border: theme === "light" ? "2px solid #FDB23A" : "1px solid #CFC6B3",
+                  borderRadius: 6,
+                  padding: "16px 12px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 8,
+                  cursor: "pointer",
+                  color: "#252A2D",
+                  boxShadow: theme === "light" ? "0 0 12px rgba(253,178,58,0.25)" : "none",
+                  transition: "all 150ms ease",
+                }}
+              >
+                <Sun size={22} color={theme === "light" ? "#FDB23A" : "#666B6E"} />
+                <span style={{ fontFamily: "var(--font-heading)", fontSize: "0.95rem", fontWeight: 700, letterSpacing: "0.05em" }}>
+                  LIGHT THEME
+                </span>
+                <span style={{ fontSize: "0.7rem", color: "#666B6E", textAlign: "center" }}>
+                  Warm technical paper &bull; Defense room document aesthetic
+                </span>
+                {theme === "light" && (
+                  <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#9A6100", marginTop: 4 }}>
+                    ACTIVE THEME
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Card 2: Density & Motion Controls */}
+          <div className="panel" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <Sliders size={16} color="var(--accent)" />
+              <strong style={{ fontSize: "0.9rem", color: "var(--text-primary)" }}>
+                Display Density & Motion
+              </strong>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: 6 }}>
+                INTERFACE DENSITY
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  className={`garud-btn ${density === "comfortable" ? "garud-btn-primary" : ""}`}
+                  onClick={() => handleDensityChange("comfortable")}
+                  style={{ flex: 1, justifyContent: "center" }}
+                >
+                  Comfortable
+                </button>
+                <button
+                  type="button"
+                  className={`garud-btn ${density === "compact" ? "garud-btn-primary" : ""}`}
+                  onClick={() => handleDensityChange("compact")}
+                  style={{ flex: 1, justifyContent: "center" }}
+                >
+                  Compact
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: 6 }}>
+                ACCESSIBILITY MOTION
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  className={`garud-btn ${!reducedMotion ? "garud-btn-primary" : ""}`}
+                  onClick={() => handleMotionChange(false)}
+                  style={{ flex: 1, justifyContent: "center" }}
+                >
+                  Full Motion (Default)
+                </button>
+                <button
+                  type="button"
+                  className={`garud-btn ${reducedMotion ? "garud-btn-primary" : ""}`}
+                  onClick={() => handleMotionChange(true)}
+                  style={{ flex: 1, justifyContent: "center" }}
+                >
+                  Reduced Motion
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: Detection & Global Risk Threshold */}
+      {activeTab === "detection" && (
+        <div className="panel" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <Shield size={16} color="var(--accent)" />
+            <strong style={{ fontSize: "0.9rem", color: "var(--text-primary)" }}>
+              Global Detection & Risk Calibration
+            </strong>
+          </div>
+          <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: 16 }}>
+            Set the baseline risk threshold above which network flows trigger sustained MITRE kill-chain progression alerts.
+          </p>
+
+          <div style={{ maxWidth: 480, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)" }}>
+                  GLOBAL RISK THRESHOLD
+                </span>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem", fontWeight: 700, color: "var(--accent)" }}>
+                  {riskThreshold.toFixed(2)}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0.10"
+                max="0.90"
+                step="0.05"
+                value={riskThreshold}
+                onChange={(e) => setRiskThreshold(parseFloat(e.target.value))}
+                style={{ width: "100%", accentColor: "var(--accent)" }}
+              />
+              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block", marginTop: 4 }}>
+                Recommended: 0.40. Lower values increase sensitivity; higher values minimize false alarms.
+              </span>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
+              <div style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 4, padding: "8px 10px" }}>
+                <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>CONSECUTIVE WINDOWS (N)</span>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.95rem", fontWeight: 700, marginTop: 2 }}>
+                  2 Steps (Sustained)
+                </div>
+              </div>
+              <div style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 4, padding: "8px 10px" }}>
+                <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>TEMPORAL HORIZON (H)</span>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.95rem", fontWeight: 700, marginTop: 2 }}>
+                  6 Rollout Minutes
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: About Project Garud */}
+      {activeTab === "about" && (
+        <div className="panel" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <Info size={16} color="var(--accent)" />
+            <strong style={{ fontSize: "0.9rem", color: "var(--text-primary)" }}>
+              About Project Garud &mdash; AI Network Attack Forecasting
+            </strong>
+          </div>
+          <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.6, maxWidth: 700 }}>
+            <p>
+              <strong>Project Garud</strong> is an advanced Defensive Network World Model built for the Smart India Hackathon (SIH) 2026 under Problem Statement <strong>PS26153</strong>.
+            </p>
+            <p>
+              Unlike legacy Intrusion Detection Systems (IDS) that only identify attacks after compromise, Garud forecasts multi-step attack progression across 5 MITRE ATT&CK kill-chain stages up to 6 minutes into the future.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 16 }}>
+              <div style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 4, padding: "10px" }}>
+                <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>ORGANIZATION</div>
+                <strong style={{ color: "var(--text-primary)" }}>SIH 2026 &bull; PS26153</strong>
+              </div>
+              <div style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 4, padding: "10px" }}>
+                <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>TEAM</div>
+                <strong style={{ color: "var(--text-primary)" }}>Team Code 4 Change</strong>
+              </div>
+              <div style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 4, padding: "10px" }}>
+                <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>MODEL ARCHITECTURE</div>
+                <strong style={{ color: "var(--text-primary)" }}>LSTM World Model (22 Feat)</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TAB 1: Simulation Lab & Source Controls */}
       {activeTab === "lab" && (

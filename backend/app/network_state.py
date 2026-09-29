@@ -209,6 +209,7 @@ class NetworkStateTracker:
         self._lock = threading.Lock()
         self._model = None
         self._model_error = None
+        self.mode = "live"
 
     @property
     def model(self):
@@ -342,6 +343,10 @@ class NetworkStateTracker:
             rows = list(self._flows)
         if not rows:
             return None
+        if getattr(self, "mode", "live") == "live":
+            live_rows = [r for r in rows if r.get("_source") != "simulated"]
+            if live_rows:
+                rows = live_rows
         st = full_grid(minute_states(flows_from_features(rows)))
         now_min = np.datetime64(datetime.now(timezone.utc).replace(tzinfo=None, second=0, microsecond=0))
         # Include current minute so real-time attack bursts reflect immediately
@@ -371,6 +376,10 @@ class NetworkStateTracker:
 
         with self._lock:
             rows = list(self._flows)
+        if getattr(self, "mode", "live") == "live":
+            live_rows = [r for r in rows if r.get("_source") != "simulated"]
+            if live_rows:
+                rows = live_rows
 
         # Compute empirical threat indicators across all minutes
         # Also incorporate flow stage tags if present
@@ -568,7 +577,12 @@ class NetworkStateTracker:
             etr_desc = "Telemetry baseline nominal across next 4+ minutes. Zero intrusion velocity."
             etr_minutes = None
 
-        stages = [str(b) for b in emp_behaviours]
+        stages = [
+            str(emp_behaviours[i]) if (
+                (not np.isnan(score[i]) and score[i] >= m.thr) or emp_scores[i] >= 0.35
+            ) else "Benign"
+            for i in range(len(emp_behaviours))
+        ]
 
         return dict(
             status="ok", minutes=minutes, state=display,

@@ -1,62 +1,62 @@
-@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+@import "./styles/tokens.css";
+@import "./styles/layout.css";
+@import "./styles/components.css";
 
 :root {
-  /* User Specific Color Tokens */
-  --c-dark-base: #1a1610; /* Base background / Tactical dark canvas */
-  --c-dark-surface: #241f18; /* Cards & Containers surface */
-  --c-dark-elevated: #3a3228; /* Headers, borders, elevated elements */
-  --c-light-base: #f5f1e8; /* Primary text on dark / Warm light base */
-  --c-muted: #b8b0a3; /* Subtitle, muted details, secondary text */
-  --c-gold: #d6b36a; /* Tactical Amber Gold / Accent highlight */
-  --c-red: #c94a45; /* Rust Red / Threat Alerts / Critical */
+  /* Legacy tokens mapped to design system */
+  --c-dark-base: var(--bg-page);
+  --c-dark-surface: var(--bg-surface);
+  --c-dark-elevated: var(--bg-raised);
+  --c-light-base: var(--text-primary);
+  --c-muted: var(--text-secondary);
+  --c-gold: var(--accent);
+  --c-red: var(--danger);
 
   /* Mapped UI Tokens */
-  --bg-base: var(--c-dark-base);
-  --bg-surface: var(--c-dark-surface);
-  --bg-elevated: var(--c-dark-elevated);
-  --bg-hover: #2e271f;
+  --bg-base: var(--bg-page);
+  --bg-surface: var(--bg-surface);
+  --bg-elevated: var(--bg-raised);
+  --bg-hover: var(--bg-raised);
 
-  --bg-dark: var(--c-dark-base);
-  --bg-dark-surface: #221c15;
-  --bg-dark-hover: #2e271f;
-  --bg-dark-elevated: var(--c-dark-elevated);
+  --bg-dark: var(--bg-page);
+  --bg-dark-surface: var(--bg-surface);
+  --bg-dark-hover: var(--bg-raised);
+  --bg-dark-elevated: var(--bg-raised);
 
-  --border: var(--c-dark-elevated);
-  --border-muted: #2c251d;
-  --border-dark: var(--c-dark-elevated);
-  --border-accent: rgba(214, 179, 106, 0.4);
+  --border: var(--border);
+  --border-muted: var(--border-subtle);
+  --border-dark: var(--border-strong);
+  --border-accent: rgba(246, 177, 68, 0.4);
 
-  --text-primary: var(--c-light-base);
-  --text-secondary: var(--c-muted);
-  --text-muted: #8e8679;
+  --text-primary: var(--text-primary);
+  --text-secondary: var(--text-secondary);
+  --text-muted: var(--text-muted);
 
-  --text-on-dark: var(--c-light-base);
-  --text-on-dark-secondary: var(--c-muted);
-  --text-on-dark-muted: #8e8679;
+  --text-on-dark: var(--text-primary);
+  --text-on-dark-secondary: var(--text-secondary);
+  --text-on-dark-muted: var(--text-muted);
 
-  --accent: var(--c-gold);
-  --accent-hover: #e3c17b;
-  --accent-muted: rgba(214, 179, 106, 0.16);
+  --accent: var(--accent);
+  --accent-hover: #E5A137;
+  --accent-muted: var(--accent-soft);
 
-  --gold: var(--c-gold);
-  --gold-muted: rgba(214, 179, 106, 0.16);
+  --gold: var(--accent);
+  --gold-muted: var(--accent-soft);
 
-  --severity-critical: var(--c-red);
-  --severity-high: var(--c-gold);
-  --severity-medium: var(--c-muted);
-  --severity-low: #58a668;
+  --severity-critical: var(--danger);
+  --severity-high: var(--accent);
+  --severity-medium: var(--text-secondary);
+  --severity-low: var(--success);
 
-  --stage-benign: #58a668;
-  --stage-recon: #4b90d6;
-  --stage-initial: var(--c-gold);
-  --stage-lateral: #d48946;
-  --stage-c2: #d1643f;
-  --stage-exfil: var(--c-red);
+  --stage-benign: var(--success);
+  --stage-recon: #4B90D6;
+  --stage-initial: var(--accent);
+  --stage-lateral: #D48946;
+  --stage-c2: #D1643F;
+  --stage-exfil: var(--danger);
 
-  --font-sans:
-    "Barlow Condensed", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
-  --font-mono: "Barlow Condensed", "JetBrains Mono", monospace;
+  --font-sans: var(--font-heading);
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 
   --sp-1: 0.25rem;
   --sp-2: 0.5rem;
@@ -801,13 +801,25 @@ a:hover {
 
 .tab-btn.active {
   background: var(--accent);
-  color: var(--c-dark-base);
+  color: #010B0C !important;
+  font-weight: 700;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
-.tab-btn:hover:not(.active) {
-  color: var(--text-primary);
-  background: var(--bg-hover);
+[data-theme="light"] .tab-btn.active {
+  background: #E8920C;
+  color: #FFFFFF !important;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(232, 146, 12, 0.35);
+}
+
+[data-theme="light"] .tab-btn:not(.active) {
+  color: #4A5256;
+}
+
+[data-theme="light"] .tab-btn:hover:not(.active) {
+  color: #111618;
+  background: rgba(37, 42, 45, 0.08);
 }
 
 /* Badges & Stage Indicators */

@@ -1,0 +1,174 @@
+/* ============================================================
+   PROJECT GARUD — DESIGN TOKENS & SYSTEM VARIABLES
+   Retro Technical SOC / Defensive Network Operations Console
+   SIH 2026 | PS26153
+   ============================================================ */
+
+:root {
+  /* Typography Stacks */
+  --font-heading: 'Barlow Condensed', -apple-system, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  /* Typography Scale */
+  --font-xs: 11px;
+  --font-sm: 12px;
+  --font-md: 13px;
+  --font-base: 14px;
+  --font-lg: 16px;
+  --font-xl: 18px;
+  --font-2xl: 22px;
+  --font-3xl: 28px;
+  --font-4xl: 36px;
+  --font-5xl: 44px;
+
+  /* Layout Constants */
+  --sidebar-w: 220px;
+  --sidebar-collapsed-w: 64px;
+  --header-h: 46px;
+  --footer-h: 30px;
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-forecast: 320ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================
+   DARK THEME (Default)
+   Near-black Technical Palette
+   ============================================================ */
+:root,
+[data-theme="dark"] {
+  --bg-page: #010B0C;
+  --bg-chrome: #020E0F;
+  --bg-surface: #041212;
+  --bg-raised: #0A1B1B;
+  --bg-inset: #02090A;
+  
+  --border-subtle: rgba(231, 240, 244, 0.05);
+  --border: rgba(231, 240, 244, 0.09);
+  --border-strong: rgba(231, 240, 244, 0.18);
+  --border-focus: rgba(246, 177, 68, 0.45);
+
+  --text-primary: #E7F0F4;
+  --text-secondary: #9AA6AA;
+  --text-muted: #5F6E72;
+  --text-dim: #3F4C50;
+  
+  --accent: #F6B144;
+  --accent-soft: rgba(246, 177, 68, 0.12);
+  --accent-text: #F6B144;
+
+  --danger: #F64541;
+  --danger-soft: rgba(246, 69, 65, 0.14);
+  --danger-border: rgba(246, 69, 65, 0.35);
+
+  --warning: #F6B144;
+  --warning-soft: rgba(246, 177, 68, 0.14);
+
+  --success: #30C07B;
+  --success-soft: rgba(48, 192, 123, 0.14);
+
+  --info: #379DF2;
+  --info-soft: rgba(55, 157, 242, 0.14);
+
+  /* Forecasting Spec Colors */
+  --observed: #39DFEB;
+  --forecast: #F64541;
+  --forecast-band: rgba(246, 69, 65, 0.20);
+  --threshold: #F6B144;
+
+  /* Network Node Colors */
+  --node-internal: #30C07B;
+  --node-external: #379DF2;
+  --node-suspicious: #F6B144;
+  --node-malicious: #F64541;
+
+  /* Map and Grid */
+  --map-bg: #02090A;
+  --grid-line: rgba(231, 240, 244, 0.04);
+  --grid-dot: rgba(231, 240, 244, 0.10);
+
+  /* Elevation Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.85);
+
+  /* Tooltip and Popover */
+  --bg-popover: #0A1B1B;
+  --border-popover: rgba(231, 240, 244, 0.22);
+}
+
+/* ============================================================
+   LIGHT THEME
+   Warm Technical Paper / Control-Room Interface
+   ============================================================ */
+[data-theme="light"] {
+  --bg-page: #FAF7F1;
+  --bg-chrome: #F9F6F1;
+  --bg-surface: #FEFBF6;
+  --bg-raised: #F6F3EC;
+  --bg-inset: #F0EBE0;
+
+  --border-subtle: #EDE6D8;
+  --border: #E6DFD0;
+  --border-strong: #CFC6B3;
+  --border-focus: #D08818;
+
+  --text-primary: #252A2D;
+  --text-secondary: #666B6E;
+  --text-muted: #8F9599;
+  --text-dim: #B4B9BC;
+
+  --accent: #FDB23A;
+  --accent-soft: rgba(253, 178, 58, 0.16);
+  --accent-text: #9A6100;
+
+  --danger: #E5392F;
+  --danger-soft: #FDE3E0;
+  --danger-border: rgba(229, 57, 47, 0.35);
+
+  --warning: #E8920C;
+  --warning-soft: #FEF3D8;
+
+  --success: #1F9D5F;
+  --success-soft: #E0F5EB;
+
+  --info: #1875ED;
+  --info-soft: #E3EFFF;
+
+  /* Forecasting Spec Colors */
+  --observed: #252A2D;
+  --forecast: #E5392F;
+  --forecast-band: rgba(229, 57, 47, 0.16);
+  --threshold: #E8920C;
+
+  /* Network Node Colors */
+  --node-internal: #1F9D5F;
+  --node-external: #1875ED;
+  --node-suspicious: #E8920C;
+  --node-malicious: #E5392F;
+
+  /* Map and Grid */
+  --map-bg: #F4EFE6;
+  --grid-line: rgba(37, 42, 45, 0.05);
+  --grid-dot: rgba(37, 42, 45, 0.12);
+
+  /* Elevation Shadows */
+  --shadow-sm: 0 1px 2px rgba(40, 30, 20, 0.06);
+  --shadow-md: 0 4px 12px rgba(40, 30, 20, 0.08);
+  --shadow-popover: 0 8px 24px rgba(40, 30, 20, 0.14);
+
+  /* Tooltip and Popover */
+  --bg-popover: #FEFBF6;
+  --border-popover: #CFC6B3;
+}

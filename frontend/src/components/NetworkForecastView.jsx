@@ -387,10 +387,12 @@ function NetworkForecastView() {
   }, [data]);
 
   const peakObservedRisk = useMemo(() => {
-    if (!data?.risk_score) return 0;
-    const valid = data.risk_score.filter((v) => v != null);
-    return valid.length ? Math.max(...valid) : 0;
-  }, [data]);
+    if (!chart || !chart.length) return 0;
+    const obs = chart
+      .filter((p) => p.observed != null)
+      .map((p) => p.observed);
+    return obs.length ? Math.max(...obs) : 0;
+  }, [chart]);
 
   if (error) {
     return (
@@ -879,19 +881,9 @@ function NetworkForecastView() {
           }}
         >
           {(() => {
-            const observedStageList = (data?.stages || [])
-              .filter((s) => s && s !== "Benign" && s !== "None")
-              .map((s) => String(s).toLowerCase());
-            if (activeStage && activeStage !== "Benign") {
-              observedStageList.push(activeStage.toLowerCase());
-            }
-
             return KILL_CHAIN_PHASES.map((phase, idx) => {
-              const phaseWasObserved = phase.keys.some((k) =>
-                observedStageList.some((s) => s.includes(k)),
-              );
-              const isCurrent = idx === currentPhaseIdx;
-              const isPassed = !isCurrent && phaseWasObserved;
+              const isCurrent = currentPhaseIdx >= 0 && idx === currentPhaseIdx;
+              const isPassed = currentPhaseIdx >= 0 && idx < currentPhaseIdx;
               const phaseCol = phase.color;
 
               return (
