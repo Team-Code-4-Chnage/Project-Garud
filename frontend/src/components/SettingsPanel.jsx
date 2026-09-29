@@ -496,7 +496,7 @@ export default function SettingsPanel({
 
       {/* TAB: Appearance & Theme (Only Place Where Theme is Switched) */}
       {activeTab === "appearance" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 16 }}>
           {/* Card 1: Theme Selection */}
           <div className="panel" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
@@ -640,53 +640,128 @@ export default function SettingsPanel({
 
       {/* TAB: Detection & Global Risk Threshold */}
       {activeTab === "detection" && (
-        <div className="panel" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <Shield size={16} color="var(--accent)" />
-            <strong style={{ fontSize: "0.9rem", color: "var(--text-primary)" }}>
-              Global Detection & Risk Calibration
-            </strong>
-          </div>
-          <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: 16 }}>
-            Set the baseline risk threshold above which network flows trigger sustained MITRE kill-chain progression alerts.
-          </p>
-
-          <div style={{ maxWidth: 480, display: "flex", flexDirection: "column", gap: 14 }}>
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)" }}>
-                  GLOBAL RISK THRESHOLD
-                </span>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem", fontWeight: 700, color: "var(--accent)" }}>
-                  {riskThreshold.toFixed(2)}
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0.10"
-                max="0.90"
-                step="0.05"
-                value={riskThreshold}
-                onChange={(e) => setRiskThreshold(parseFloat(e.target.value))}
-                style={{ width: "100%", accentColor: "var(--accent)" }}
-              />
-              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block", marginTop: 4 }}>
-                Recommended: 0.40. Lower values increase sensitivity; higher values minimize false alarms.
-              </span>
+        <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 16 }}>
+          {/* Card 1: Global Risk Calibration */}
+          <div className="panel" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <Shield size={16} color="var(--accent)" />
+              <strong style={{ fontSize: "0.9rem", color: "var(--text-primary)" }}>
+                Global Detection & Risk Calibration
+              </strong>
             </div>
+            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: 16 }}>
+              Set the baseline risk threshold above which network flows trigger sustained MITRE kill-chain progression alerts.
+            </p>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
-              <div style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 4, padding: "8px 10px" }}>
-                <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>CONSECUTIVE WINDOWS (N)</span>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.95rem", fontWeight: 700, marginTop: 2 }}>
-                  2 Steps (Sustained)
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)" }}>
+                    GLOBAL RISK THRESHOLD
+                  </span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem", fontWeight: 700, color: "var(--accent)" }}>
+                    {riskThreshold.toFixed(2)}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.10"
+                  max="0.90"
+                  step="0.05"
+                  value={riskThreshold}
+                  onChange={(e) => setRiskThreshold(parseFloat(e.target.value))}
+                  style={{ width: "100%", accentColor: "var(--accent)" }}
+                />
+                <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block", marginTop: 4 }}>
+                  Recommended: 0.40. Lower values increase sensitivity; higher values minimize false alarms.
+                </span>
+
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <button
+                    type="button"
+                    className={`garud-btn garud-btn-sm ${riskThreshold === 0.30 ? "garud-btn-primary" : ""}`}
+                    onClick={() => setRiskThreshold(0.30)}
+                    style={{ flex: 1, justifyContent: "center", fontSize: 10 }}
+                  >
+                    High Sensitivity (0.30)
+                  </button>
+                  <button
+                    type="button"
+                    className={`garud-btn garud-btn-sm ${riskThreshold === 0.40 ? "garud-btn-primary" : ""}`}
+                    onClick={() => setRiskThreshold(0.40)}
+                    style={{ flex: 1, justifyContent: "center", fontSize: 10 }}
+                  >
+                    Balanced SOC (0.40)
+                  </button>
+                  <button
+                    type="button"
+                    className={`garud-btn garud-btn-sm ${riskThreshold === 0.55 ? "garud-btn-primary" : ""}`}
+                    onClick={() => setRiskThreshold(0.55)}
+                    style={{ flex: 1, justifyContent: "center", fontSize: 10 }}
+                  >
+                    Low Noise (0.55)
+                  </button>
                 </div>
               </div>
-              <div style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 4, padding: "8px 10px" }}>
-                <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>TEMPORAL HORIZON (H)</span>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.95rem", fontWeight: 700, marginTop: 2 }}>
-                  6 Rollout Minutes
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
+                <div style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 4, padding: "8px 10px" }}>
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>CONSECUTIVE WINDOWS (N)</span>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.95rem", fontWeight: 700, marginTop: 2 }}>
+                    2 Steps (Sustained)
+                  </div>
                 </div>
+                <div style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 4, padding: "8px 10px" }}>
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>TEMPORAL HORIZON (H)</span>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.95rem", fontWeight: 700, marginTop: 2 }}>
+                    6 Rollout Minutes
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: MITRE Infiltration & Alert Trigger Rules */}
+          <div className="panel" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <Sliders size={16} color="var(--accent)" />
+              <strong style={{ fontSize: "0.9rem", color: "var(--text-primary)" }}>
+                Attack Progression & Alert Trigger Rules
+              </strong>
+            </div>
+            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: 14 }}>
+              Automated correlation rules tuned to differentiate normal multi-cloud traffic from adversarial attack patterns.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 4, padding: "10px 12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-primary)" }}>Reconnaissance & Scan Suppressor</span>
+                  <span style={{ fontSize: "0.7rem", color: "var(--success)", fontWeight: 700 }}>ACTIVE</span>
+                </div>
+                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", lineHeight: 1.4 }}>
+                  Suppresses single isolated probe flows; requires multiple SYN bursts or multi-port sweeps before raising high-priority alert.
+                </span>
+              </div>
+
+              <div style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 4, padding: "10px 12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-primary)" }}>Lateral Movement & Pivot Correlator</span>
+                  <span style={{ fontSize: "0.7rem", color: "var(--success)", fontWeight: 700 }}>ACTIVE</span>
+                </div>
+                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", lineHeight: 1.4 }}>
+                  Detects internal peer-to-peer subnet hops (SMB 445, RPC 135, RDP 3389) linking ingress nodes to protected internal workstations.
+                </span>
+              </div>
+
+              <div style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 4, padding: "10px 12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-primary)" }}>Exfiltration & High Egress Bandwidth</span>
+                  <span style={{ fontSize: "0.7rem", color: "var(--danger)", fontWeight: 700 }}>CRITICAL</span>
+                </div>
+                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", lineHeight: 1.4 }}>
+                  Immediately flags abnormal backward packet byte spikes and elevated PSH flag flushes directed at external endpoints.
+                </span>
               </div>
             </div>
           </div>
@@ -695,7 +770,7 @@ export default function SettingsPanel({
 
       {/* TAB: About Project Garud */}
       {activeTab === "about" && (
-        <div className="panel" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+        <div className="panel" style={{ gridColumn: "1 / -1", background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
             <Info size={16} color="var(--accent)" />
             <strong style={{ fontSize: "0.9rem", color: "var(--text-primary)" }}>
@@ -993,9 +1068,8 @@ export default function SettingsPanel({
           </div>
 
 
-          {/* Interactive Simulation Lab Console (Visible only in Simulation Research Lab mode) */}
-          {systemMode === "simulated" && (
-            <div className="panel" style={{ gridColumn: "1 / -1" }}>
+          {/* Interactive Simulation Lab Console */}
+          <div className="panel" style={{ gridColumn: "1 / -1" }}>
             <div
               className="panel-header"
               style={{
@@ -1319,13 +1393,12 @@ export default function SettingsPanel({
               </div>
             </div>
           </div>
-        )}
         </>
       )}
 
       {/* TAB 2: Model Architecture & Telemetry Database */}
       {activeTab === "architecture" && (
-        <>
+        <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 16 }}>
           {/* World Model Architecture Card */}
           <div className="panel">
             <div className="panel-header">
@@ -1467,7 +1540,7 @@ export default function SettingsPanel({
               </div>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* TAB 3: Feature Reference Dictionary */}
