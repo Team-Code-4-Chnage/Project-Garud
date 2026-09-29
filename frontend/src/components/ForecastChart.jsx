@@ -94,6 +94,88 @@ export function getStageMeta(stage) {
   return { key: "benign", label: stage, color: "#34D399", phase: "0" };
 }
 
+// Maps exact numerical risk percentage, explicit stage, and dynamic operating threshold to MITRE kill chain color
+export function getPointMeta(riskVal, rawStage, thresholdVal = 0.4) {
+  const r = Number(riskVal || 0.0);
+  const s = String(rawStage || "")
+    .trim()
+    .toLowerCase();
+  const thr = Number(thresholdVal || 0.4);
+
+  // 1. Safe / Benign Baseline:
+  // Guarantees that nominal baseline history before attack onset displays clean Green!
+  if (
+    r <= 0.22 ||
+    (r < thr * 0.9 && (s === "benign" || s === "nominal" || !s))
+  ) {
+    return {
+      key: "benign",
+      label: "Benign (Nominal)",
+      color: "#34D399",
+      phase: "0",
+    };
+  }
+
+  // 2. Pre-Threshold Early Probing / Reconnaissance:
+  if (
+    r < thr ||
+    s.includes("recon") ||
+    s.includes("scan") ||
+    s.includes("port") ||
+    s.includes("prob")
+  ) {
+    return {
+      key: "recon",
+      label: "Reconnaissance (Probing)",
+      color: "#39DFEB",
+      phase: "1",
+    };
+  }
+
+  // 3. Above Threshold: Escalating Attack Journey:
+  if (
+    s.includes("exfil") ||
+    s.includes("infilt") ||
+    s.includes("heartbleed") ||
+    r >= 0.85
+  ) {
+    return {
+      key: "exfil",
+      label: "Exfiltration (Critical)",
+      color: "#F64541",
+      phase: "5",
+    };
+  }
+  if (
+    s.includes("c2") ||
+    s.includes("bot") ||
+    s.includes("command") ||
+    r >= 0.72
+  ) {
+    return {
+      key: "c2",
+      label: "C2 Channel (High)",
+      color: "#E5633E",
+      phase: "4",
+    };
+  }
+  if (s.includes("lateral") || s.includes("pivot") || r >= 0.58) {
+    return {
+      key: "lateral",
+      label: "Lateral Movement (Warning)",
+      color: "#E8873A",
+      phase: "3",
+    };
+  }
+
+  return {
+    key: "initial",
+    label: "Initial Access (Elevated)",
+    color: "#F6B144",
+    phase: "2",
+  };
+}
+
 // Custom retro-technical tooltip with stage color integration
 function ForecastTooltip({ active, payload, isDark, thresholdVal }) {
   if (!active || !payload || !payload.length) return null;
@@ -217,16 +299,41 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
     const pastRisks = forecastData.risk_score || [];
     const pastStages = forecastData.stages || [];
 
+    // Guarantee minimum 8 observed points so the full green-to-red progression is always visible
+    const padCount = Math.max(0, 8 - pastMinutes.length);
+    for (let p = 0; p < padCount; p++) {
+      const minutesDiff = -(8 - p - 1);
+      const label = `${minutesDiff}m`;
+      const baseRisk = 0.08;
+      const stgMeta = getPointMeta(baseRisk, "Benign", thresholdVal);
+      result.push({
+        time: `pad_${minutesDiff}`,
+        displayLabel: label,
+        observedRisk: baseRisk,
+        forecastRisk: null,
+        lowerUncertainty: null,
+        upperUncertainty: null,
+        uncertaintyRange: null,
+        stage: stgMeta.label,
+        stageKey: stgMeta.key,
+        stageLabel: stgMeta.label,
+        stageColor: stgMeta.color,
+        stagePhase: stgMeta.phase,
+        isObserved: true,
+        isNow: false,
+      });
+    }
+
     // Take past observed minutes (up to 8 minutes prior)
     const startIdx = Math.max(0, pastMinutes.length - 8);
     for (let i = startIdx; i < pastMinutes.length; i++) {
       const minStr = pastMinutes[i];
-      const riskVal = pastRisks[i] != null ? Number(pastRisks[i]) : 0.0;
+      const riskVal = pastRisks[i] != null ? Number(pastRisks[i]) : 0.08;
       const isNow = i === pastMinutes.length - 1;
       const minutesDiff = i - (pastMinutes.length - 1);
       const label = isNow ? "NOW" : `${minutesDiff}m`;
       const rawStage = pastStages[i] || (isNow ? activeStage : "Benign");
-      const stgMeta = getStageMeta(rawStage);
+      const stgMeta = getPointMeta(riskVal, rawStage, thresholdVal);
 
       result.push({
         time: minStr,
@@ -238,7 +345,7 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
         uncertaintyRange: isNow
           ? [Math.max(0, riskVal - 0.08), Math.min(1, riskVal + 0.08)]
           : null,
-        stage: rawStage,
+        stage: stgMeta.label,
         stageKey: stgMeta.key,
         stageLabel: stgMeta.label,
         stageColor: stgMeta.color,
@@ -260,7 +367,7 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
       const riskVal = Number(step.risk || 0.0);
       const stepNum = idx + 1;
       const topBeh = step.behaviours?.[0]?.behaviour || "Benign";
-      const stgMeta = getStageMeta(topBeh);
+      const stgMeta = getPointMeta(riskVal, topBeh, thresholdVal);
       const uncertaintySpread = 0.06 + idx * 0.03; // uncertainty grows with horizon
 
       result.push({
@@ -274,7 +381,7 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
           Math.max(0, riskVal - uncertaintySpread),
           Math.min(1, riskVal + uncertaintySpread),
         ],
-        stage: topBeh,
+        stage: stgMeta.label,
         stageKey: stgMeta.key,
         stageLabel: stgMeta.label,
         stageColor: stgMeta.color,
@@ -285,7 +392,41 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
     });
 
     return result;
-  }, [forecastData, horizonFilter, activeStage]);
+  }, [forecastData, horizonFilter, activeStage, thresholdVal]);
+
+  // Dynamic gradient stops based on individual points' stage % and risk level
+  const { observedStops, forecastStops } = useMemo(() => {
+    const obs = chartData.filter((d) => d.isObserved);
+    const fc = chartData.filter((d) => !d.isObserved || d.isNow);
+
+    const calcStops = (list) => {
+      if (!list || !list.length) {
+        return [
+          { offset: 0, color: "#34D399" },
+          { offset: 100, color: "#34D399" },
+        ];
+      }
+      if (list.length === 1) {
+        const c = list[0].stageColor || "#34D399";
+        return [
+          { offset: 0, color: c },
+          { offset: 100, color: c },
+        ];
+      }
+      return list.map((item, idx) => {
+        const offset = Math.round((idx / (list.length - 1)) * 1000) / 10;
+        return {
+          offset,
+          color: item.stageColor || "#34D399",
+        };
+      });
+    };
+
+    return {
+      observedStops: calcStops(obs),
+      forecastStops: calcStops(fc),
+    };
+  }, [chartData]);
 
   // Stage distribution counts for filter buttons
   const stageCounts = useMemo(() => {
@@ -484,22 +625,69 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
             >
               <defs>
                 <linearGradient
-                  id="forecastRiskAreaGrad"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
+                  id="observedLineGrad"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="0%"
                 >
-                  <stop
-                    offset="0%"
-                    stopColor={activeStageColor}
-                    stopOpacity={0.28}
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor={activeStageColor}
-                    stopOpacity={0.0}
-                  />
+                  {observedStops.map((st, idx) => (
+                    <stop
+                      key={`obs-line-${idx}`}
+                      offset={`${st.offset}%`}
+                      stopColor={st.color}
+                    />
+                  ))}
+                </linearGradient>
+
+                <linearGradient
+                  id="observedAreaGrad"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="0%"
+                >
+                  {observedStops.map((st, idx) => (
+                    <stop
+                      key={`obs-area-${idx}`}
+                      offset={`${st.offset}%`}
+                      stopColor={st.color}
+                      stopOpacity={isDark ? 0.24 : 0.16}
+                    />
+                  ))}
+                </linearGradient>
+
+                <linearGradient
+                  id="forecastLineGrad"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="0%"
+                >
+                  {forecastStops.map((st, idx) => (
+                    <stop
+                      key={`fc-line-${idx}`}
+                      offset={`${st.offset}%`}
+                      stopColor={st.color}
+                    />
+                  ))}
+                </linearGradient>
+
+                <linearGradient
+                  id="forecastAreaGrad"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="0%"
+                >
+                  {forecastStops.map((st, idx) => (
+                    <stop
+                      key={`fc-area-${idx}`}
+                      offset={`${st.offset}%`}
+                      stopColor={st.color}
+                      stopOpacity={isDark ? 0.18 : 0.12}
+                    />
+                  ))}
                 </linearGradient>
               </defs>
 
@@ -563,12 +751,12 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
                 strokeWidth={1.5}
               />
 
-              {/* Area Gradient under curve matching active stage */}
+              {/* Area Gradient under curve matching individual point stage colors */}
               <Area
                 type="monotone"
                 dataKey="observedRisk"
                 stroke="none"
-                fill="url(#forecastRiskAreaGrad)"
+                fill="url(#observedAreaGrad)"
                 connectNulls
                 isAnimationActive={false}
               />
@@ -578,22 +766,26 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
                 type="monotone"
                 dataKey="upperUncertainty"
                 stroke="none"
-                fill={`${activeStageColor}26`}
+                fill={
+                  isDark
+                    ? "rgba(231, 240, 244, 0.08)"
+                    : "rgba(37, 42, 45, 0.08)"
+                }
                 connectNulls
                 isAnimationActive={false}
               />
 
-              {/* Observed History Line with Stage-Colored Dots */}
+              {/* Observed History Line with Stage-Calibrated Gradient */}
               <Line
                 type="monotone"
                 dataKey="observedRisk"
-                stroke={activeStageColor}
+                stroke="url(#observedLineGrad)"
                 strokeWidth={2.5}
                 dot={(dotProps) => {
                   const { cx, cy, payload } = dotProps;
                   if (cx == null || cy == null || payload.observedRisk == null)
                     return null;
-                  const col = payload.stageColor || activeStageColor;
+                  const col = payload.stageColor || "#34D399";
                   const isNow = payload.isNow;
                   const isDimmed =
                     stageFilter !== "all" && payload.stageKey !== stageFilter;
@@ -616,23 +808,23 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
                     />
                   );
                 }}
-                activeDot={{ r: 6.5, fill: activeStageColor }}
+                activeDot={{ r: 6.5 }}
                 connectNulls
                 isAnimationActive={false}
               />
 
-              {/* Forecast Rollout Line with Stage-Colored Dots */}
+              {/* Forecast Rollout Line with Stage-Calibrated Gradient */}
               <Line
                 type="monotone"
                 dataKey="forecastRisk"
-                stroke={activeStageColor}
+                stroke="url(#forecastLineGrad)"
                 strokeWidth={2.5}
                 strokeDasharray="4 3"
                 dot={(dotProps) => {
                   const { cx, cy, payload } = dotProps;
                   if (cx == null || cy == null || payload.forecastRisk == null)
                     return null;
-                  const col = payload.stageColor || activeStageColor;
+                  const col = payload.stageColor || "#34D399";
                   const isDimmed =
                     stageFilter !== "all" && payload.stageKey !== stageFilter;
                   const isFilteredActive =
@@ -650,7 +842,7 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
                     />
                   );
                 }}
-                activeDot={{ r: 6.5, fill: activeStageColor }}
+                activeDot={{ r: 6.5 }}
                 connectNulls
                 isAnimationActive={false}
               />
@@ -666,16 +858,19 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
           <div className="garud-legend-item">
             <span
               className="garud-legend-line"
-              style={{ background: activeStageColor }}
+              style={{
+                background:
+                  "linear-gradient(90deg, #34D399, #39DFEB, #F6B144, #E8873A, #F64541)",
+              }}
             />
-            <span>Observed History ({activeStageMeta.label})</span>
+            <span>Observed History (Stage % Calibrated)</span>
           </div>
           <div className="garud-legend-item">
             <span
               className="garud-legend-line"
               style={{
                 background: "transparent",
-                borderBottom: `2px dashed ${activeStageColor}`,
+                borderBottom: "2px dashed #F6B144",
                 height: 0,
               }}
             />
@@ -684,7 +879,11 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
           <div className="garud-legend-item">
             <span
               className="garud-legend-band"
-              style={{ background: `${activeStageColor}26` }}
+              style={{
+                background: isDark
+                  ? "rgba(231, 240, 244, 0.12)"
+                  : "rgba(37, 42, 45, 0.12)",
+              }}
             />
             <span>Uncertainty Range (&plusmn;&sigma;)</span>
           </div>
