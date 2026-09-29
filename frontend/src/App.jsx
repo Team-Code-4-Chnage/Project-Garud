@@ -13,9 +13,12 @@ import {
   Menu,
   X,
   HelpCircle,
+  Moon,
+  Sun,
 } from "lucide-react";
 import EagleIcon from "./components/EagleIcon";
 import { apiFetch, apiPost, createWebSocket } from "./api";
+import { useTheme } from "./theme";
 import { flowKey } from "./utils";
 import { WellbeingModal } from "./components/Badges";
 import ConfirmModal from "./components/ConfirmModal";
@@ -30,6 +33,7 @@ import { IngestPanel } from "./components/UploadPanel";
 import "./index.css";
 
 export default function App() {
+  const { isDark, setTheme } = useTheme();
   const [view, setView] = useState("dashboard");
   const [health, setHealth] = useState(null);
   const [alertCount, setAlertCount] = useState(0);
@@ -647,6 +651,26 @@ export default function App() {
                 second: "2-digit",
               })}
             </span>
+
+            <button
+              className="garud-btn garud-btn-sm"
+              onClick={() => setTheme(isDark ? "light" : "dark")}
+              title={`Switch to ${isDark ? "Light" : "Dark"} Theme`}
+              style={{
+                fontSize: 11,
+                padding: "3px 8px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                background: "var(--bg-surface)",
+                border: "1px solid var(--border)",
+                color: "var(--text-primary)",
+                cursor: "pointer",
+              }}
+            >
+              {isDark ? <Moon size={11} color="var(--accent)" /> : <Sun size={11} color="var(--accent)" />}
+              <span>{isDark ? "DARK" : "LIGHT"}</span>
+            </button>
 
             <button
               className="garud-btn garud-btn-sm"

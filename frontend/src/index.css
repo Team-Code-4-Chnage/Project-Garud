@@ -14,7 +14,6 @@
 
   /* Mapped UI Tokens */
   --bg-base: var(--bg-page);
-  --bg-surface: var(--bg-surface);
   --bg-elevated: var(--bg-raised);
   --bg-hover: var(--bg-raised);
 
@@ -23,20 +22,14 @@
   --bg-dark-hover: var(--bg-raised);
   --bg-dark-elevated: var(--bg-raised);
 
-  --border: var(--border);
   --border-muted: var(--border-subtle);
   --border-dark: var(--border-strong);
   --border-accent: rgba(246, 177, 68, 0.4);
-
-  --text-primary: var(--text-primary);
-  --text-secondary: var(--text-secondary);
-  --text-muted: var(--text-muted);
 
   --text-on-dark: var(--text-primary);
   --text-on-dark-secondary: var(--text-secondary);
   --text-on-dark-muted: var(--text-muted);
 
-  --accent: var(--accent);
   --accent-hover: #E5A137;
   --accent-muted: var(--accent-soft);
 
@@ -2138,10 +2131,10 @@ a:hover {
 }
 
 .garud-modal {
-  background: var(--c-dark-surface);
-  border: 1px solid var(--c-dark-elevated);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(214, 179, 106, 0.15);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px var(--border);
   width: 100%;
   max-width: 820px;
   max-height: 88vh;
@@ -2157,8 +2150,8 @@ a:hover {
 
 .garud-modal-header {
   padding: 14px 20px;
-  background: var(--c-dark-base);
-  border-bottom: 1px solid var(--border-dark);
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2170,12 +2163,13 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);
+  background: var(--bg-surface);
 }
 
 .garud-modal-footer {
   padding: 12px 20px;
-  background: var(--c-dark-base);
-  border-top: 1px solid var(--border-dark);
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border);
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -2193,13 +2187,13 @@ a:hover {
 
 /* Containment Rule Snippets */
 .containment-code-block {
-  background: var(--c-dark-base);
-  border: 1px solid var(--border-dark);
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 12px 14px;
   font-family: var(--font-mono);
   font-size: 0.76rem;
-  color: #a8d5ba;
+  color: var(--success);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2209,8 +2203,8 @@ a:hover {
 
 /* Blockchain Block Visualization Card */
 .blockchain-block-card {
-  background: var(--c-dark-base);
-  border: 1px solid var(--border-dark);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 14px 16px;
   display: flex;
@@ -2221,7 +2215,7 @@ a:hover {
 }
 
 .blockchain-block-card:hover {
-  border-color: rgba(214, 179, 106, 0.5);
+  border-color: var(--accent);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
