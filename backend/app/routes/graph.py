@@ -8,16 +8,15 @@ Exposes the session-derived directed IP graph and geographic threat map via REST
   GET /graph/geoip/{ip}        — individual IP geolocation lookup
 """
 import time
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import SessionDB, get_db
-from ..graph_state import build_session_graph
 from ..geoip import resolve_ip_geo
+from ..graph_state import build_session_graph
 
 router = APIRouter(prefix="/graph", tags=["Graph Topology"])
 

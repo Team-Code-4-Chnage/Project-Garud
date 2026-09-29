@@ -695,7 +695,7 @@ class DeviceLocationPayload(BaseModel):
 @router.post("/device-location")
 async def set_device_location(loc: DeviceLocationPayload):
     """Dynamically set the device's live location from browser GPS / IP resolution."""
-    from ..geoip import update_device_location, get_device_location
+    from ..geoip import get_device_location, update_device_location
     update_device_location(
         lat=loc.latitude,
         lon=loc.longitude,

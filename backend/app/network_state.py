@@ -361,17 +361,11 @@ class NetworkStateTracker:
         st = self.states()
         if st is None or len(st) == 0:
             return dict(status="no_data")
-        import pandas as pd
-        target_len = max(m.W, 8)
-        if len(st) < target_len:
-            earliest_min = st.index[0]
-            needed = target_len - len(st)
-            pad_dates = pd.date_range(end=earliest_min - pd.Timedelta(minutes=1), periods=needed, freq="min")
-            pad_df = pd.DataFrame(0.0, index=pad_dates, columns=st.columns).rename_axis("minute")
-            st = pd.concat([pad_df, st])
-
         minutes = [t.isoformat() for t in st.index]
         display = {f: st[f].round(4).tolist() for f in DISPLAY_FEATURES if f in st}
+        if len(st) < m.W:
+            return dict(status="warming_up", minutes_available=len(st), minutes_needed=m.W,
+                        minutes=minutes, state=display, model=self.model_info())
         Z = m.encode(st)
         win = np.stack([Z[i - m.W + 1:i + 1] for i in range(m.W - 1, len(Z))])
         with torch.no_grad():
@@ -445,18 +439,6 @@ class NetworkStateTracker:
                 score[end_idx] = min(base_risk, 0.16)
             else:
                 score[end_idx] = max(base_risk, e_threat)
-
-        # Populate nominal baseline scores for historical window minutes prior to m.W - 1
-        for i in range(min(m.W - 1, len(score))):
-            if np.isnan(score[i]):
-                e_threat = emp_scores[i] if i < len(emp_scores) else 0.0
-                beh = emp_behaviours[i] if i < len(emp_behaviours) else "Benign"
-                if beh == "Benign" and e_threat == 0.0:
-                    score[i] = 0.08
-                elif beh == "Benign" and e_threat < 0.25:
-                    score[i] = 0.14
-                else:
-                    score[i] = max(0.08, e_threat)
 
         flag = np.nan_to_num(score, nan=0.0) >= m.thr
         run, alert = 0, []
