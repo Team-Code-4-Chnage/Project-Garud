@@ -5,7 +5,7 @@ This document describes what the code does today. Measured results are in [docs/
 ## Overview
 
 ```text
- live capture (Scapy)     PCAP / PCAPNG upload     CSV upload     POST /ingest
+ live capture (Scapy)     PCAP / PCAPNG via /ingest/pcap     CSV via /ingest/csv     POST /ingest
         |                        |                     |               |
         +------------------------+----------+----------+---------------+
                                             |
@@ -27,6 +27,8 @@ This document describes what the code does today. Measured results are in [docs/
                         REST + WebSocket API (FastAPI)  ->  React dashboard
 ```
 
+The diagram is the live system. Uploads from the Offline Analysis page take a separate path that never reaches it (see "Offline analysis path" below).
+
 ## Components
 
 ### Flow extraction (`capture/`)
@@ -40,6 +42,12 @@ This document describes what the code does today. Measured results are in [docs/
 | Module | Responsibility |
 | --- | --- |
 | `main.py` | Application setup, CORS, optional API key, security headers, optional rate limiting, router registration |
+| `table_reader.py` | Recognises the container and layout of an uploaded table by content (gzip, zip, Parquet, JSON, JSON lines, Zeek, delimited text in any encoding) and yields text chunks |
+| `flow_schema.py` | Converts CICFlowMeter, Zeek, Suricata, nfdump, NetFlow, UNSW-NB15 and Garud tables to the 22 features: column recognition, derived features, unit and date checks, and a report of every assumption |
+| `labels.py` | Maps attack labels of public datasets (and 0/1, normal/attack) to the behaviour classes |
+| `flow_classifier.py` | Loads the real-data flow classifier (`backend/artifacts_flow/`) and scores flows in batches |
+| `offline_analysis.py`, `routes/offline.py` | Isolated analysis of uploaded files (see below); no database, live tracker or WebSocket access |
+| `upload_ingest.py` | Streaming and bulk ingestion for `/ingest/csv` and `/ingest/pcap` (live system) |
 | `ingestion.py` | Validates flows, resolves sessions, keeps per-session windows, calls the models, creates alerts, broadcasts events |
 | `model_loader.py`, `inference.py` | Loads the per-flow model; single prediction, rollout with Monte Carlo input noise, SHAP and gradient attribution |
 | `network_state.py` | Per-minute network state, network-state model, forecast payload, sustained-alert rule |
@@ -88,6 +96,25 @@ The forecast shown to the user is not only model output:
 
 These constants and thresholds are engineering choices, not trained values.
 
+### Offline analysis path (`offline_analysis.py`)
+
+```text
+uploaded file -> table_reader (container, layout) -> flow_schema (22 features, time, labels, report)
+   -> completion of missing structure (synthetic timeline only if no timestamps; blocks of 30 rows if no addresses)
+   -> flow_classifier (attack probability, behaviour, confidence per flow)   [labels from the file kept as truth]
+   -> per-minute network state (worldmodel_v3.state) on the file's own dates, split at silences over 60 minutes
+   -> network-state model on every window of every activity period (no rules, caps or blending)
+   -> forecast for the next 4 minutes, and with labels a back-test of every forecast issued in the period
+```
+
+The path has its own copy of the state builder inputs and never calls the live tracker's `add`, `analyze` or database code, so an upload cannot change live sessions, alerts, logs, the map or the live forecast. The result is returned as one JSON document; nothing is stored on the server.
+
+Complexity is linear in the number of flows: reading and conversion in 50,000-row chunks, classification in batches of 250,000, the network model over the minutes of each period. Measured: about 15,000 flows per second, about 1.2 KB of memory per flow.
+
+### Flow classifier (`backend/artifacts_flow/`, `flowclf/`)
+
+A gradient-boosted classifier (scikit-learn `HistGradientBoostingClassifier`) over the 22 features of a single flow, with nine output classes (Benign plus eight behaviours). The attack probability is 1 - P(Benign); flows at or above 0.5 are flagged. It uses no session, address or time information, so it works on any table the converter can read. Training data, split and measured results are in `backend/artifacts_flow/config.json` and the model card. The split is the network-state model's: the last 25% of each capture day are held out from everything.
+
 ### Frontend (`frontend/src/`)
 
 React 19 with Vite, Recharts for charts and Leaflet for the map. `App.jsx` handles navigation, health polling and the WebSocket connection. Views: dashboard, live logs, alerts, network forecast and map, explainability, reports, ingestion, settings. All data comes from the backend through `api.js`; the model result panel on the forecast view reads the served model's `config.json`.
@@ -104,6 +131,7 @@ React 19 with Vite, Recharts for charts and Leaflet for the map. `App.jsx` handl
 | `setup/run_all.py` | Generates synthetic campaigns and trains the per-flow model |
 | `pipeline_fixed.py` | Per-flow training pipeline for real flow data |
 | `worldmodel_v3/` | Network-state model, state builder, training, leave-one-day-out and behaviour studies |
+| `flowclf/` | Flow classifier training and held-out evaluation |
 | `data/` | Dataset download, preprocessing, augmentation, window builder |
 | `experiments/` | Evaluation, calibration, parity and replay scripts with recorded JSON outputs |
 | `lab/` | Isolated-lab data collection (see [LAB_SETUP.md](LAB_SETUP.md)) |

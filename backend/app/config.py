@@ -79,6 +79,7 @@ ADAPTIVE_EMA_ALPHA = 0.3
 ADAPTIVE_SIGMA_MULTIPLIER = 2.0
 
 API_KEY = os.environ.get("API_KEY", None)
+AUTO_START_CAPTURE = os.environ.get("AUTO_START_CAPTURE", "1") == "1"  # start the live sniffer with the service
 
 _extra_origins = [
     url.strip()

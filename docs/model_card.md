@@ -7,7 +7,8 @@ Project Garud ships two models. This card lists what each was trained on, what w
 | Model | Artifacts | Used by |
 | --- | --- | --- |
 | Per-flow model | `backend/artifacts/` (`world_model.pt`, `scaler.pkl`, `config.json`) | `/predict`, `/forecast`, `/explain`, session scoring and alerts during ingestion |
-| Network-state model | `backend/artifacts_v3/` (`network_world_model.pt`, `config.json`) | `/network/forecast` and the network forecast view |
+| Network-state model | `backend/artifacts_v3/` (`network_world_model.pt`, `config.json`) | `/network/forecast`, the network forecast view, and the offline analysis forecast |
+| Flow classifier | `backend/artifacts_flow/` (`flow_classifier.joblib`, `config.json`) | offline analysis: per-flow attack probability and behaviour, predicted labels |
 
 ## 2. Per-flow model
 
@@ -91,22 +92,70 @@ An end-to-end replay of one day through the API is described in the V3 report (s
 
 Earlier versions of `backend/artifacts_v3/config.json` and of the dashboard's result panel showed a detection F1 of 0.86, ROC-AUC 0.885, three of three episodes warned and a table of baseline models. Re-running the training script with the committed weights and seed did not reproduce those values; the weights were identical and the measured values are those in the table above. The config now holds the measured values and the panel reads them from the config. The report [world_model_v3_report.md](world_model_v3_report.md) already contained the measured values.
 
-## 4. Rules that shape what the dashboard shows
+## 4. Flow classifier
+
+### Definition
+
+`HistGradientBoostingClassifier` (400 iterations, learning rate 0.06, 127 leaves, L2 1.0; chosen among four configurations on validation segments) over the 22 features of one flow, nine classes (Benign, PortScan, BruteForce, DoS, DDoS, WebAttack, Bot, Infiltration, Heartbleed). Attack probability = 1 - P(Benign); flows at 0.5 or above are flagged. Class shares in training are restored by sample weights after capping each class at 120,000 rows, with a mild boost for rare attack classes. No session, address or time input.
+
+### Training data and split
+
+CIC-IDS2017 labelled flows with timestamps (`python data/fetch_cic2017_labelled.py`), converted by the same `flow_schema.adapt_frame` that serves uploads. The split is the network-state model's: per capture day the minutes are cut at 60% and 75% of the day's minute grid. Before 60%: fit. 60-75%: choose the configuration. After 75%: test, used for nothing else. The served model is refit on everything before the 75% cut (2,036,519 flows, 408,428 attacks). Rows whose label could not be interpreted (288,602 blank rows of the Thursday-morning file) are dropped.
+
+### Measured results (held-out last 25% of every day, 794,224 flows, 149,218 attacks)
+
+| Metric | Value |
+| --- | --- |
+| ROC-AUC / PR-AUC | 0.920 / 0.805 |
+| Precision / recall / F1 at 0.5 | 0.800 / 0.672 / 0.731 |
+| False-positive rate | 3.9% |
+| At 0.8: precision / recall / false-positive rate | 0.964 / 0.290 / 0.25% |
+
+| Family in the held-out segments | Flows | Detected | Named correctly | Rows of the family in training |
+| --- | --- | --- | --- | --- |
+| PortScan | 20,065 | 99.7% | 99.5% | 138,865 |
+| BruteForce (SSH-Patator) | 1,097 | 95.9% | 95.8% | 12,738 (FTP- and SSH-Patator) |
+| DDoS | 128,027 | 61.9% | 0% | 0 |
+| Infiltration | 18 | 0% | 0% | 18 |
+| Heartbleed | 11 | 0% | 0% | 0 |
+
+Reading: families that were trained on are found with high accuracy; a family absent from training (DDoS) is found in about 62% of flows because it resembles DoS, but it is not named correctly; families with almost no examples are not found. The false-positive rate on the held-out segments is 3.9% at 0.5; the validation-optimal threshold (0.05) gave 6.1% there, so 0.5 was fixed beforehand as the natural boundary of the prior-restored probabilities.
+
+### Other checks
+
+| Data | Result |
+| --- | --- |
+| `data/samples/cic2017_tuesday_ssh_patator_heldout.csv.gz` (held out) | recall 0.959, precision 0.862, false-positive rate 0.35%, ROC-AUC 0.996 |
+| CSE-CIC-IDS2018 infiltration sample (different year and environment) | ROC-AUC 0.445; not separable with these 22 features |
+
+
+## 5. Offline analysis of a file
+
+The Offline Analysis page and `POST /offline/analyze` apply the flow classifier to every flow and the network-state model to the file's own minute timeline (split at silences over an hour), and show the network model's output without the rules of the live forecast. When the file has labels, the report measures both models on it:
+
+- flow level: precision, recall, false-positive rate, ROC-AUC per attack family;
+- forecast back-test: every forecast issued inside the period (each window's risk for t+1..t+4) is compared with whether that minute really contained attack flows; ROC-AUC per horizon, the model's alert rule (risk at or above 0.518 for 5 minutes) for early warning and false alarms, and next-minute behaviour accuracy;
+- state prediction: the model's mean squared error for the next four network states against repeating the last minute.
+
+On the held-out Tuesday sample (61 minutes, 13 attack minutes) the forecast back-test gives ROC-AUC 0.63 to 0.64 for t+1..t+4 and the state prediction is better than repeating the last minute at every horizon (0.60 to 0.69 against 0.86 to 1.28). With 13 attack minutes and one episode these are indications, not estimates. Files without labels get predicted labels only.
+
+## 6. Rules that shape what the dashboard shows
 
 The values on the dashboard are not raw model output. Both paths add hand-written rules (plausibility rules for the per-flow path; rule-based threat scores, stage constants and projection rules for the network path). They are listed in [ARCHITECTURE.md](../ARCHITECTURE.md). They were not evaluated separately, so no accuracy claim is made for the combined system.
 
-## 5. Intended use and limits
+## 7. Intended use and limits
 
 Intended use: research demonstration of flow-based monitoring, network-state forecasting and analyst tooling.
 
 Not supported by the evidence in this repository:
 
-- Detecting attacks on real traffic with the per-flow model.
+- Detecting attacks on real traffic with the per-flow LSTM.
+- Detecting attack families that are not in the training data of the flow classifier.
 - Forecasting attack stages or kill-chain progression.
 - Detecting attack families absent from training with usable accuracy.
 - Performance on captures produced by the live extractor: the network-state features were validated on the CIC windows and on a replay of CIC flows, not on live captures.
 
-## 6. Reproduce
+## 8. Reproduce
 
 ```bash
 # network-state model: retrain into a scratch directory and compare test_results in config.json
@@ -120,6 +169,12 @@ python experiments/evaluate_model.py
 
 # per-flow model on the synthetic set: run evaluate_model.py with real_flows.csv
 # replaced by campaign_dataset.csv in the read_csv call
+
+# flow classifier (needs data/cic2017_labelled from data/fetch_cic2017_labelled.py)
+python -m flowclf.train
+
+# offline analysis on the bundled real-data files
+cd backend && python -m pytest tests/test_upload_formats.py
 
 # model quality tests
 cd backend && python -m pytest tests -m requires_model

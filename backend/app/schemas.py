@@ -274,6 +274,13 @@ class IngestResponse(BaseModel):
     flows_rejected: int
     errors: list[str]
     alerts_generated: int
+    input_kind: Optional[str] = None
+    rows_read: Optional[int] = None
+    schema_report: Optional[dict] = Field(default=None, alias="schema")
+    evaluation: Optional[dict] = None
+    label_counts: Optional[dict] = None
+
+    model_config = {"populate_by_name": True}
 
 
 class HealthResponse(BaseModel):

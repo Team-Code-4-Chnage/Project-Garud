@@ -77,3 +77,4 @@ render.yaml
 ChatGPT*.png
 backend/data/forecaster.db-journal
 backend/data/geoip_cache.json
+data/cic2017_labelled/

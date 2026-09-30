@@ -15,3 +15,4 @@ import os
 import tempfile
 
 os.environ["DB_DIR"] = tempfile.mkdtemp(prefix="netforecast_test_db_")
+os.environ["AUTO_START_CAPTURE"] = "0"  # tests must not sniff the developer machine

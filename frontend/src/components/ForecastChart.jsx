@@ -252,27 +252,15 @@ function ForecastTooltip({ active, payload, isDark, thresholdVal }) {
           {pt.stage}
         </span>
       </div>
-      {!pt.isObserved && pt.lowerUncertainty != null && (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 14,
-            marginTop: 2,
-          }}
-        >
-          <span style={{ color: "var(--text-secondary)" }}>Uncertainty:</span>
-          <span style={{ color: "var(--text-muted)" }}>
-            [{pt.lowerUncertainty.toFixed(2)} – {pt.upperUncertainty.toFixed(2)}
-            ]
-          </span>
-        </div>
-      )}
     </div>
   );
 }
 
-export default function ForecastChart({ forecastData, _onSelectSession }) {
+export default function ForecastChart({
+  forecastData,
+  _onSelectSession,
+  maxHistory = 8,
+}) {
   const { isDark } = useTheme();
   const [horizonFilter, setHorizonFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
@@ -299,8 +287,8 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
     const pastRisks = forecastData.risk_score || [];
     const pastStages = forecastData.stages || [];
 
-    // Take past observed minutes (up to 8 minutes prior)
-    const startIdx = Math.max(0, pastMinutes.length - 8);
+    // Take past observed minutes (up to maxHistory minutes prior)
+    const startIdx = Math.max(0, pastMinutes.length - maxHistory);
     for (let i = startIdx; i < pastMinutes.length; i++) {
       const minStr = pastMinutes[i];
       if (pastRisks[i] == null) continue; // no real score for this minute yet
@@ -316,11 +304,6 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
         displayLabel: label,
         observedRisk: riskVal,
         forecastRisk: isNow ? riskVal : null,
-        lowerUncertainty: isNow ? Math.max(0, riskVal - 0.08) : null,
-        upperUncertainty: isNow ? Math.min(1, riskVal + 0.08) : null,
-        uncertaintyRange: isNow
-          ? [Math.max(0, riskVal - 0.08), Math.min(1, riskVal + 0.08)]
-          : null,
         stage: stgMeta.label,
         stageKey: stgMeta.key,
         stageLabel: stgMeta.label,
@@ -344,19 +327,12 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
       const stepNum = idx + 1;
       const topBeh = step.behaviours?.[0]?.behaviour || "Benign";
       const stgMeta = getPointMeta(riskVal, topBeh, thresholdVal);
-      const uncertaintySpread = 0.06 + idx * 0.03; // uncertainty grows with horizon
 
       result.push({
         time: step.minute,
         displayLabel: `+${stepNum}m`,
         observedRisk: null,
         forecastRisk: riskVal,
-        lowerUncertainty: Math.max(0, riskVal - uncertaintySpread),
-        upperUncertainty: Math.min(1, riskVal + uncertaintySpread),
-        uncertaintyRange: [
-          Math.max(0, riskVal - uncertaintySpread),
-          Math.min(1, riskVal + uncertaintySpread),
-        ],
         stage: stgMeta.label,
         stageKey: stgMeta.key,
         stageLabel: stgMeta.label,
@@ -368,7 +344,7 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
     });
 
     return result;
-  }, [forecastData, horizonFilter, activeStage, thresholdVal]);
+  }, [forecastData, horizonFilter, activeStage, thresholdVal, maxHistory]);
 
   // Dynamic gradient stops based on individual points' stage % and risk level
   const { observedStops, forecastStops } = useMemo(() => {
@@ -737,20 +713,6 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
                 isAnimationActive={false}
               />
 
-              {/* Uncertainty Area Range Band */}
-              <Area
-                type="monotone"
-                dataKey="upperUncertainty"
-                stroke="none"
-                fill={
-                  isDark
-                    ? "rgba(231, 240, 244, 0.08)"
-                    : "rgba(37, 42, 45, 0.08)"
-                }
-                connectNulls
-                isAnimationActive={false}
-              />
-
               {/* Observed History Line with Stage-Calibrated Gradient */}
               <Line
                 type="monotone"
@@ -851,17 +813,6 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
               }}
             />
             <span>Forecast Rollout (t+1..t+{horizonSteps})</span>
-          </div>
-          <div className="garud-legend-item">
-            <span
-              className="garud-legend-band"
-              style={{
-                background: isDark
-                  ? "rgba(231, 240, 244, 0.12)"
-                  : "rgba(37, 42, 45, 0.12)",
-              }}
-            />
-            <span>Uncertainty Range (&plusmn;&sigma;)</span>
           </div>
           <div className="garud-legend-item">
             <span className="garud-legend-line threshold" />

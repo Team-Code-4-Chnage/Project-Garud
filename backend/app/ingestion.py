@@ -78,6 +78,18 @@ def generate_containment_rule(session_key: str, predicted_stage: str) -> tuple[s
     return action, rule
 
 
+class BulkContext:
+    """Caches for one file upload: session lookups and the alert-ledger head are read from the database
+    once instead of once per flow."""
+
+    _UNSET = object()
+
+    def __init__(self):
+        self.session_keys: dict[tuple, str] = {}
+        self.sessions: dict[str, SessionDB] = {}
+        self.last_alert_hash = self._UNSET
+
+
 async def _create_chained_alert(
     db: AsyncSession,
     session_key: str,
@@ -86,22 +98,28 @@ async def _create_chained_alert(
     predicted_stage: str,
     recommended_action: str,
     now: datetime,
+    ctx: "BulkContext | None" = None,
 ) -> AlertDB:
     """Creates an alert with cryptographic SHA-256 blockchain hashing and proactive mitigation rule."""
-    last_hash = (
-        await db.execute(
-            select(AlertDB.block_hash)
-            .where(AlertDB.block_hash.isnot(None))
-            .order_by(desc(AlertDB.id))
-            .limit(1)
-        )
-    ).scalar_one_or_none()
+    if ctx is not None and ctx.last_alert_hash is not BulkContext._UNSET:
+        last_hash = ctx.last_alert_hash
+    else:
+        last_hash = (
+            await db.execute(
+                select(AlertDB.block_hash)
+                .where(AlertDB.block_hash.isnot(None))
+                .order_by(desc(AlertDB.id))
+                .limit(1)
+            )
+        ).scalar_one_or_none()
 
     prev_hash = last_hash or "0000000000000000000000000000000000000000000000000000000000000000"
     mit_action, mit_rule = generate_containment_rule(session_key, predicted_stage)
 
     raw_str = f"{session_key}|{severity}|{infiltration_prob:.6f}|{predicted_stage}|{now.isoformat()}|{prev_hash}"
     block_hash = hashlib.sha256(raw_str.encode("utf-8")).hexdigest()
+    if ctx is not None:
+        ctx.last_alert_hash = block_hash
 
     return AlertDB(
         session_key=session_key,
@@ -341,9 +359,16 @@ def _stage_index(stage: str) -> int:
         return 0
 
 
+# Flows read from a file describe traffic of another machine: they are not resolved against this
+# host's sockets and processes.
+STATIC_SOURCES = ("csv_upload", "pcap_upload")
+
+
 async def ingest_single_flow(
     flow: FlowRecord,
     db: AsyncSession,
+    bulk: bool = False,
+    ctx: "BulkContext | None" = None,
 ) -> dict:
     """
     Process a single flow record:
@@ -353,6 +378,9 @@ async def ingest_single_flow(
     4. If window is full → run prediction
     5. If alert → persist alert
     6. Broadcast result via WebSocket (BUG-01 fix)
+
+    With bulk=True (file uploads) the caller owns the commit, and per-flow GeoIP lookups and WebSocket
+    events are skipped so large files are processed at model speed.
 
     Returns dict with prediction results (if window was full) or buffer status.
     """
@@ -374,7 +402,13 @@ async def ingest_single_flow(
     if random.random() < 0.01:
         evict_stale_buffers()
 
-    session_key = await resolve_session_key(db, flow.src_ip, flow.dst_ip, flow.timestamp)
+    pair = (flow.src_ip, flow.dst_ip)
+    if ctx is not None and pair in ctx.session_keys:
+        session_key = ctx.session_keys[pair]
+    else:
+        session_key = await resolve_session_key(db, flow.src_ip, flow.dst_ip, flow.timestamp)
+        if ctx is not None:
+            ctx.session_keys[pair] = session_key
     source = getattr(flow, "source", None) or "api"
     network_tracker.add(flow, source)  # per-minute network state for the network world model
 
@@ -394,9 +428,14 @@ async def ingest_single_flow(
         direction = classify_direction(flow.src_ip, flow.dst_ip)
         port_for_proc = getattr(flow, "src_port", None) or getattr(flow, "dst_port", None)
 
-    proc_info = resolve_process(port_for_proc, getattr(flow, "protocol", "TCP"))
-    process_name = getattr(flow, "process_name", None) or proc_info.get("process_name")
-    app_name = getattr(flow, "app_name", None) or proc_info.get("app_name")
+    if source in STATIC_SOURCES:
+        proc_info = {}
+        process_name = getattr(flow, "process_name", None)
+        app_name = getattr(flow, "app_name", None)
+    else:
+        proc_info = resolve_process(port_for_proc, getattr(flow, "protocol", "TCP"))
+        process_name = getattr(flow, "process_name", None) or proc_info.get("process_name")
+        app_name = getattr(flow, "app_name", None) or proc_info.get("app_name")
     app_icon = proc_info.get("app_icon", "network")
 
     db_record = FlowRecordDB(
@@ -417,10 +456,12 @@ async def ingest_single_flow(
     )
     db.add(db_record)
 
-    result = await db.execute(
-        select(SessionDB).where(SessionDB.session_key == session_key)
-    )
-    session = result.scalar_one_or_none()
+    session = ctx.sessions.get(session_key) if ctx is not None else None
+    if session is None:
+        result = await db.execute(
+            select(SessionDB).where(SessionDB.session_key == session_key)
+        )
+        session = result.scalar_one_or_none()
     now = datetime.now(timezone.utc)
 
     fwd_pkts = float(getattr(flow, "tot_fwd_pkts", 0) or 0)
@@ -447,7 +488,11 @@ async def ingest_single_flow(
             max_stage_reached="Benign",
         )
         db.add(session)
+        if ctx is not None:
+            ctx.sessions[session_key] = session
     else:
+        if ctx is not None:
+            ctx.sessions[session_key] = session
         session.flow_count += 1
         session.last_seen = now
         # a session can span several ports over its life (e.g. a browser opening new connections to
@@ -508,6 +553,7 @@ async def ingest_single_flow(
             predicted_stage="Exfiltration",
             recommended_action=heartbleed_action,
             now=now,
+            ctx=ctx,
         )
         db.add(heartbleed_alert)
         result_data["heartbleed_alert"] = {
@@ -609,6 +655,7 @@ async def ingest_single_flow(
                     predicted_stage=predicted_stage,
                     recommended_action=action,
                     now=now,
+                    ctx=ctx,
                 )
                 db.add(alert)
                 result_data["alert"] = {
@@ -621,6 +668,9 @@ async def ingest_single_flow(
                     "prev_hash": alert.prev_hash,
                     "mitigation_rule": alert.mitigation_rule,
                 }
+
+    if bulk:
+        return result_data
 
     await db.commit()
 

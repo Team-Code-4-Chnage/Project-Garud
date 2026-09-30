@@ -11,12 +11,13 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import desc, select
+from sqlalchemy import desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import FlowRecordDB, SessionDB, get_db
 from ..geoip import clear_geoip_cache, resolve_ip_geo, resolve_ips_batch
 from ..graph_state import build_session_graph
+from ..ingestion import STATIC_SOURCES
 
 router = APIRouter(prefix="/graph", tags=["Graph Topology"])
 
@@ -117,8 +118,9 @@ async def get_topology(
     if SystemState.mode == "live":
         stmt = stmt.where(SessionDB.source != "simulated")
     if is_active_only:
+        # uploaded files describe past traffic, so the "still active" window applies to live sources only
         cutoff = now_utc - timedelta(seconds=max_age)
-        stmt = stmt.where(SessionDB.last_seen >= cutoff)
+        stmt = stmt.where(or_(SessionDB.source.in_(STATIC_SOURCES), SessionDB.last_seen >= cutoff))
     stmt = stmt.order_by(SessionDB.latest_risk_score.desc(), SessionDB.last_seen.desc()).limit(limit_val * 2)
     result = await db.execute(stmt)
     rows = result.scalars().all()
@@ -137,7 +139,7 @@ async def get_topology(
 
         is_threat = prob >= 0.25 or (s.latest_stage and s.latest_stage != "Benign")
 
-        if is_active_only:
+        if is_active_only and s.source not in STATIC_SOURCES:
             if not s.last_seen:
                 continue
             s_seen = s.last_seen if s.last_seen.tzinfo else s.last_seen.replace(tzinfo=timezone.utc)
@@ -191,7 +193,7 @@ async def get_topology(
             flow_stmt = flow_stmt.where(FlowRecordDB.source != "simulated")
         if is_active_only:
             cutoff = now_utc - timedelta(seconds=max_age)
-            flow_stmt = flow_stmt.where(FlowRecordDB.timestamp >= cutoff)
+            flow_stmt = flow_stmt.where(or_(FlowRecordDB.source.in_(STATIC_SOURCES), FlowRecordDB.timestamp >= cutoff))
         flow_stmt = (
             flow_stmt
             .order_by(desc(FlowRecordDB.timestamp), desc(FlowRecordDB.id))
@@ -208,7 +210,7 @@ async def get_topology(
             if f_prob < min_risk_val:
                 continue
 
-            if is_active_only:
+            if is_active_only and f.source not in STATIC_SOURCES:
                 if not f.timestamp:
                     continue
                 f_seen = f.timestamp if f.timestamp.tzinfo else f.timestamp.replace(tzinfo=timezone.utc)

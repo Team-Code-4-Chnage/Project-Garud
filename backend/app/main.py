@@ -10,6 +10,7 @@ from .config import (
     ALLOWED_ORIGINS,
     API_KEY,
     ARTIFACTS_DIR,
+    AUTO_START_CAPTURE,
     FLOW_FEATURES,
     N_FEATURES,
     STAGES,
@@ -24,6 +25,7 @@ from .routes import (
     ingest,
     mitre,
     network,
+    offline,
     pcap,
     predict,
     reports,
@@ -88,7 +90,7 @@ async def lifespan(app: FastAPI):
     # Auto-start live packet sniffer in background by default
     try:
         from .routes.system import SystemState, start_live_capture
-        if SystemState.mode == "live" and not SystemState.is_capture_running():
+        if AUTO_START_CAPTURE and SystemState.mode == "live" and not SystemState.is_capture_running():
             logger.info("Auto-starting live network packet sniffer by default...")
             await start_live_capture()
     except Exception as e:
@@ -222,6 +224,7 @@ app.include_router(pcap.router, tags=["PCAP Ingestion"])
 app.include_router(reports.router, tags=["Reports"])
 app.include_router(mitre.router, tags=["MITRE"])
 app.include_router(network.router, tags=["Network State"])
+app.include_router(offline.router)   # offline file analysis, isolated from the live system
 app.include_router(graph.router)   # graph topology — PS 26153 graph-based representation
 app.include_router(system.router, tags=["System"])
 app.include_router(ws.router, tags=["Live Feed"])

@@ -1,0 +1,146 @@
+{
+ "version": "flow_classifier_v2",
+ "features": [
+  "flow_duration",
+  "tot_fwd_pkts",
+  "tot_bwd_pkts",
+  "fwd_pkt_len_mean",
+  "bwd_pkt_len_mean",
+  "flow_bytes_s",
+  "flow_pkts_s",
+  "flow_iat_mean",
+  "flow_iat_std",
+  "fwd_iat_mean",
+  "bwd_iat_mean",
+  "syn_flag_cnt",
+  "ack_flag_cnt",
+  "fin_flag_cnt",
+  "rst_flag_cnt",
+  "psh_flag_cnt",
+  "urg_flag_cnt",
+  "down_up_ratio",
+  "pkt_size_avg",
+  "ttl_variance",
+  "tcp_win_size",
+  "retransmit_cnt"
+ ],
+ "behaviours": [
+  "Benign",
+  "PortScan",
+  "BruteForce",
+  "DoS",
+  "DDoS",
+  "WebAttack",
+  "Bot",
+  "Infiltration",
+  "Heartbleed"
+ ],
+ "classes": [
+  0,
+  1,
+  2,
+  3,
+  5,
+  6,
+  7
+ ],
+ "attack_threshold": 0.5,
+ "validation_optimal_threshold": 0.05,
+ "model": "HistGradientBoostingClassifier({'max_iter': 400, 'learning_rate': 0.06, 'max_leaf_nodes': 127, 'l2_regularization': 1.0})",
+ "trained_on": "CIC-IDS2017 labelled flows (data/cic2017_labelled), all flows before each day's test cut",
+ "split": "per capture day, minutes cut at 60% and 75% (same grid as the network-state model): fit / choose configuration and threshold / test",
+ "training_rows": 2036519,
+ "training_attack_rows": 408428,
+ "label_rule": "labels are mapped to behaviours by backend/app/labels.py; Benign vs everything else is the attack flag",
+ "held_out_test": {
+  "rows": 794224,
+  "attacks": 149218,
+  "threshold": 0.5,
+  "roc_auc": 0.9201295922496103,
+  "pr_auc": 0.8051526362814262,
+  "precision": 0.800192988612077,
+  "recall": 0.6724456834966291,
+  "f1": 0.7307784745133169,
+  "fpr": 0.03884459989519477,
+  "families": {
+   "BruteForce": {
+    "rows": 1097,
+    "detected": 0.95897903372835,
+    "family_correct": 0.9580674567000912,
+    "rows_in_training": 12738
+   },
+   "DDoS": {
+    "rows": 128027,
+    "detected": 0.6192912432533763,
+    "family_correct": 0.0,
+    "rows_in_training": 0
+   },
+   "Heartbleed": {
+    "rows": 11,
+    "detected": 0.0,
+    "family_correct": 0.0,
+    "rows_in_training": 0
+   },
+   "Infiltration": {
+    "rows": 18,
+    "detected": 0.0,
+    "family_correct": 0.0,
+    "rows_in_training": 18
+   },
+   "PortScan": {
+    "rows": 20065,
+    "detected": 0.9969100423623225,
+    "family_correct": 0.9954149015698979,
+    "rows_in_training": 138865
+   }
+  },
+  "at_other_thresholds": {
+   "0.05": {
+    "rows": 794224,
+    "attacks": 149218,
+    "threshold": 0.05,
+    "roc_auc": 0.9201295922496103,
+    "pr_auc": 0.8051526362814262,
+    "precision": 0.7228121205275198,
+    "recall": 0.6861236580037261,
+    "f1": 0.7039902084149872,
+    "fpr": 0.06087075158990769
+   },
+   "0.20": {
+    "rows": 794224,
+    "attacks": 149218,
+    "threshold": 0.2,
+    "roc_auc": 0.9201295922496103,
+    "pr_auc": 0.8051526362814262,
+    "precision": 0.7361536080173363,
+    "recall": 0.685245747832031,
+    "f1": 0.709788037498655,
+    "fpr": 0.0568180761109199
+   },
+   "0.50": {
+    "rows": 794224,
+    "attacks": 149218,
+    "threshold": 0.5,
+    "roc_auc": 0.9201295922496103,
+    "pr_auc": 0.8051526362814262,
+    "precision": 0.800192988612077,
+    "recall": 0.6724456834966291,
+    "f1": 0.7307784745133169,
+    "fpr": 0.03884459989519477
+   },
+   "0.80": {
+    "rows": 794224,
+    "attacks": 149218,
+    "threshold": 0.8,
+    "roc_auc": 0.9201295922496103,
+    "pr_auc": 0.8051526362814262,
+    "precision": 0.963622981532697,
+    "recall": 0.28954281655028213,
+    "f1": 0.44528842487142756,
+    "fpr": 0.0025286586481366065
+   }
+  }
+ },
+ "limits": "A supervised flow classifier finds behaviours it was trained on. Families that are absent from the training rows are mostly missed (see rows_in_training per family), and data from another dataset or capture environment can be poorly separated with these 22 features (CSE-CIC-IDS2018 infiltration: ROC-AUC below 0.5 in our checks).",
+ "seed": 42
+}

@@ -23,19 +23,41 @@ export function apiPost(endpoint, body) {
   return apiFetch(endpoint, { method: 'POST', body: JSON.stringify(body) });
 }
 
-export async function apiUpload(endpoint, file) {
+export function apiUpload(endpoint, file, onProgress, { blob = false } = {}) {
   const url = `${API_URL}${endpoint}`;
   const form = new FormData();
   form.append('file', file);
-  const headers = {
-    ...(API_KEY ? { 'X-API-Key': API_KEY } : {}),
-  };
-  const res = await fetch(url, { method: 'POST', body: form, headers });
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(`Upload ${res.status}: ${detail}`);
-  }
-  return res.json();
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    if (blob) xhr.responseType = 'blob';
+    if (API_KEY) xhr.setRequestHeader('X-API-Key', API_KEY);
+    xhr.upload.onprogress = (e) => {
+      if (onProgress && e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onerror = () => reject(new Error('Upload failed: the backend is not reachable'));
+    xhr.onload = () => {
+      if (blob && xhr.status >= 200 && xhr.status < 300) return resolve(xhr.response);
+      if (blob) {
+        xhr.response.text().then((t) => {
+          let d = t;
+          try { d = JSON.parse(t).detail ?? t; } catch { /* plain text */ }
+          reject(new Error(typeof d === 'string' ? d : JSON.stringify(d)));
+        });
+        return;
+      }
+      let body = null;
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        body = null;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(body);
+      const detail = body?.detail ?? xhr.responseText;
+      reject(new Error(typeof detail === 'string' ? detail : JSON.stringify(detail)));
+    };
+    xhr.send(form);
+  });
 }
 
 export function createWebSocket() {

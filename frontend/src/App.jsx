@@ -500,7 +500,7 @@ export default function App() {
                   onClick={() => handleNavClick("ingest")}
                 >
                   <span className="garud-nav-item-left">
-                    <Upload size={15} /> Ingest Captures
+                    <Upload size={15} /> Offline Analysis
                   </span>
                 </button>
                 <button

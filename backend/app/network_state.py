@@ -596,7 +596,10 @@ class NetworkStateTracker:
             emp_behaviours.append(eb)
 
         now_utc = datetime.now(timezone.utc)
-        is_live_telemetry = getattr(self, "mode", "live") == "live"
+        # Uploaded files are replays of past traffic: only live sources can go "stale"
+        is_live_telemetry = getattr(self, "mode", "live") == "live" and any(
+            r.get("_source") not in ("csv_upload", "pcap_upload") for r in rows
+        )
         latest_flow_age = None
         if rows:
             latest_ts = max(r["timestamp"] for r in rows)
