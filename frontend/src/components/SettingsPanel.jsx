@@ -1408,18 +1408,18 @@ export default function SettingsPanel({
               <div className="settings-row">
                 <span className="settings-key">Model Network Type</span>
                 <span className="settings-val">
-                  {health?.num_layers || 2}-Layer PyTorch LSTM Network
+                  {health?.num_layers ?? "—"}-Layer PyTorch LSTM Network
                 </span>
               </div>
               <div className="settings-row">
                 <span className="settings-key">Hidden Dimension</span>
                 <span className="settings-val">
-                  {health?.hidden_size ?? 256} units
+                  {health?.hidden_size ?? "—"} units
                 </span>
               </div>
               <div className="settings-row">
                 <span className="settings-key">Dropout Regularization</span>
-                <span className="settings-val">{health?.dropout ?? 0.25}</span>
+                <span className="settings-val">{health?.dropout ?? "—"}</span>
               </div>
               <div className="settings-row">
                 <span className="settings-key">Execution Device</span>
@@ -1427,19 +1427,19 @@ export default function SettingsPanel({
                   className="settings-val"
                   style={{ color: "var(--c-gold)" }}
                 >
-                  {health?.device?.toUpperCase() || "CPU"}
+                  {health?.device?.toUpperCase() || "—"}
                 </span>
               </div>
               <div className="settings-row">
                 <span className="settings-key">Input Feature Vector</span>
                 <span className="settings-val">
-                  {health?.features_count || 22} flow features
+                  {health?.features_count ?? "—"} flow features
                 </span>
               </div>
               <div className="settings-row">
                 <span className="settings-key">Temporal Lookback Window</span>
                 <span className="settings-val">
-                  {health?.window_size ?? 6} consecutive flows
+                  {health?.window_size ?? "—"} consecutive flows
                 </span>
               </div>
               <div className="settings-row">

@@ -522,8 +522,8 @@ export default function NetworkMap({
   const [isRadarMinimized, setIsRadarMinimized] = useState(false);
   const [hostIdentity, setHostIdentity] = useState(null);
   const [deviceLocation, setDeviceLocation] = useState({
-    latitude: 0,
-    longitude: 0,
+    latitude: null,
+    longitude: null,
     city: "Local Host",
     region: "",
     country: "Defender HQ",
@@ -802,12 +802,12 @@ export default function NetworkMap({
             apps: app && app.toLowerCase() !== "unknown" ? [app] : [],
             is_internal: isInt,
             latitude: isInt
-              ? deviceLocation.latitude || 18.5
+              ? deviceLocation.latitude ?? null
               : hasGeo
                 ? flowGeo.latitude
                 : null,
             longitude: isInt
-              ? deviceLocation.longitude || 73.8
+              ? deviceLocation.longitude ?? null
               : hasGeo
                 ? flowGeo.longitude
                 : null,

@@ -518,8 +518,8 @@ export default function Dashboard({
                   ) : (
                     recentAlerts.slice(0, 5).map((alert, idx) => {
                       const alertRisk =
-                        alert.risk_score != null ? alert.risk_score : 0.65;
-                      const isHigh = alertRisk >= 0.7;
+                        alert.risk_score != null ? alert.risk_score : null;
+                      const isHigh = alertRisk != null && alertRisk >= 0.7;
                       return (
                         <tr
                           key={alert.id || `alert-${idx}`}
@@ -556,7 +556,7 @@ export default function Dashboard({
                               color: isHigh ? "var(--danger)" : "var(--accent)",
                             }}
                           >
-                            {alertRisk.toFixed(2)}
+                            {alertRisk != null ? alertRisk.toFixed(2) : "—"}
                           </td>
                           <td>
                             <span
