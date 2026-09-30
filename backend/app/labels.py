@@ -11,18 +11,29 @@ from __future__ import annotations
 
 import re
 
-BEHAVIOURS = ["Benign", "PortScan", "BruteForce", "DoS", "DDoS", "WebAttack", "Bot", "Infiltration", "Heartbleed"]
+BEHAVIOURS = [
+    "Benign", "PortScan", "BruteForce", "DoS", "DDoS", "WebAttack", "Bot", "Infiltration", "Heartbleed",
+    "Reconnaissance", "Initial Access", "Lateral Movement", "C2", "Exfiltration",
+]
 OTHER_ATTACK = "Other attack"
 UNKNOWN = "Unknown"
 
 BENIGN_WORDS = {"benign", "normal", "0", "false", "background", "legitimate", "none", "legit", "clean", ""}
-GENERIC_ATTACK_WORDS = {"1", "true", "attack", "malicious", "anomaly", "abnormal", "intrusion", "bad", "threat",
-                        "malware", "generic", "backdoor", "fuzzers", "analysis", "worms", "trojan", "ransomware",
-                        "c2", "exfiltration"}
+GENERIC_ATTACK_WORDS = {
+    "1", "true", "attack", "malicious", "anomaly", "abnormal", "intrusion", "bad", "threat",
+    "malware", "generic", "backdoor", "fuzzers", "analysis", "worms", "trojan", "ransomware",
+    "c2", "command and control", "command_and_control", "exfiltration", "exfil",
+    "initial access", "initial_access", "lateral movement", "lateral_movement", "reconnaissance", "recon",
+    "execution", "privilege escalation", "credential access", "defense evasion", "discovery", "collection", "impact",
+}
 
 # order matters: the first matching rule wins
 _RULES = [
     (r"heartbleed", "Heartbleed"),
+    (r"exfil", "Exfiltration"),
+    (r"\bc2\b|command ?(?:and|&|-) ?control", "C2"),
+    (r"lateral ?move", "Lateral Movement"),
+    (r"initial ?access", "Initial Access"),
     (r"infil", "Infiltration"),
     (r"\bbot|botnet|ares", "Bot"),
     (r"port ?scan|portsweep|reconnaissance|recon|scan|probe|nmap", "PortScan"),

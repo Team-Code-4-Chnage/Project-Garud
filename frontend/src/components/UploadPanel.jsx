@@ -97,7 +97,7 @@ function SegmentBar({ segments, active, onPick }) {
   return (
     <Panel title="Activity Periods in the File" meta="the timeline is split where traffic stops for over an hour">
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {segments.map((s) => {
+        {segments.map((s, idx) => {
           const on = s.id === active;
           const peak = s.peak_risk;
           return (
@@ -110,10 +110,13 @@ function SegmentBar({ segments, active, onPick }) {
                 borderColor: on ? "var(--c-gold)" : undefined,
                 background: on ? "rgba(214,179,106,0.12)" : undefined,
                 textAlign: "left",
+                padding: "8px 12px",
               }}
             >
-              <div className="mono text-xs">{longTime(s.start)} &rarr; {longTime(s.end)}</div>
-              <div className="mono text-xs text-muted">
+              <div className="mono text-xs" style={{ fontWeight: on ? 700 : 600, color: on ? "var(--c-gold)" : "var(--text-primary)" }}>
+                Period #{idx + 1}: {longTime(s.start)} &rarr; {longTime(s.end)}
+              </div>
+              <div className="mono text-xs text-muted" style={{ marginTop: 2 }}>
                 {s.minutes} min &bull; {num(s.flows)} flows &bull;{" "}
                 {s.status === "ok" ? `forecast peak ${pct(peak, 0)}` : "too short for the model"}
               </div>
@@ -223,6 +226,7 @@ function TimelineBlock({ seg, labelled }) {
           color: meta ? meta.color : "#34D399",
           stage: meta ? meta.label : "-",
           actual: labelled ? (p.labelled_attacks > 0 ? 1 : 0) : null,
+          stageTrue: p.behaviour_true || (p.labelled_attacks > 0 ? "Attack" : "Benign"),
           flaggedShare: p.flows ? p.flagged / p.flows : 0,
           alert: p.alert,
         };
@@ -276,20 +280,25 @@ function TimelineBlock({ seg, labelled }) {
                       Level: <span style={{ color: d.color, fontWeight: 700 }}>&bull; {d.stage}</span>
                     </div>
                     {d.alert && <div style={{ color: "#F64541", fontWeight: 700 }}>Sustained alert</div>}
-                    {labelled ? (
-                      <div>File labels: {d.actual ? "attack in this minute" : "no attack"}</div>
-                    ) : (
-                      <div>Flows flagged: {pct(d.flaggedShare, 0)}</div>
+                    {labelled && (
+                      <div>
+                        File Label:{" "}
+                        <strong style={{ color: d.actual ? "var(--c-red)" : "var(--text-secondary)" }}>
+                          {d.stageTrue}
+                        </strong>
+                      </div>
                     )}
+                    <div>
+                      Flows Flagged: <strong>{pct(d.flaggedShare, 0)}</strong>
+                    </div>
                   </div>
                 );
               }}
             />
-            {labelled ? (
+            {labelled && (
               <Area type="stepAfter" dataKey="actual" name="Attack minutes in the file" stroke="none" fill="#F64541" fillOpacity={0.14} isAnimationActive={false} />
-            ) : (
-              <Area type="monotone" dataKey="flaggedShare" name="Share of flows flagged" stroke="none" fill="#F6B144" fillOpacity={0.16} isAnimationActive={false} />
             )}
+            <Area type="monotone" dataKey="flaggedShare" name="Share of flows flagged" stroke="none" fill="#F6B144" fillOpacity={labelled ? 0.12 : 0.16} isAnimationActive={false} />
             <Area type="monotone" dataKey="risk" stroke="none" fill={`url(#${gradId}Fill)`} connectNulls isAnimationActive={false} />
             <ReferenceLine y={thr} stroke="#F6B144" strokeDasharray="5 4" label={{ value: `Threshold ${thr.toFixed(2)}`, fontSize: 10, fill: "#F6B144", position: "insideTopRight" }} />
             <Line type="monotone" dataKey="risk" stroke={`url(#${gradId})`} strokeWidth={2.5} dot={renderDot} activeDot={{ r: 5 }} connectNulls isAnimationActive={false} />
@@ -305,9 +314,13 @@ function TimelineBlock({ seg, labelled }) {
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text-secondary)" }}>
           <span style={{ width: 9, height: 9, borderRadius: "50%", border: "2px solid #fff", background: "#F64541" }} /> Sustained alert
         </span>
+        {labelled && (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text-secondary)" }}>
+            <span style={{ width: 16, height: 8, background: "rgba(246,69,65,0.25)" }} /> Attack minutes labelled in the file
+          </span>
+        )}
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text-secondary)" }}>
-          <span style={{ width: 16, height: 8, background: labelled ? "rgba(246,69,65,0.25)" : "rgba(246,177,68,0.3)" }} />
-          {labelled ? "Attack minutes labelled in the file" : "Share of flows flagged"}
+          <span style={{ width: 16, height: 8, background: "rgba(246,177,68,0.3)" }} /> Share of flows flagged by classifier
         </span>
       </div>
     </Panel>
@@ -552,7 +565,7 @@ function ConversionBlock({ result, onDownload, downloading }) {
 function Report({ result, onDownload, downloading }) {
   const okSegs = result.segments.filter((s) => s.status === "ok");
   const [pick, setPick] = useState(null);
-  const active = pick ?? okSegs[okSegs.length - 1]?.id;
+  const active = pick ?? okSegs[0]?.id ?? okSegs[okSegs.length - 1]?.id;
   const seg = result.segments.find((s) => s.id === active);
   const labelled = result.labels.source === "file";
   const lastSeg = seg?.forecast;
@@ -661,7 +674,7 @@ export default function UploadPanel() {
     <>
       <div style={{ marginBottom: "var(--sp-4)" }}>
         <span className="section-label" style={{ fontSize: "0.85rem" }}>
-          Offline File Analysis
+          Upload PCAP and CSV
         </span>
         <p className="mono text-sm" style={{ color: "var(--text-secondary)", marginTop: "var(--sp-1)" }}>
           Upload any flow table (CSV, TSV, JSON, Parquet, Zeek, Suricata, NetFlow, gzip or zip) or a packet capture

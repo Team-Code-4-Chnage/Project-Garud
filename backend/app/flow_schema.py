@@ -83,6 +83,7 @@ SRC_PORT = ["src_port", "source_port", "sport", "srcport", "id_orig_p", "orig_p"
 DST_PORT = ["dst_port", "destination_port", "dport", "dstport", "id_resp_p", "resp_p", "l4_dst_port", "dest_port",
             "dp", "destinationport"]
 PROTO = ["protocol", "proto", "ip_protocol", "protocol_name", "l4_proto", "protocol_identifier", "pr"]
+SESSION_ID = ["session_id", "session", "sessionid", "flow_id", "flowid", "conn_id", "connection_id"]
 TIME = ["timestamp", "flow_start_time", "start_time", "stime", "ts", "time", "first_seen", "flowstart",
         "first_switched", "frame_time", "flow_start", "flow_start_timestamp", "start", "begin", "datetime", "date_time",
         "event_time", "flowstartmilliseconds", "flow_start_milliseconds", "tstart"]
@@ -436,6 +437,7 @@ def adapt_frame(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
         cleaned[feat] = arr
     features = pd.DataFrame(cleaned, index=df.index, columns=FLOW_FEATURES)
     report["nonfinite_values_set_to_zero"] = nonfinite
+    report["negative_values_count"] = negative
     if negative:
         report["warnings"].append(f"{negative} negative feature values were kept as given")
     if constant:
@@ -445,7 +447,7 @@ def adapt_frame(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
         report["warnings"].append(
             f"only {obtained} of 22 features could be obtained; predictions from so little information are unreliable")
 
-    # identity, ports, protocol
+    # identity, ports, protocol, session_id
     def text(names):
         c = _first(cols, names)
         return df[c].astype("string").str.strip() if c is not None else pd.Series([None] * n, index=df.index)
@@ -459,6 +461,7 @@ def adapt_frame(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
 
     src_ip, dst_ip = text(SRC_IP), text(DST_IP)
     src_port, dst_port = port(SRC_PORT), port(DST_PORT)
+    session_id = text(SESSION_ID)
     if src_ip.notna().any():
         src_ip, sp = _split_ip_port(src_ip)
         if sp is not None and src_port.isna().all():
@@ -469,8 +472,10 @@ def adapt_frame(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
         if dp is not None and dst_port.isna().all():
             dst_port = dp.round().astype("Int64")
             report["assumptions"].append("destination ports were split from 'address:port' values")
-    meta = pd.DataFrame({"src_ip": src_ip, "dst_ip": dst_ip, "src_port": src_port, "dst_port": dst_port},
-                        index=df.index)
+    meta = pd.DataFrame({
+        "src_ip": src_ip, "dst_ip": dst_ip, "src_port": src_port, "dst_port": dst_port,
+        "session_id": session_id,
+    }, index=df.index)
     pc = _first(cols, PROTO)
     if pc is not None:
         raw = df[pc].astype("string").fillna("").str.strip().str.split(".").str[0]

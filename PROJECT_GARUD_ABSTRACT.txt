@@ -1,0 +1,80 @@
+================================================================================
+PROJECT GARUD: AI-BASED NETWORK ATTACK FORECASTING & PREDICTIVE CYBER DEFENSE
+================================================================================
+Smart India Hackathon 2026 | Problem Statement: PS26153
+Team: Team Code 4 Change
+Core Architecture: Dual-Scale Temporal World Model & Autonomous Defense Platform
+
+--------------------------------------------------------------------------------
+ABSTRACT SUMMARY
+--------------------------------------------------------------------------------
+
+Modern enterprise networks operate under constant, asymmetric warfare. Advanced 
+persistent threats (APTs) and sophisticated cyber adversaries rarely strike in 
+single isolated bursts; instead, they conduct calculated multi-stage campaigns—
+silently probing perimeters, establishing stealthy initial access, propagating 
+laterally, and exfiltrating intellectual property long before traditional defenses 
+detect their presence. Conventional Intrusion Detection Systems (IDS) and Security 
+Information and Event Management (SIEM) architectures are fundamentally reactive, 
+alerting security analysts only after an intrusion has compromised critical 
+infrastructure. Project Garud—inspired by the mythic avian guardian celebrated for 
+its panoramic, telescopic vision and lightning reflexes—redefines defensive cyber 
+operations by flipping the paradigm from retrospective post-mortems to proactive, 
+real-time attack forecasting. Rather than asking whether an attack is underway, 
+Garud continuously predicts where the adversary will advance within the next one to 
+four minutes.
+
+At the core of Project Garud is a novel dual-scale dynamical system engine:
+
+First, at the microscopic flow resolution, Garud continuously tracks active network 
+sessions across rolling temporal windows of 6 flows parameterized by 22 bidirectional 
+traffic kinetics, including packet inter-arrival distributions, payload asymmetries, 
+and TCP flag transitions. A deep multi-head Long Short-Term Memory (LSTM) network 
+projects next-state feature regressions and classifies the session's evolving 
+adversarial trajectory across the MITRE ATT&CK kill chain—from Reconnaissance and 
+Initial Access through Lateral Movement, Command & Control (C2), and Exfiltration—
+enhanced by batched Monte Carlo simulations with stochastic noise perturbation to 
+quantify predictive uncertainty bounds.
+
+Second, at the macroscopic network resolution, Garud abstracts millions of raw 
+transfers into unified 45-dimensional network state vectors calculated every sixty 
+seconds. These state vectors encode port fan-outs, connection rates, protocol 
+distributions, and communication entropies without geographic or IP-directional bias. 
+A secondary temporal World Model LSTM rolls this global state vector forward across 
+1, 2, 3, and 4-minute horizons, implementing a calibrated sustained-threat 
+threshold rule (0.518 sustained over five consecutive minutes) to forecast multi-host 
+saturation and coordinate attacks before network degradation occurs.
+
+Operating in parallel with the sequence forecasters is a high-throughput 
+HistGradientBoosting flow classifier trained across 2.0 million flows from benchmark 
+datasets. Capable of evaluating over 15,000 flows per second, this engine categorizes 
+traffic across nine granular behavioral classes—including Port Scans, Brute Force, 
+Denial-of-Service, DDoS, Web Attacks, Botnet activity, Infiltration, and Heartbleed 
+signature matches.
+
+To ensure operational trust in life-critical environments, Garud replaces black-box 
+heuristics with glass-box Explainable AI (XAI). Every forecast and alert is instantly 
+deconstructed via SHAP (Shapley Additive exPlanations) KernelExplainers and neural 
+gradient attributions, exposing the exact microsecond packet inter-arrival delta or 
+flag anomaly driving the risk score. For forensic integrity and legal chain-of-custody, 
+all alerts and operator actions are cryptographically sealed into a SHA-256 hash-chained 
+ledger that provides mathematical proof against log tampering. Threat containment is 
+simultaneously autonomous and actionable: Garud dynamically synthesizes ready-to-execute 
+Linux iptables scripts and JSON SOAR payloads to quarantine malicious endpoints at the 
+firewall boundary the moment a predicted trajectory crosses mitigation thresholds.
+
+The platform includes an air-gapped, zero-contamination offline analysis sandbox that 
+parses multi-gigabyte PCAP/PCAPNG streams, Zeek logs, Suricata eve.json, and custom 
+CSV tables in memory, automatically normalizing heterogeneous schemas and back-testing 
+predictive temporal accuracy against historical ground truth without contaminating live 
+production state. Packaged within a retro-technical, high-density React mission control 
+console featuring live 3D GeoIP topology mapping and real-time statistical feature drift 
+monitoring, Project Garud solves the defender's fundamental dilemma—delivering the 
+ultimate tactical advantage in high-stakes cyber defense: the power to preempt the future.
+
+================================================================================
+KEYWORDS:
+Network Attack Forecasting, Temporal World Model, Deep LSTM, MITRE ATT&CK, 
+Multi-Stage Cyber Campaigns, Explainable AI (SHAP), Cryptographic Ledger, 
+Automated Firewall Mitigation, High-Throughput Flow Classification, SIH 2026.
+================================================================================

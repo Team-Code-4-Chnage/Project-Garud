@@ -2387,3 +2387,65 @@ a:hover {
   background: var(--border-strong);
   border-radius: 2px;
 }
+
+/* ============================================================
+   LIVE LOGS CATEGORY FILTER CHIPS
+   ============================================================ */
+.live-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--border);
+  font-weight: 700;
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.live-filter-chip:hover {
+  background: var(--bg-raised);
+}
+
+.live-filter-chip.active {
+  background: var(--bg-chip-active, #0A1B1B);
+  border-width: 1.5px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* Light Mode: Active filter button is clean crisp white with subtle depth */
+[data-theme="light"] .live-filter-chip {
+  background: transparent;
+}
+
+[data-theme="light"] .live-filter-chip:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="light"] .live-filter-chip.active {
+  background: #ffffff !important;
+  border-width: 1.5px;
+  box-shadow: 0 1px 3px rgba(40, 30, 20, 0.1), 0 0 0 1px currentColor;
+}
+
+.live-filter-chip .filter-count-badge {
+  background: var(--bg-inset);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: inherit;
+  transition: background 0.15s ease;
+}
+
+.live-filter-chip.active .filter-count-badge {
+  background: var(--badge-chip-active, rgba(255, 255, 255, 0.12));
+}
+
+[data-theme="light"] .live-filter-chip.active .filter-count-badge {
+  background: rgba(0, 0, 0, 0.07) !important;
+}

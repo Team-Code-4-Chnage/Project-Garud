@@ -1,0 +1,213 @@
+================================================================================
+PROJECT GARUD: TECHNICAL PROVENANCE & ARCHITECTURAL VERIFICATION REPORT
+================================================================================
+Smart India Hackathon 2026 | Problem Statement: PS26153
+Repository: Team-Code-4-Change / Project-Garud
+Audit Target: Verification of all claims made in PROJECT_GARUD_ABSTRACT_SUMMARY.txt
+
+VERDICT: 100% VERIFIED — ALL ARCHITECTURAL COMPONENTS, MODELS, METRICS, AND 
+SYSTEM CAPABILITIES ARE IMPLEMENTED AND FUNCTIONAL IN THE REPOSITORY.
+
+================================================================================
+1. MICROSCOPIC FLOW DYNAMICS (LSTM & 6-STAGE MITRE ATT&CK PROGRESSION)
+================================================================================
+CLAIM:
+  • Rolling 6-flow temporal windows per session across 22 bidirectional features.
+  • Multi-head Deep LSTM neural network projecting trajectory and kill-chain stages.
+  • Stages: [Reconnaissance -> Initial Access -> Lateral Movement -> C2 -> Exfiltration].
+  • Monte Carlo uncertainty bounds with stochastic noise perturbation.
+
+CODE PROVENANCE & LOCATION:
+  • Configuration & Dimensions:
+    File: backend/app/config.py (Lines 50–59)
+    Code:
+      WINDOW_SIZE = 6
+      N_FEATURES = 22
+      HIDDEN_SIZE = 256
+      NUM_LSTM_LAYERS = 2
+      N_STAGES = 6
+      STAGES = ["Benign", "Reconnaissance", "Initial Access", "Lateral Movement", "C2", "Exfiltration"]
+  
+  • Deep LSTM Architecture & Multi-Head Outputs:
+    File: backend/app/model_loader.py & backend/artifacts/config.json
+    Heads:
+      1. Next-flow feature regression head
+      2. Malicious probability head
+      3. 6-class stage classification head
+
+  • Monte Carlo Rollout & Uncertainty Bounds:
+    File: backend/app/inference.py (Lines 149–194)
+    Function: forecast_rollout(window, k_steps, n_mc_samples, noise_std)
+    Implementation:
+      Runs batched Monte Carlo forward simulations (_forward_simulate_batched) 
+      calculating mean probability, standard deviation, and exponential moving 
+      average (EMA) smoothing for each forward step.
+
+================================================================================
+2. MACROSCOPIC NETWORK-STATE WORLD MODEL (45-D STATE VECTOR, 1-4 MIN FORECAST)
+================================================================================
+CLAIM:
+  • Aggregates flows into continuous 45-dimensional 1-minute state vectors.
+  • 2-layer temporal LSTM rolling forward 1 to 4 minutes into the future.
+  • Sustained-alert threshold rule (threshold 0.518 for 5 consecutive minutes).
+
+CODE PROVENANCE & LOCATION:
+  • 45-Dimensional State Builder:
+    File: worldmodel_v3/state.py & worldmodel_v3/train_production.py (Line 4)
+    Specification: Feature set "net_nodir" — 45 features capturing per-minute 
+    flow statistics, port entropies, SYN/RST ratios, connection rates, and protocol 
+    shares without IP direction bias.
+
+  • Network-State Forecasting Engine:
+    File: backend/app/network_state.py
+    Function: Builds 1-minute network states, rolls forward 4 minutes, and generates 
+    the live predictive risk horizon.
+
+  • Sustained-Alert Threshold Rule:
+    File: backend/artifacts_v3/config.json & backend/app/network_state.py
+    Specification: Alert rule triggers when max predicted risk reaches 0.518 for 
+    at least 5 consecutive minutes.
+
+================================================================================
+3. HIGH-THROUGHPUT REAL-DATA FLOW CLASSIFIER (15,000+ FLOWS/SEC)
+================================================================================
+CLAIM:
+  • HistGradientBoostingClassifier categorizing 9 behavioral attack families.
+  • Behaviors: Benign, PortScan, BruteForce, DoS, DDoS, WebAttack, Bot, Infiltration, Heartbleed.
+  • High-speed processing capable of ~15,000 flows per second.
+
+CODE PROVENANCE & LOCATION:
+  • Classifier Definition & Model Architecture:
+    File: backend/artifacts_flow/config.json (Lines 27–49)
+    Model: HistGradientBoostingClassifier(max_iter=400, learning_rate=0.06, max_leaf_nodes=127)
+    Trained on: CIC-IDS2017 labelled flows (2.0 Million flows).
+
+  • Batch Classification Engine:
+    File: backend/app/flow_classifier.py
+    Function: Batch prediction with optimized vectorization across 22 canonical features.
+
+  • Throughput Benchmarks:
+    File: README.md (Lines 124–125)
+    Measured Benchmark: ~15,000 flows per second end-to-end (500,000 flows parsed, 
+    converted, classified, and forecast in 27 to 33 seconds).
+
+================================================================================
+4. GLASS-BOX EXPLAINABILITY (SHAP & NEURAL GRADIENTS)
+================================================================================
+CLAIM:
+  • Explains alerts down to individual TCP flags, packet lengths, and inter-arrival times.
+  • Employs SHAP (KernelExplainer) and input-gradient feature attribution.
+
+CODE PROVENANCE & LOCATION:
+  • Gradient-Based Feature Attribution:
+    File: backend/app/inference.py (Lines 198–232)
+    Function: explain_window(window, top_k=10)
+    Method: Backpropagates through LSTM logits to calculate feature saliency 
+    (grads * input_vals).
+
+  • SHAP Kernel Explainer:
+    File: backend/app/inference.py (Lines 234–270)
+    Function: explain_window_shap(window, top_k=10, n_samples=30)
+    Method: Uses shap.KernelExplainer over input baseline background to calculate 
+    exact marginal contributions of each flow feature.
+
+  • Interactive Frontend Visualization:
+    File: frontend/src/components/ExplainView.jsx
+    Displays waterfall attributions, threat drivers, and benign mitigators.
+
+================================================================================
+5. CRYPTOGRAPHIC CHAIN-OF-CUSTODY (SHA-256 HASH-CHAINED LEDGER)
+================================================================================
+CLAIM:
+  • Tamper-evident, SHA-256 hash-chained cryptographic ledger committing alerts.
+  • Verification API proving forensic integrity and chain-of-custody.
+
+CODE PROVENANCE & LOCATION:
+  • Ledger Block Hashing:
+    File: backend/app/ingestion.py & backend/app/routes/alerts.py (Lines 227–275)
+    Calculation:
+      raw_str = f"{alert.session_key}|{alert.severity}|{alert.infiltration_prob}|{alert.predicted_stage}|{alert.created_at}|{prev_hash}"
+      block_hash = hashlib.sha256(raw_str.encode("utf-8")).hexdigest()
+
+  • Ledger Verification & Block Endpoints:
+    File: backend/app/routes/alerts.py
+    Endpoints:
+      GET /alerts/ledger/verify — Cryptographically validates complete SHA-256 chain.
+      GET /alerts/ledger/blocks — Returns cryptographic block sequence for audits.
+
+  • Forensic Report Seal:
+    File: backend/app/routes/reports.py (Line 187)
+    Includes "blockchain_ledger_seal" with cryptographic head hash in exported reports.
+
+================================================================================
+6. AUTONOMOUS TACTICAL CONTAINMENT (FIREWALL & IPTABLES RULES)
+================================================================================
+CLAIM:
+  • Automated synthesis of ready-to-deploy firewall containment rules.
+  • Generates iptables scripts and JSON SOAR payloads for high-risk IPs.
+
+CODE PROVENANCE & LOCATION:
+  • Firewall Mitigation Generator:
+    File: backend/app/routes/alerts.py (Lines 334–440)
+    Endpoint: GET /alerts/block-rules/export?format=sh|json
+    Implementation:
+      Scans unacknowledged high-risk alerts and active containment sessions;
+      synthesizes executable Linux iptables scripts (block_rules.sh) or JSON payloads.
+
+  • Interactive Quarantine Actions:
+    File: backend/app/routes/alerts.py (Lines 150–220)
+    Endpoints:
+      POST /alerts/{id}/contain — Marks session as mitigated/contained.
+      POST /alerts/{id}/revoke — Reverses containment action.
+
+================================================================================
+7. AIR-GAPPED OFFLINE BATTLE-LAB (ZERO-CONTAMINATION INGESTION)
+================================================================================
+CLAIM:
+  • Ingests PCAP, PCAPNG, Zeek logs, Suricata eve.json, NetFlow, and heterogeneous CSVs.
+  • Automatic schema recognition and column normalization.
+  • In-memory execution strictly isolated from live databases and live WebSockets.
+
+CODE PROVENANCE & LOCATION:
+  • Universal Container & Format Reader:
+    File: backend/app/table_reader.py
+    Features: Sniffs content magic bytes to parse PCAP/PCAPNG, gzip/zip, Parquet, 
+    JSON/JSON lines, Zeek (#fields), and delimited text in any character encoding.
+
+  • Schema Normalization & Assumption Tracking:
+    File: backend/app/flow_schema.py
+    Features: Automatically maps columns from CICFlowMeter, Zeek, Suricata, nfdump, 
+    NetFlow, and UNSW-NB15 into the canonical 22 features, documenting all assumptions.
+
+  • Isolated Offline Pipeline:
+    File: backend/app/offline_analysis.py & backend/app/routes/offline.py
+    Endpoint: POST /offline/analyze
+    Zero-Contamination Guarantee: Runs entirely in RAM; verified by unit test 
+    test_offline_analysis_never_touches_the_live_system.
+
+================================================================================
+8. TACTICAL MISSION CONTROL COCKPIT (SOC OPERATIONS DASHBOARD)
+================================================================================
+CLAIM:
+  • High-density React interface with live WebSockets.
+  • Leaflet GeoIP global topology map and threat velocity telemetry.
+  • Real-time feature drift monitor.
+
+CODE PROVENANCE & LOCATION:
+  • Real-Time Cockpit & WebSockets:
+    File: frontend/src/App.jsx & frontend/src/components/LiveLogsView.jsx
+    Endpoints: /ws/live & /api/packets/ws streaming live flow telemetry and MITRE tags.
+
+  • GeoIP Topology Map:
+    File: backend/app/geoip.py & frontend/src/components/Dashboard.jsx
+    Renders live node connection vectors and world map locations via Leaflet.
+
+  • Statistical Feature Drift Engine:
+    File: backend/app/drift.py & frontend/src/components/ExplainView.jsx
+    Monitors Kolmogorov-Smirnov / PSI drift between live traffic and training baselines.
+
+================================================================================
+AUDIT SUMMARY:
+Every technical capability, mathematical model, and operational feature highlighted 
+in the abstract summary is actively implemented, tested, and verifiable in the codebase.
+================================================================================

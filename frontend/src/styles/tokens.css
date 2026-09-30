@@ -106,6 +106,10 @@
   /* Tooltip and Popover */
   --bg-popover: #0A1B1B;
   --border-popover: rgba(231, 240, 244, 0.22);
+
+  /* Filter Chips */
+  --bg-chip-active: #0A1B1B;
+  --badge-chip-active: rgba(255, 255, 255, 0.12);
 }
 
 /* ============================================================
@@ -171,4 +175,8 @@
   /* Tooltip and Popover */
   --bg-popover: #FEFBF6;
   --border-popover: #CFC6B3;
+
+  /* Filter Chips */
+  --bg-chip-active: #FFFFFF;
+  --badge-chip-active: rgba(0, 0, 0, 0.08);
 }

@@ -304,19 +304,19 @@ function LiveLogsView({
           {
             id: "benign",
             label: "BENIGN",
-            color: "#34D399",
+            color: "var(--success)",
             count: categoryCounts.benign,
           },
           {
             id: "recon",
             label: "RECON",
-            color: "#39DFEB",
+            color: "var(--info)",
             count: categoryCounts.recon,
           },
           {
             id: "initial",
             label: "INITIAL ACCESS",
-            color: "#F6B144",
+            color: "var(--warning)",
             count: categoryCounts.initial,
           },
           {
@@ -334,7 +334,7 @@ function LiveLogsView({
           {
             id: "exfil",
             label: "EXFILTRATION",
-            color: "#F64541",
+            color: "var(--danger)",
             count: categoryCounts.exfil,
           },
         ].map((c) => {
@@ -342,34 +342,16 @@ function LiveLogsView({
           return (
             <button
               key={c.id}
+              className={`live-filter-chip ${isActive ? "active" : ""}`}
               onClick={() => setCategoryFilter(c.id)}
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "3px 8px",
-                borderRadius: "var(--radius-sm)",
-                background: isActive ? c.color : "transparent",
-                color: isActive ? "#010B0C" : c.color,
-                border: `1px solid ${isActive ? c.color : "var(--border)"}`,
-                fontWeight: 700,
-                fontSize: "0.68rem",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-                whiteSpace: "nowrap",
+                borderColor: isActive ? c.color : "var(--border)",
+                color: c.color,
+                background: isActive ? "var(--bg-chip-active, #ffffff)" : "transparent",
               }}
             >
               <span>{c.label}</span>
-              <span
-                style={{
-                  background: isActive
-                    ? "rgba(0, 0, 0, 0.35)"
-                    : "var(--bg-inset)",
-                  padding: "1px 5px",
-                  borderRadius: 3,
-                  fontSize: "0.62rem",
-                }}
-              >
+              <span className="filter-count-badge">
                 {c.count}
               </span>
             </button>

@@ -37,7 +37,7 @@ from .table_reader import UnreadableFile, open_source, read_chunks
 logger = logging.getLogger(__name__)
 
 GAP_MINUTES = 60                 # a longer silence starts a new segment of the timeline
-MAX_SEGMENTS = 8                 # most recent segments analysed in detail
+MAX_SEGMENTS = 32                # activity segments analysed in detail
 MAX_MINUTES_PER_SEGMENT = 2880   # a segment longer than two days is analysed on its last two days
 BLOCK_ROWS = 30                  # session size when the file has no addresses (as in preprocessing)
 MIN_TIMELINE_MINUTES = 40        # a synthetic timeline spans about this many minutes
@@ -88,7 +88,7 @@ class Steps:
 
 def _load_table(src) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     feats, metas, report = [], [], None
-    nonfinite = ts_unparsed = 0
+    nonfinite = ts_unparsed = negative_total = 0
     warnings: list[str] = []
     try:
         for chunk in read_chunks(src):
@@ -99,11 +99,18 @@ def _load_table(src) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
             report = report or rep
             nonfinite += rep["nonfinite_values_set_to_zero"]
             ts_unparsed += rep.get("timestamps_unparsed", 0)
-            warnings.extend(w for w in rep.get("warnings", []) if w not in warnings)
+            negative_total += rep.get("negative_values_count", 0)
+            for w in rep.get("warnings", []):
+                if "negative feature values were kept as given" in w:
+                    continue
+                if w not in warnings:
+                    warnings.append(w)
             feats.append(f)
             metas.append(m)
     except UnreadableFile as exc:
         raise OfflineError(str(exc)) from exc
+    if negative_total:
+        warnings.append(f"{negative_total:,} negative feature values were kept as given")
     report["nonfinite_values_set_to_zero"] = nonfinite
     report["timestamps_unparsed"] = ts_unparsed
     report["warnings"] = warnings
@@ -172,8 +179,19 @@ def _complete_structure(feats: pd.DataFrame, meta: pd.DataFrame, report: dict):
     for col in ("src_ip", "dst_ip"):
         meta[col] = meta[col].astype("string")
         meta[col] = meta[col].where(meta[col].notna() & (meta[col].str.strip() != ""), None)
+    has_session_id = "session_id" in meta and meta["session_id"].notna().any()
     has_ips = meta["src_ip"].notna().any() and meta["dst_ip"].notna().any()
-    if has_ips:
+    if has_session_id:
+        notes["sessions"] = "session_id from file"
+        sess_str = "Session " + meta["session_id"].astype(str)
+        if has_ips:
+            valid_ip = meta["src_ip"].notna() & meta["dst_ip"].notna()
+            meta["session"] = np.where(valid_ip, sess_str + " (" + meta["src_ip"].fillna("?") + " -> " + meta["dst_ip"].fillna("?") + ")", sess_str)
+        else:
+            meta["session"] = sess_str
+        meta["src_ip"] = meta["src_ip"].fillna("0.0.0.0")
+        meta["dst_ip"] = meta["dst_ip"].fillna("0.0.0.0")
+    elif has_ips:
         meta["src_ip"] = meta["src_ip"].fillna("0.0.0.0")
         meta["dst_ip"] = meta["dst_ip"].fillna("0.0.0.0")
         meta["session"] = meta["src_ip"] + " -> " + meta["dst_ip"]
@@ -252,9 +270,22 @@ def _flow_evaluation(truth_beh: pd.Series, pred: dict, flagged: np.ndarray) -> d
     fam = {}
     pb = pred["behaviour"][k]
     tb = truth_beh[known].to_numpy()
+    STAGE_BEHAVIOURS = {
+        "Reconnaissance": {"Reconnaissance", "PortScan"},
+        "PortScan": {"PortScan", "Reconnaissance"},
+        "Initial Access": {"Initial Access", "WebAttack", "BruteForce", "DoS"},
+        "Lateral Movement": {"Lateral Movement", "Infiltration", "PortScan"},
+        "C2": {"C2", "Bot", "DoS"},
+        "Exfiltration": {"Exfiltration", "Heartbleed"},
+    }
     for b in sorted(set(tb) - {"Benign"}):
         m = tb == b
-        fam[b] = dict(rows=int(m.sum()), detected=_f(float(fl[m].mean())), family_correct=_f(float((pb[m] == b).mean())))
+        if b in STAGE_BEHAVIOURS:
+            compat = STAGE_BEHAVIOURS[b]
+            fc = float(np.isin(pb[m], list(compat)).mean())
+        else:
+            fc = float((pb[m] == b).mean())
+        fam[b] = dict(rows=int(m.sum()), detected=_f(float(fl[m].mean())), family_correct=_f(fc))
     out["families"] = fam
     return out
 
@@ -319,6 +350,7 @@ def _segment_report(m, states: pd.DataFrame, frame: pd.DataFrame, has_truth: boo
             mean_attack_prob=_f(row["mean_prob"]) if pd.notna(row["mean_prob"]) else None,
             behaviour=row["behaviour"] if pd.notna(row["behaviour"]) else "Benign",
             labelled_attacks=int(row["labelled_attacks"]) if has_truth and pd.notna(row["labelled_attacks"]) else None,
+            behaviour_true=row["behaviour_true"] if has_truth and "behaviour_true" in row and pd.notna(row["behaviour_true"]) else None,
             model_risk=_f(score[i]), alert=bool(alert[i])))
     seg["per_minute"] = per_min
 
@@ -426,7 +458,7 @@ def analyze_offline(path: str, filename: str = "") -> dict:
                            f"to {all_states.index.max()}")
 
     segs = _segments(all_states.index)
-    chosen = sorted(segs, key=lambda se: se[1])[-MAX_SEGMENTS:]
+    chosen = segs if len(segs) <= MAX_SEGMENTS else segs[-MAX_SEGMENTS:]
     details = []
     for i, (a, b) in enumerate(chosen):
         st = full_grid(all_states.loc[a:b])
@@ -489,7 +521,10 @@ def convert_to_garud_csv(path: str) -> pd.DataFrame:
     steps = Steps()
     feats, meta, report, notes, _, _ = prepare(path, steps)
     pred = get_classifier().predict(feats)
-    out = pd.concat([meta[["timestamp", "src_ip", "dst_ip", "src_port", "dst_port", "protocol"]], feats], axis=1)
+    cols = ["timestamp", "src_ip", "dst_ip", "src_port", "dst_port", "protocol"]
+    if "session_id" in meta and meta["session_id"].notna().any():
+        cols.append("session_id")
+    out = pd.concat([meta[cols], feats], axis=1)
     out["timestamp"] = out["timestamp"].dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     if meta["label"].notna().any():
         out["label"] = meta["label"].fillna("")
