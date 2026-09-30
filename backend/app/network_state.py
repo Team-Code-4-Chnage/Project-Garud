@@ -198,6 +198,15 @@ class NetworkWorldModel:
         return np.expm1(z * self.std + self.mean)
 
 
+def _threat_projection(peak, age, k, minutes_since_peak, recent_scores):
+    """Projected risk k+1 minutes ahead: an attack still in progress keeps climbing, a finished one decays."""
+    if minutes_since_peak == 0 and peak >= 0.35:
+        rising = len(recent_scores) < 2 or recent_scores[-1] >= recent_scores[-2] - 1e-9
+        if rising:
+            return float(min(0.99, peak + (0.99 - peak) * 0.15 * (k + 1)))
+    return float(peak * (0.92 ** age))
+
+
 class NetworkStateTracker:
     """Every flow recorded, regardless of source, feeds one combined network-wide state. The source tag
     on each flow is kept only so a specific source's flows can be purged (see reset()); it is never used
@@ -379,203 +388,164 @@ class NetworkStateTracker:
             return dict(status="model_unavailable", detail=self._model_error)
         st = self.states()
         if st is None or len(st) == 0:
-            if getattr(self, "mode", "live") == "live":
-                now_utc = datetime.now(timezone.utc)
-                now_iso = now_utc.replace(second=0, microsecond=0).isoformat()
-                return dict(
-                    status="ok",
-                    minutes=[now_iso],
-                    state={f: [0.0] for f in DISPLAY_FEATURES},
-                    risk_score=[0.08],
-                    stages=["Benign"],
-                    alert=[False],
-                    current=dict(
-                        minute=now_iso,
-                        alert=False,
-                        risk_score=0.08,
-                        attack_state="NORMAL_BASELINE",
-                        attack_state_label="Defense Telemetry Nominal",
-                        attack_stage="Benign",
-                        top_behaviour="Benign",
-                        estimated_time_to_attack="Stable (Nominal Baseline)",
-                        estimated_time_desc="Telemetry baseline nominal across next 4+ minutes. Zero intrusion velocity.",
-                        estimated_reach_minutes=None,
-                        consecutive_needed=m.N if m else 3,
-                        threshold=m.thr if m else 0.4,
-                    ),
-                    forecast=[
-                        dict(
-                            step=k + 1,
-                            minute=(now_utc + timedelta(minutes=k + 1)).replace(second=0, microsecond=0).isoformat(),
-                            risk=0.08,
-                            behaviours=[dict(behaviour="Benign", probability=1.0, techniques=[], tactics=[])],
-                            state={f: 0.0 for f in DISPLAY_FEATURES},
-                        )
-                        for k in range(m.H if m else 4)
-                    ],
-                    explanation=[],
-                    model=self.model_info() if m else {},
-                )
             return dict(status="no_data")
         minutes = [t.isoformat() for t in st.index]
         display = {f: st[f].round(4).tolist() for f in DISPLAY_FEATURES if f in st}
-        # Compute real empirical threat scores for all available minutes
-        with self._lock:
-            rows_all = list(self._flows)
-        if getattr(self, "mode", "live") == "live":
-            rows_all = [r for r in rows_all if r.get("_source") != "simulated"] or rows_all
+        if len(st) < m.W:
+            # Compute real empirical threat scores for all available minutes
+            with self._lock:
+                rows_all = list(self._flows)
+            if getattr(self, "mode", "live") == "live":
+                rows_all = [r for r in rows_all if r.get("_source") != "simulated"] or rows_all
 
-        min_to_stages_wu = defaultdict(list)
-        for r in rows_all:
-            stg = r.get("stage")
-            if stg:
-                ts = r["timestamp"]
-                mk = ts.strftime("%Y-%m-%dT%H:%M") if hasattr(ts, "strftime") else str(ts)[:16]
-                min_to_stages_wu[mk].append(stg)
+            min_to_stages_wu = defaultdict(list)
+            for r in rows_all:
+                stg = r.get("stage")
+                if stg:
+                    ts = r["timestamp"]
+                    mk = ts.strftime("%Y-%m-%dT%H:%M") if hasattr(ts, "strftime") else str(ts)[:16]
+                    min_to_stages_wu[mk].append(stg)
 
-        wu_emp_scores = []
-        wu_emp_behaviours = []
-        for i in range(len(st)):
-            m_dt = st.index[i]
-            m_key = m_dt.strftime("%Y-%m-%dT%H:%M") if hasattr(m_dt, "strftime") else str(m_dt)[:16]
-            explicit_stages = min_to_stages_wu.get(m_key, [])
-            if explicit_stages:
-                non_benign = [s for s in explicit_stages if s and s != "Benign"]
-                if non_benign:
-                    top_exp = max(non_benign, key=lambda s: KILL_CHAIN_ORDER.get(s, 0))
-                    es = STAGE_CALIBRATED_RISK.get(top_exp, 0.70)
-                    eb = top_exp
+            wu_emp_scores = []
+            wu_emp_behaviours = []
+            for i in range(len(st)):
+                m_dt = st.index[i]
+                m_key = m_dt.strftime("%Y-%m-%dT%H:%M") if hasattr(m_dt, "strftime") else str(m_dt)[:16]
+                explicit_stages = min_to_stages_wu.get(m_key, [])
+                if explicit_stages:
+                    non_benign = [s for s in explicit_stages if s and s != "Benign"]
+                    if non_benign:
+                        top_exp = max(non_benign, key=lambda s: KILL_CHAIN_ORDER.get(s, 0))
+                        es = STAGE_CALIBRATED_RISK.get(top_exp, 0.70)
+                        eb = top_exp
+                    else:
+                        raw_es, raw_eb = compute_empirical_threat(st.iloc[i])
+                        es, eb = (0.0, "Benign") if raw_es < 0.85 else (raw_es, raw_eb)
                 else:
-                    raw_es, raw_eb = compute_empirical_threat(st.iloc[i])
-                    es, eb = (0.0, "Benign") if raw_es < 0.85 else (raw_es, raw_eb)
-            else:
-                es, eb = compute_empirical_threat(st.iloc[i])
-            wu_emp_scores.append(es)
-            wu_emp_behaviours.append(eb)
+                    es, eb = compute_empirical_threat(st.iloc[i])
+                wu_emp_scores.append(es)
+                wu_emp_behaviours.append(eb)
 
-        # Try partial model inference using whatever data we have
-        now_utc = datetime.now(timezone.utc)
-        now_iso = minutes[-1] if minutes else now_utc.replace(second=0, microsecond=0).isoformat()
-        Z = m.encode(st)
-        # Use the last min(len(Z), W) rows as a partial window for the model
-        partial_win = Z[-m.W:] if len(Z) >= m.W else np.concatenate([
-            np.zeros((m.W - len(Z), Z.shape[1])), Z
-        ], axis=0)
-        try:
-            with torch.no_grad():
-                S1, R1, C1 = m.model.rollout(torch.tensor(partial_win[np.newaxis]), m.H)
-            probs_wu = torch.softmax(C1, dim=-1).detach().numpy()[0]
-            pred_states_wu = m.decode(S1.detach().numpy()[0])
-            # Use peak threat from the last 5 minutes (not just last minute)
-            # so attack forecasts persist even if the last minute happens to be benign
-            THREAT_HORIZON = 5
-            recent_scores_wu = wu_emp_scores[-THREAT_HORIZON:] if wu_emp_scores else [0.0]
-            recent_behs_wu = wu_emp_behaviours[-THREAT_HORIZON:] if wu_emp_behaviours else ["Benign"]
-            peak_emp_threat_wu = max(recent_scores_wu)
-            peak_emp_beh_wu = max(
-                recent_behs_wu,
-                key=lambda b: KILL_CHAIN_ORDER.get(b, 0)
-            )
-            # Only consider all-benign if no attack in last 5 minutes
-            recent_all_benign_wu = (peak_emp_threat_wu == 0.0)
-            # Minutes since peak attack (for decay)
+            # Try partial model inference using whatever data we have
+            now_utc = datetime.now(timezone.utc)
+            now_iso = minutes[-1] if minutes else now_utc.replace(second=0, microsecond=0).isoformat()
+            Z = m.encode(st)
+            # Use the last min(len(Z), W) rows as a partial window for the model
+            partial_win = Z[-m.W:] if len(Z) >= m.W else np.concatenate([
+                np.zeros((m.W - len(Z), Z.shape[1])), Z
+            ], axis=0)
             try:
-                peak_idx = len(recent_scores_wu) - 1 - next(
-                    i for i, v in enumerate(reversed(recent_scores_wu)) if v >= 0.35
+                with torch.no_grad():
+                    S1, R1, C1 = m.model.rollout(torch.tensor(partial_win[np.newaxis], dtype=torch.float32), m.H)
+                probs_wu = torch.softmax(C1, dim=-1).detach().numpy()[0]
+                pred_states_wu = m.decode(S1.detach().numpy()[0])
+                # Use peak threat from the last 5 minutes (not just last minute)
+                # so attack forecasts persist even if the last minute happens to be benign
+                THREAT_HORIZON = 5
+                recent_scores_wu = wu_emp_scores[-THREAT_HORIZON:] if wu_emp_scores else [0.0]
+                recent_behs_wu = wu_emp_behaviours[-THREAT_HORIZON:] if wu_emp_behaviours else ["Benign"]
+                peak_emp_threat_wu = max(recent_scores_wu)
+                peak_emp_beh_wu = max(
+                    recent_behs_wu,
+                    key=lambda b: KILL_CHAIN_ORDER.get(b, 0)
                 )
-                minutes_since_peak = len(recent_scores_wu) - 1 - peak_idx
-            except StopIteration:
-                minutes_since_peak = THREAT_HORIZON
-            steps_wu = []
-            for k in range(m.H):
-                raw_step_risk = float(torch.sigmoid(R1[0, k]).item())
-                if peak_emp_threat_wu > 0.0:
-                    # Decay from peak, accounting for how many minutes ago the peak was
-                    effective_age = minutes_since_peak + k + 1
-                    decayed = float(peak_emp_threat_wu * (0.92 ** effective_age))
-                    step_risk = max(raw_step_risk, decayed)
-                elif recent_all_benign_wu:
-                    step_risk = min(raw_step_risk, 0.10)
+                # Only consider all-benign if no attack in last 5 minutes
+                recent_all_benign_wu = (peak_emp_threat_wu == 0.0)
+                # Minutes since peak attack (for decay)
+                try:
+                    peak_idx = len(recent_scores_wu) - 1 - next(
+                        i for i, v in enumerate(reversed(recent_scores_wu)) if v >= 0.35
+                    )
+                    minutes_since_peak = len(recent_scores_wu) - 1 - peak_idx
+                except StopIteration:
+                    minutes_since_peak = THREAT_HORIZON
+                steps_wu = []
+                for k in range(m.H):
+                    raw_step_risk = float(torch.sigmoid(R1[0, k]).item())
+                    if peak_emp_threat_wu > 0.0:
+                        # Decay from peak, accounting for how many minutes ago the peak was
+                        effective_age = minutes_since_peak + k + 1
+                        decayed = _threat_projection(peak_emp_threat_wu, effective_age, k, minutes_since_peak, recent_scores_wu)
+                        step_risk = max(raw_step_risk, decayed)
+                    elif recent_all_benign_wu:
+                        step_risk = min(raw_step_risk, 0.10)
+                    else:
+                        step_risk = raw_step_risk
+                    step_probs = probs_wu[k].copy()
+                    target_beh_wu = STAGE_TO_BEHAVIOUR.get(peak_emp_beh_wu, peak_emp_beh_wu)
+                    if (step_risk < m.thr and peak_emp_threat_wu < 0.35) or recent_all_benign_wu:
+                        benign_idx = m.behaviours.index("Benign")
+                        step_probs = np.zeros_like(step_probs)
+                        step_probs[benign_idx] = 1.0
+                    elif peak_emp_threat_wu >= m.thr and target_beh_wu in m.behaviours:
+                        beh_idx = m.behaviours.index(target_beh_wu)
+                        blend_w = min(0.85, (peak_emp_threat_wu - 0.35) * 1.5)
+                        step_probs = (1.0 - blend_w) * step_probs
+                        step_probs[beh_idx] += blend_w
+                        step_probs /= step_probs.sum()
+                    top = np.argsort(-step_probs)[:3]
+                    beh = [dict(behaviour=m.behaviours[i], probability=float(step_probs[i]),
+                                techniques=[], tactics=[]) for i in top]
+                    steps_wu.append(dict(step=k + 1,
+                        minute=(now_utc + timedelta(minutes=k + 1)).replace(second=0, microsecond=0).isoformat(),
+                        risk=step_risk, behaviours=beh,
+                        state={f: float(pred_states_wu[k][m.features.index(f)]) for f in DISPLAY_FEATURES if f in m.features}))
+            except Exception as e:
+                logger.exception("warm-up forecast failed")
+                return dict(status="model_error", detail=f"forecast rollout failed: {e}")
+
+            # Build per-minute risk scores using real empirical data
+            wu_risk_scores = []
+            for i, es in enumerate(wu_emp_scores):
+                eb = wu_emp_behaviours[i]
+                if eb == "Benign" and es == 0.0:
+                    wu_risk_scores.append(0.08)
+                elif eb == "Benign" and es < 0.25:
+                    wu_risk_scores.append(min(es, 0.16))
                 else:
-                    step_risk = raw_step_risk
-                step_probs = probs_wu[k].copy()
-                target_beh_wu = STAGE_TO_BEHAVIOUR.get(peak_emp_beh_wu, peak_emp_beh_wu)
-                if (step_risk < m.thr and peak_emp_threat_wu < 0.35) or recent_all_benign_wu:
-                    benign_idx = m.behaviours.index("Benign")
-                    step_probs = np.zeros_like(step_probs)
-                    step_probs[benign_idx] = 1.0
-                elif peak_emp_threat_wu >= m.thr and target_beh_wu in m.behaviours:
-                    beh_idx = m.behaviours.index(target_beh_wu)
-                    blend_w = min(0.85, (peak_emp_threat_wu - 0.35) * 1.5)
-                    step_probs = (1.0 - blend_w) * step_probs
-                    step_probs[beh_idx] += blend_w
-                    step_probs /= step_probs.sum()
-                top = np.argsort(-step_probs)[:3]
-                beh = [dict(behaviour=m.behaviours[i], probability=float(step_probs[i]),
-                            techniques=[], tactics=[]) for i in top]
-                steps_wu.append(dict(step=k + 1,
-                    minute=(now_utc + timedelta(minutes=k + 1)).replace(second=0, microsecond=0).isoformat(),
-                    risk=step_risk, behaviours=beh,
-                    state={f: float(pred_states_wu[k][m.features.index(f)]) for f in DISPLAY_FEATURES if f in m.features}))
-        except Exception:
-            recent_all_benign_wu = True
-            steps_wu = [dict(step=k + 1,
-                minute=(now_utc + timedelta(minutes=k + 1)).replace(second=0, microsecond=0).isoformat(),
-                risk=0.08, behaviours=[dict(behaviour="Benign", probability=1.0, techniques=[], tactics=[])],
-                state={f: 0.0 for f in DISPLAY_FEATURES}) for k in range(m.H)]
+                    wu_risk_scores.append(max(es, 0.08))
 
-        # Build per-minute risk scores using real empirical data
-        wu_risk_scores = []
-        for i, es in enumerate(wu_emp_scores):
-            eb = wu_emp_behaviours[i]
-            if eb == "Benign" and es == 0.0:
-                wu_risk_scores.append(0.08)
-            elif eb == "Benign" and es < 0.25:
-                wu_risk_scores.append(min(es, 0.16))
+            wu_stages = [
+                str(wb) if we >= 0.35 and wb != "Benign" else "Benign"
+                for we, wb in zip(wu_emp_scores, wu_emp_behaviours)
+            ]
+
+            latest_wu_risk = wu_risk_scores[-1] if wu_risk_scores else 0.08
+            wu_attack_stage = wu_emp_behaviours[-1] if wu_emp_scores and wu_emp_scores[-1] >= 0.35 else "Benign"
+            if wu_attack_stage == "Benign":
+                wu_attack_state = "NORMAL_BASELINE"
+                wu_attack_state_label = "Defense Telemetry Nominal"
             else:
-                wu_risk_scores.append(max(es, 0.08))
+                wu_attack_state = "SUSPICIOUS_PROBING"
+                wu_attack_state_label = "Suspicious Activity Detected"
 
-        wu_stages = [
-            str(wb) if we >= 0.35 and wb != "Benign" else "Benign"
-            for we, wb in zip(wu_emp_scores, wu_emp_behaviours)
-        ]
-
-        latest_wu_risk = wu_risk_scores[-1] if wu_risk_scores else 0.08
-        wu_attack_stage = wu_emp_behaviours[-1] if wu_emp_scores and wu_emp_scores[-1] >= 0.35 else "Benign"
-        if wu_attack_stage == "Benign":
-            wu_attack_state = "NORMAL_BASELINE"
-            wu_attack_state_label = "Defense Telemetry Nominal"
-        else:
-            wu_attack_state = "SUSPICIOUS_PROBING"
-            wu_attack_state_label = "Suspicious Activity Detected"
-
-        return dict(
-            status="warming_up",
-            minutes_available=len(st),
-            minutes_needed=m.W,
-            minutes=minutes,
-            state=display,
-            risk_score=wu_risk_scores,
-            stages=wu_stages,
-            alert=[False] * len(minutes),
-            current=dict(
-                minute=now_iso,
-                alert=False,
-                risk_score=latest_wu_risk,
-                attack_state=wu_attack_state,
-                attack_state_label=wu_attack_state_label,
-                attack_stage=wu_attack_stage,
-                top_behaviour=wu_emp_behaviours[-1] if wu_emp_behaviours else "Benign",
-                estimated_time_to_attack="Stable (Nominal Baseline)" if wu_attack_stage == "Benign" else "~3 - 4 min to Critical Reach",
-                estimated_time_desc="Telemetry baseline nominal across next 4+ minutes. Zero intrusion velocity." if wu_attack_stage == "Benign" else "Early threat indicators detected.",
-                estimated_reach_minutes=None if wu_attack_stage == "Benign" else 4,
-                consecutive_needed=m.N,
-                threshold=m.thr,
-            ),
-            forecast=steps_wu,
-            explanation=[],
-            model=self.model_info(),
-        )
+            return dict(
+                status="warming_up",
+                minutes_available=len(st),
+                minutes_needed=m.W,
+                minutes=minutes,
+                state=display,
+                risk_score=wu_risk_scores,
+                stages=wu_stages,
+                alert=[False] * len(minutes),
+                current=dict(
+                    minute=now_iso,
+                    alert=False,
+                    risk_score=latest_wu_risk,
+                    attack_state=wu_attack_state,
+                    attack_state_label=wu_attack_state_label,
+                    attack_stage=wu_attack_stage,
+                    top_behaviour=wu_emp_behaviours[-1] if wu_emp_behaviours else "Benign",
+                    estimated_time_to_attack="Stable (Nominal Baseline)" if wu_attack_stage == "Benign" else "~3 - 4 min to Critical Reach",
+                    estimated_time_desc="Telemetry baseline nominal across next 4+ minutes. Zero intrusion velocity." if wu_attack_stage == "Benign" else "Early threat indicators detected.",
+                    estimated_reach_minutes=None if wu_attack_stage == "Benign" else 4,
+                    consecutive_needed=m.N,
+                    threshold=m.thr,
+                ),
+                forecast=steps_wu,
+                explanation=[],
+                model=self.model_info(),
+            )
 
         Z = m.encode(st)
         win = np.stack([Z[i - m.W + 1:i + 1] for i in range(m.W - 1, len(Z))])
@@ -711,7 +681,7 @@ class NetworkStateTracker:
             raw_step_risk = float(torch.sigmoid(R1[0, k]).item())
             if peak_emp_threat > 0.0:
                 effective_age = minutes_since_peak + k + 1
-                decayed = float(peak_emp_threat * (0.92 ** effective_age))
+                decayed = _threat_projection(peak_emp_threat, effective_age, k, minutes_since_peak, recent_emp_scores)
                 step_risk = max(raw_step_risk, decayed)
             elif recent_all_benign:
                 step_risk = min(raw_step_risk, 0.10)
@@ -846,7 +816,7 @@ class NetworkStateTracker:
 
         return dict(
             status="ok", minutes=minutes, state=display,
-            risk_score=[0.08 if np.isnan(v) else float(v) for v in score],
+            risk_score=[None if np.isnan(v) else float(v) for v in score],
             stages=stages,
             alert=alert,
             current=dict(

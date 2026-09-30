@@ -22,7 +22,7 @@ async def sources():
 async def forecast():
     """Combined network-wide state history, sustained-alert status, and the t+1..t+4 forecast."""
     result = tracker.analyze()
-    if result.get("status") == "model_unavailable":
+    if result.get("status") in ("model_unavailable", "model_error"):
         raise HTTPException(status_code=503, detail=result.get("detail"))
     return result
 

@@ -299,36 +299,12 @@ export default function ForecastChart({ forecastData, _onSelectSession }) {
     const pastRisks = forecastData.risk_score || [];
     const pastStages = forecastData.stages || [];
 
-    // Guarantee minimum 8 observed points so the full green-to-red progression is always visible
-    const padCount = Math.max(0, 8 - pastMinutes.length);
-    for (let p = 0; p < padCount; p++) {
-      const minutesDiff = -(8 - p - 1);
-      const label = `${minutesDiff}m`;
-      const baseRisk = 0.08;
-      const stgMeta = getPointMeta(baseRisk, "Benign", thresholdVal);
-      result.push({
-        time: `pad_${minutesDiff}`,
-        displayLabel: label,
-        observedRisk: baseRisk,
-        forecastRisk: null,
-        lowerUncertainty: null,
-        upperUncertainty: null,
-        uncertaintyRange: null,
-        stage: stgMeta.label,
-        stageKey: stgMeta.key,
-        stageLabel: stgMeta.label,
-        stageColor: stgMeta.color,
-        stagePhase: stgMeta.phase,
-        isObserved: true,
-        isNow: false,
-      });
-    }
-
     // Take past observed minutes (up to 8 minutes prior)
     const startIdx = Math.max(0, pastMinutes.length - 8);
     for (let i = startIdx; i < pastMinutes.length; i++) {
       const minStr = pastMinutes[i];
-      const riskVal = pastRisks[i] != null ? Number(pastRisks[i]) : 0.08;
+      if (pastRisks[i] == null) continue; // no real score for this minute yet
+      const riskVal = Number(pastRisks[i]);
       const isNow = i === pastMinutes.length - 1;
       const minutesDiff = i - (pastMinutes.length - 1);
       const label = isNow ? "NOW" : `${minutesDiff}m`;
