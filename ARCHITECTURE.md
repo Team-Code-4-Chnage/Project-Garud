@@ -1,93 +1,111 @@
-# Project Garud / NetForecast — Architecture
+# Project Garud Architecture
 
-**SIH 2026, Problem Statement 26153 (NTRO).** A defensive network world model: it learns the evolving state of
-a network from flow telemetry, forecasts near-future state and attack risk, maps predicted behaviour to MITRE
-ATT&CK, and explains each prediction. Two models are served side by side. Detailed numbers and methods are in
-`docs/model_card.md`, `docs/world_model_v3_report.md`, and `docs/pcap_parity.md`; this is the 2-page overview.
+Project Garud is a React/Vite security dashboard backed by a FastAPI service. The backend ingests network-flow telemetry, normalizes it into 22 features, evaluates six-flow windows with a PyTorch LSTM, persists operational state in SQLite, and exposes REST and WebSocket APIs for the dashboard.
 
-## Pipeline
+## System Diagram
 
+The following diagram is also shown in the [README](README.md#system-architecture).
+
+```mermaid
+flowchart TB
+    subgraph INGEST ["1. Telemetry Ingestion Layer"]
+        L1["Live NIC Sniffer<br/>(Scapy / Npcap)"]
+        L2["PCAP / PCAPNG<br/>(PcapReader)"]
+        L3["CSV Flow Logs<br/>(Batch Upload)"]
+    end
+
+    subgraph PREPROC ["2. Flow Extraction & Normalization"]
+        FE["22-Feature Extractor<br/>(Durations, Flags, IATs, Sizes)"]
+        SC["StandardScaler<br/>(Train-Fitted Parameters)"]
+        SB["Session Buffer<br/>(Sliding Window W=6)"]
+        INGEST --> FE --> SC --> SB
+    end
+
+    subgraph CORE ["3. Deep World Model Core"]
+        LSTM["2-Layer Stacked LSTM<br/>(Hidden=256, Dropout=0.25)"]
+        H1["Next-State Head<br/>(Linear -> 22 Features)"]
+        H2["Infiltration Head<br/>(MLP -> Risk Logit)"]
+        H3["MITRE Stage Head<br/>(MLP -> 6 Classes)"]
+        SB --> LSTM
+        LSTM --> H1
+        LSTM --> H2
+        LSTM --> H3
+    end
+
+    subgraph FORECAST ["4. Forward Rollout & Explainability"]
+        MC["Monte Carlo Simulator<br/>(k=6 Steps, N=20 Rollouts)"]
+        AT["Adaptive Threshold<br/>(EMA + 2σ Baseline)"]
+        SHAP["SHAP / Gradient<br/>Feature Attribution"]
+        H1 --> MC
+        H2 --> AT
+        LSTM --> SHAP
+    end
+
+    subgraph SOC ["5. Decision Support & UI"]
+        D1["Kill-Chain Radar"]
+        D2["Monte Carlo Bands"]
+        D3["Feature Attribution Bar"]
+        D4["Forensic Reports (CSV/JSON)"]
+        AT --> D1
+        MC --> D2
+        SHAP --> D3
+        D1 & D2 & D3 --> D4
+    end
 ```
-CSV flows ─┐
-PCAP ──────┼─> flow extractor ─> 22 features ─> per-flow model (V1)   ─┐
-Live NIC ──┘   (capture/flow_table.py,          + per-minute network   ├─> REST + WebSocket ─> React dashboard
-               flow_state.py; CICFlowMeter        state ─> network       │   (alerts, forecast, explanation,
-               semantics)                          world model (V3)     ─┘    MITRE, reports) + SQLite store
-```
 
-One extractor serves PCAP upload and live capture, reproducing the CICFlowMeter definitions the model was
-trained on (padding, first-packet flag encoding, header-length, integer-microsecond timing). Verified against
-the official CIC-IDS2017 flow files at 95–100% per-feature agreement, and the served model gives the same
-alert on 99–100% of windows whether features come from a PCAP or the official CSV (`docs/pcap_parity.md`).
+## Runtime Components
 
-## Model 1 — per-flow world model (V1, `backend/artifacts/`)
+### Ingestion and preprocessing
 
-Input: a window of 6 consecutive flows, each a 22-feature vector. A 2-layer LSTM (hidden 256, dropout 0.25)
-feeds three heads: next-state regression (22-dim), an infiltration-risk logit, and a 6-way stage head. Loss is
-MSE(next state) + pos-weighted BCE(risk) + class-weighted focal cross-entropy(stage). At inference it rolls
-forward up to K steps (Monte-Carlo input noise for an uncertainty band); the stage head classifies the last
-flow's stage. **Stage labels are dataset-derived proxies, not a verified kill chain** (e.g. the "C2" label was
-trained on DoS traffic). Held-out (de-duplicated): infiltration ROC-AUC 0.948, F1 0.838, FPR 3.5%; it beats a
-Logistic Regression baseline on the same split (F1 0.838 vs ~0.52). It does not demonstrate early warning.
+- `capture/` contains shared flow reconstruction, packet parsing, live capture, and signature detection.
+- `backend/app/routes/ingest.py` accepts individual flows and CSV uploads.
+- `backend/app/routes/pcap.py` reconstructs flows from PCAP/PCAPNG input.
+- `backend/app/ingestion.py` validates records, resolves sessions, updates buffers, persists data, and triggers inference.
+- `backend/app/model_loader.py` loads `world_model.pt`, `scaler.pkl`, and `config.json` from `backend/artifacts/`.
 
-The 22 features are the CICFlowMeter columns as `data/preprocess_cicids.py` derives them, so several carry that
-tool's quirks: the flag columns are 0/1 bits of the flow's first packet (with SYN/PSH swapped), `ttl_variance`
-is a header-length difference (not TTL), and `retransmit_cnt` is always 0. Real TTL, retransmission and
-payload-size statistics are extracted separately (`FlowState.packet_features()`) and are **not** model inputs,
-because no training data contains them. Full table and formulas: `docs/model_card.md`.
+All model inputs use the configured 22-feature order. The scaler is fitted during training and reused at inference. A six-flow session window is required before the sequence model produces its primary prediction.
 
-## Model 2 — network-state world model (V3, `backend/artifacts_v3/`, served)
+### Model and forecasting
 
-State S(t) is the whole network aggregated over **one minute**: 45 features covering flow statistics plus
-network context — unique source/destination hosts and ports, unique pairs, protocol mix, port and host
-entropy, connection and new-connection rate, per-source destination-port/host spread, and scan/flag ratios
-(`worldmodel_v3/state.py`, shared by the training-data builder and the backend). It excludes direction and
-single-host-share features, which an ablation showed mostly encode the CIC testbed layout rather than attack
-behaviour (`docs/world_model_v3_report.md` §14).
+The production flow model is a two-layer LSTM with three output heads:
 
-An LSTM is trained with genuine multi-step targets: from the last 6 minutes it predicts states, infiltration
-risk, and behaviour class for t+1…t+4, using recursive rollout with scheduled teacher forcing so training
-matches inference. A sustained-alert rule (risk ≥ threshold for N consecutive minutes) is frozen on validation
-under a false-alarm budget; the shipped weights are the ones evaluated on the held-out test segment. Served via
-`GET /network/forecast` and the NETWORK_FORECAST dashboard view, which also shows the model's measured
-reliability and caveats.
+1. Next-state regression predicts the next 22-feature vector.
+2. The infiltration head produces the binary risk score used by alerting.
+3. The stage head predicts one of six dataset-derived labels.
 
-Honest evaluation (chronological within-day split; families seen in training, later in the day): detection
-ROC-AUC 0.83; state prediction beats a persistence baseline at t+2…t+4 but not at t+1; false alarms ~0.4 per
-quiet hour after operating-point tuning. On attack families **never seen in training** (leave-one-day-out,
-5 seeds): detection near chance (ROC-AUC ~0.56) and ~34% of episodes warned within 20 minutes. Behaviour
-forecasting did not beat persistence. In an end-to-end replay of a real DDoS it detected the attack shortly
-after onset, not before it. Net reading: strong at detection, weak at genuine forecasting — the limiting
-factor is that open flow datasets contain no multi-stage campaign, which the `lab/` collection addresses.
+`backend/app/inference.py` performs single-window prediction and autoregressive forecast rollouts. Monte Carlo input noise provides a forecast spread. The adaptive threshold uses the configured alert baseline and EMA smoothing. These labels are operational proxies, not proof of a real multi-stage campaign.
 
-## Explainability
+The repository also contains the network-state experiment and served V3 path under `worldmodel_v2/`, `worldmodel_v3/`, `backend/app/network_state.py`, and `backend/artifacts_v3/`. It aggregates flows into one-minute state vectors and exposes the network forecast route.
 
-Both models are explained from the actual prediction, no hard-coded values. V1: SHAP KernelExplainer (50
-samples, training-mean baseline) with a gradient×input fast path, attributing the infiltration risk over the
-22 features. V3: gradient×input of the forecast risk over the 45 network-state features, surfaced in the
-dashboard as the drivers of each forecast.
+### Persistence and APIs
 
-## MITRE ATT&CK mapping
+`backend/app/database.py` owns the async SQLite models for flows, sessions, alerts, and cycle archives. The FastAPI application in `backend/app/main.py` registers route modules for:
 
-An analyst-written backend lookup (`backend/app/mitre.py`, `GET /mitre/mapping`), not a model output. It maps a
-behaviour or stage label to techniques and tactics with a rationale and confidence, corrects the dataset
-mislabels (DoS/DDoS → Impact, brute force → Credential Access, scanning → Reconnaissance/Discovery), and flags
-ambiguous mappings. Verify IDs against the current ATT&CK release before external use.
+- Prediction and forecasting: `/predict`, `/forecast`.
+- Ingestion: `/ingest`, `/ingest/csv`, `/ingest/pcap`.
+- Explainability: `/explain` and export/view variants.
+- Network state and topology: `/network/*`, `/topology`, and GeoIP routes.
+- Alerts, reports, MITRE mappings, system controls, and WebSocket sessions.
 
-## Deployment and safety
+Optional `X-API-Key` authentication, CORS, rate limiting, Pydantic validation, and security headers are applied by the backend middleware. `/health` and the OpenAPI endpoints provide service diagnostics.
 
-FastAPI backend, async SQLite store with cycle archiving, React/Vite dashboard; runs fully offline (one
-optional Google-Fonts import). SlowAPI rate limiting (120/min per IP), optional `X-API-Key` (constant-time
-compare; `/health`, `/docs`, `/ws` exempt), CORS restricted to `FRONTEND_URL`, Pydantic input validation,
-`torch.no_grad()`/`eval()` inference. Live capture runs as its own elevated process posting to `/ingest`. A
-mode gate rejects simulated traffic while in live mode. Docker Compose builds from the repo root so the backend
-image includes the shared `capture/` and `worldmodel_*` code. The `lab/` harness generates multi-stage attack
-data on an isolated VM network, refusing in code any target outside the configured lab subnet (`LAB_SETUP.md`).
+### Frontend
 
-## Reproducibility
+`frontend/src/App.jsx` owns navigation, health polling, system controls, and the WebSocket connection. Dashboard, network forecast, alert, explainability, report, ingestion, live-log, topology, and settings components consume the backend through `frontend/src/api.js`.
 
-Fixed seeds, committed weights and configs, and a committed 1-minute network-state dataset. Retrain: V1 via
-`pipeline_fixed.py`; V3 via `worldmodel_v3/train_production.py`. Evaluate: `experiments/evaluate_model.py`,
-`worldmodel_v3/run_lodo.py`, `experiments/pcap_parity.py`. ~100 automated tests cover inference, the flow
-extractor's CICFlowMeter parity (incl. a real-traffic fixture), the network-state service, MITRE rules, and the
-lab harness allow-list.
+## Training and Evaluation
+
+Dataset preparation and augmentation live under `data/`. `pipeline_fixed.py` trains the flow model and writes the production artifact directory. `worldmodel_v2/` and `worldmodel_v3/` contain the network-state training and evaluation workflow. `experiments/` contains calibration, model evaluation, parity, family-holdout, replay, and threshold experiments. Results in JSON and CSV files are recorded experiment outputs, not automatic retraining.
+
+Retraining is manual. The resulting weights, scaler, and configuration must be kept together before deployment. Backend tests cover inference, API behavior, flow semantics, signatures, network state, graph behavior, security, and explainability.
+
+## Deployment Boundaries
+
+The backend and frontend run directly in Python and Node environments. SQLite stores local service state; model artifacts are read from the configured artifact directories. Environment variables are documented in `.env.example`.
+
+## Limitations
+
+- Stage labels are derived from public dataset labels and do not represent verified attacker progression.
+- PCAP/live visibility depends on capture permissions and available interfaces.
+- Model quality depends on dataset coverage and can degrade under network or attack-family shift.
+- The network-state forecast is a separate experimental/served path from the six-flow model and should be evaluated with its own documented metrics.
