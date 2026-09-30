@@ -8,14 +8,14 @@ Exposes the session-derived directed IP graph and geographic threat map via REST
   GET /graph/geoip/{ip}        — individual IP geolocation lookup
 """
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..database import SessionDB, get_db
-from ..geoip import resolve_ip_geo
+from ..database import FlowRecordDB, SessionDB, get_db
+from ..geoip import clear_geoip_cache, resolve_ip_geo, resolve_ips_batch
 from ..graph_state import build_session_graph
 
 router = APIRouter(prefix="/graph", tags=["Graph Topology"])
@@ -110,11 +110,14 @@ async def get_topology(
     limit_val = limit if isinstance(limit, int) else getattr(limit, "default", 150)
     min_risk_val = min_risk if isinstance(min_risk, (int, float)) else getattr(min_risk, "default", 0.0)
 
-    stmt = select(SessionDB).order_by(SessionDB.latest_risk_score.desc(), SessionDB.last_seen.desc()).limit(limit_val * 2)
+    now_utc = datetime.now(timezone.utc)
+    stmt = select(SessionDB)
+    if is_active_only:
+        cutoff = now_utc - timedelta(seconds=max(max_age * 2, 300))
+        stmt = stmt.where(SessionDB.last_seen >= cutoff)
+    stmt = stmt.order_by(SessionDB.latest_risk_score.desc(), SessionDB.last_seen.desc()).limit(limit_val * 2)
     result = await db.execute(stmt)
     rows = result.scalars().all()
-
-    now_utc = datetime.now(timezone.utc)
     running_procs, active_sockets = _get_live_system_state()
 
     sessions = []
@@ -130,41 +133,49 @@ async def get_topology(
 
         is_threat = prob >= 0.25 or (s.latest_stage and s.latest_stage != "Benign")
 
-        if is_active_only and not is_threat:
-            # 1. Process Liveness Check: If an application is associated, verify it is actually running
-            proc_raw = (s.process_name or "").lower().strip()
-            app_raw = (s.app_name or "").lower().strip()
-
-            target_binaries = []
-            if proc_raw.endswith(".exe"):
-                target_binaries = [proc_raw]
-            elif app_raw in APP_BINARY_MAP:
-                val = APP_BINARY_MAP[app_raw]
-                target_binaries = val if isinstance(val, list) else [val]
-            else:
-                for k, b in APP_BINARY_MAP.items():
-                    if k in app_raw:
-                        target_binaries = b if isinstance(b, list) else [b]
-                        break
-
-            # If the application binary is known but no longer running on the host OS, it's CLOSED!
-            if target_binaries and running_procs and not any(b in running_procs for b in target_binaries):
-                continue
-
-            # 2. Socket / Recency Check
-            has_live_socket = (
-                s.src_port in active_sockets
-                or s.dst_port in active_sockets
-                or (s.src_port, s.dst_port) in active_sockets
-            )
-            is_recent = False
-            if s.last_seen:
+        if is_active_only:
+            # Threat aging check: do not show stale threats from hours ago if active_only=True
+            if is_threat and s.last_seen:
                 s_seen = s.last_seen if s.last_seen.tzinfo else s.last_seen.replace(tzinfo=timezone.utc)
                 age = (now_utc - s_seen).total_seconds()
-                is_recent = age <= max_age
+                if age > max(max_age * 2, 180):
+                    continue
 
-            if not has_live_socket and not is_recent:
-                continue
+            if not is_threat:
+                # 1. Process Liveness Check: If an application is associated, verify it is actually running
+                proc_raw = (s.process_name or "").lower().strip()
+                app_raw = (s.app_name or "").lower().strip()
+
+                target_binaries = []
+                if proc_raw.endswith(".exe"):
+                    target_binaries = [proc_raw]
+                elif app_raw in APP_BINARY_MAP:
+                    val = APP_BINARY_MAP[app_raw]
+                    target_binaries = val if isinstance(val, list) else [val]
+                else:
+                    for k, b in APP_BINARY_MAP.items():
+                        if k in app_raw:
+                            target_binaries = b if isinstance(b, list) else [b]
+                            break
+
+                # If the application binary is known but no longer running on the host OS, it's CLOSED!
+                if target_binaries and running_procs and not any(b in running_procs for b in target_binaries):
+                    continue
+
+                # 2. Socket / Recency Check
+                has_live_socket = (
+                    s.src_port in active_sockets
+                    or s.dst_port in active_sockets
+                    or (s.src_port, s.dst_port) in active_sockets
+                )
+                is_recent = False
+                if s.last_seen:
+                    s_seen = s.last_seen if s.last_seen.tzinfo else s.last_seen.replace(tzinfo=timezone.utc)
+                    age = (now_utc - s_seen).total_seconds()
+                    is_recent = age <= max_age
+
+                if not has_live_socket and not is_recent:
+                    continue
 
         seen_session_keys.add(s.session_key)
         sessions.append({
@@ -184,9 +195,86 @@ async def get_topology(
         if len(sessions) >= limit:
             break
 
+    # Also include recent active flows from FlowRecordDB (matching live event logs)
+    if len(sessions) < limit:
+        flow_stmt = (
+            select(FlowRecordDB)
+            .order_by(desc(FlowRecordDB.timestamp), desc(FlowRecordDB.id))
+            .limit(limit * 2)
+        )
+        flow_res = await db.execute(flow_stmt)
+        recent_flows = flow_res.scalars().all()
+        for f in recent_flows:
+            skey = f.session_key or f"{f.src_ip}->{f.dst_ip}@{f.dst_port or 80}"
+            if skey in seen_session_keys:
+                continue
+
+            f_prob = float(f.infiltration_prob or 0.0)
+            if f_prob < min_risk_val:
+                continue
+
+            if is_active_only:
+                proc_raw = (f.process_name or "").lower().strip()
+                app_raw = (f.app_name or "").lower().strip()
+                target_binaries = []
+                if proc_raw.endswith(".exe"):
+                    target_binaries = [proc_raw]
+                elif app_raw in APP_BINARY_MAP:
+                    val = APP_BINARY_MAP[app_raw]
+                    target_binaries = val if isinstance(val, list) else [val]
+                else:
+                    for k, b in APP_BINARY_MAP.items():
+                        if k in app_raw:
+                            target_binaries = b if isinstance(b, list) else [b]
+                            break
+
+                if target_binaries and running_procs and not any(b in running_procs for b in target_binaries):
+                    continue
+
+                has_live_socket = (
+                    f.src_port in active_sockets
+                    or f.dst_port in active_sockets
+                    or (f.src_port, f.dst_port) in active_sockets
+                )
+                is_recent = False
+                if f.timestamp:
+                    f_seen = f.timestamp if f.timestamp.tzinfo else f.timestamp.replace(tzinfo=timezone.utc)
+                    age = (now_utc - f_seen).total_seconds()
+                    is_recent = age <= max(max_age * 2, 300)
+
+                if not has_live_socket and not is_recent:
+                    continue
+
+            seen_session_keys.add(skey)
+            sessions.append({
+                "session_key": skey,
+                "src_ip": f.src_ip,
+                "dst_ip": f.dst_ip,
+                "src_port": f.src_port,
+                "dst_port": f.dst_port,
+                "protocol": f.protocol or "TCP",
+                "predicted_stage": f.predicted_stage or "Benign",
+                "latest_risk_score": f_prob,
+                "flow_count": 1,
+                "source": f.source,
+                "app_name": f.app_name or f.process_name or "Network Flow",
+            })
+            if len(sessions) >= limit:
+                break
+
     graph = build_session_graph(sessions)
     graph["sessions_included"] = len(sessions)
     graph["filter_applied"] = {"min_risk": min_risk, "limit": limit}
+
+    # Batch-resolve all unique public IPs across all nodes and edges in a single request
+    all_ips = set()
+    for node in graph["nodes"]:
+        all_ips.add(node["id"])
+    for edge in graph["edges"]:
+        all_ips.add(edge["source"])
+        all_ips.add(edge["target"])
+
+    resolve_ips_batch(list(all_ips))
 
     # Enrich nodes and edges with real-world GeoIP coordinates
     for node in graph["nodes"]:
@@ -239,6 +327,12 @@ async def get_topology_geo(
 async def get_ip_geo(ip: str):
     """Lookup real geographic location, ISP/Organization, and country for an IP."""
     return resolve_ip_geo(ip)
+
+
+@router.post("/geoip/clear_cache")
+async def clear_cache_endpoint():
+    """Clear all cached IP geolocations from memory and disk to force fresh resolution."""
+    return clear_geoip_cache()
 
 
 @router.get("/topology/summary")

@@ -625,6 +625,10 @@ async def ingest_single_flow(
     await db.commit()
 
     try:
+        from .geoip import resolve_ip_geo
+        src_geo = resolve_ip_geo(flow.src_ip) if flow.src_ip else None
+        dst_geo = resolve_ip_geo(flow.dst_ip) if flow.dst_ip else None
+
         event_type = "alert" if (result_data["alert"] or result_data["heartbleed_alert"]) else (
             "prediction" if result_data["prediction"] else "flow_ingested"
         )
@@ -666,6 +670,8 @@ async def ingest_single_flow(
             "alert": result_data["alert"],
             "heartbleed_alert": result_data["heartbleed_alert"],
             "timestamp": now.isoformat(),
+            "src_geo": src_geo,
+            "dst_geo": dst_geo,
         })
     except Exception as exc:
         logger.warning("WebSocket broadcast failed (non-fatal): %s", exc)

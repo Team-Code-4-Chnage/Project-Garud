@@ -26,6 +26,7 @@ import {
   Minus,
   ChevronDown,
   ChevronUp,
+  Trash2,
 } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -143,24 +144,38 @@ export function getStageTheme(stage, risk = 0) {
   };
 }
 
+// Dynamic registry of local host interface IPs discovered at runtime
+const _detectedLocalIps = new Set(["127.0.0.1", "::1", "localhost", "0.0.0.0"]);
+
+export function registerLocalIps(ips) {
+  if (Array.isArray(ips)) {
+    ips.forEach((ip) => {
+      if (ip && typeof ip === "string")
+        _detectedLocalIps.add(ip.trim().toLowerCase());
+    });
+  }
+}
+
 // Helper to determine if an IP is a local host, private LAN, loopback, or local interface
 export function isLocalHostOrLAN(ip) {
   if (!ip || typeof ip !== "string") return false;
+  const clean = ip.trim().toLowerCase();
+  if (_detectedLocalIps.has(clean)) return true;
   if (
-    ip.startsWith("10.") ||
-    ip.startsWith("192.168.") ||
-    ip.startsWith("127.") ||
-    ip === "localhost" ||
-    ip.startsWith("fe80::") ||
-    ip === "::1" ||
-    ip.startsWith("26.") ||
-    ip.startsWith("2406:b400:") ||
-    ip.startsWith("169.254.")
+    clean.startsWith("10.") ||
+    clean.startsWith("192.168.") ||
+    clean.startsWith("127.") ||
+    clean === "localhost" ||
+    clean === "::1" ||
+    clean.startsWith("fe80:") ||
+    clean.startsWith("fc00:") ||
+    clean.startsWith("fd00:") ||
+    clean.startsWith("169.254.")
   ) {
     return true;
   }
-  if (ip.startsWith("172.")) {
-    const parts = ip.split(".");
+  if (clean.startsWith("172.")) {
+    const parts = clean.split(".");
     const second = parseInt(parts[1], 10);
     if (second >= 16 && second <= 31) return true;
   }
@@ -536,12 +551,39 @@ export default function NetworkMap({
   const linesLayerRef = useRef(null);
   const hasInitialFittedRef = useRef(false);
 
+  // Client-side GeoIP cache for dynamic live flow resolution
+  const [geoCache, setGeoCache] = useState({});
+  const pendingGeoIpsRef = useRef(new Set());
+
+  const fetchMissingGeo = useCallback(async (ip) => {
+    if (!ip || isLocalHostOrLAN(ip) || pendingGeoIpsRef.current.has(ip)) return;
+    pendingGeoIpsRef.current.add(ip);
+    try {
+      const geo = await apiFetch(`/graph/geoip/${encodeURIComponent(ip)}`);
+      if (
+        geo &&
+        typeof geo.latitude === "number" &&
+        typeof geo.longitude === "number"
+      ) {
+        setGeoCache((prev) => ({ ...prev, [ip]: geo }));
+      }
+    } catch {
+      // Non-fatal fallback
+    }
+  }, []);
+
   // Fetch host machine identity (real hostname, primary IP, active adapters, auto-detected egress location)
   useEffect(() => {
     apiFetch("/system/host-identity")
       .then((h) => {
         if (h?.hostname) {
           setHostIdentity(h);
+          if (Array.isArray(h.local_ips)) {
+            registerLocalIps(h.local_ips);
+          }
+          if (h.primary_ip) {
+            registerLocalIps([h.primary_ip]);
+          }
           if (
             h.location &&
             (h.location.latitude || h.location.longitude || h.location.city)
@@ -669,6 +711,22 @@ export default function NetworkMap({
     }
   };
 
+  // Clear GeoIP cache on server and client to force fresh live geolocations
+  const [clearingCache, setClearingCache] = useState(false);
+  const handleClearMapCache = async () => {
+    try {
+      setClearingCache(true);
+      await apiPost("/graph/geoip/clear_cache");
+      setGeoCache({});
+      if (pendingGeoIpsRef.current) pendingGeoIpsRef.current.clear();
+      await loadTopology();
+    } catch (e) {
+      console.error("Failed to clear GeoIP cache:", e);
+    } finally {
+      setTimeout(() => setClearingCache(false), 500);
+    }
+  };
+
   // Seamlessly merge REST topology with real-time liveFlows from WebSocket
   const combinedGraph = useMemo(() => {
     const nodesMap = new Map();
@@ -687,7 +745,11 @@ export default function NetworkMap({
       if (seenSessionKeys.has(key)) return;
       seenSessionKeys.add(key);
 
-      const prob = flow.predicted_probability ?? flow.latest_risk_score ?? 0;
+      const prob =
+        flow.predicted_probability ??
+        flow.latest_risk_score ??
+        flow.infiltration_prob ??
+        0;
       const stage = flow.predicted_stage || "Benign";
       const app = flow.app_name || flow.process_name || "Network Flow";
 
@@ -697,6 +759,19 @@ export default function NetworkMap({
           const isInt =
             (hostIdentity?.local_ips && hostIdentity.local_ips.includes(ip)) ||
             isLocalHostOrLAN(ip);
+
+          // Real GeoIP from flow metadata or client cache
+          const flowGeo =
+            (ip === src ? flow.src_geo : flow.dst_geo) || geoCache[ip];
+          const hasGeo =
+            flowGeo &&
+            typeof flowGeo.latitude === "number" &&
+            typeof flowGeo.longitude === "number";
+
+          if (!isInt && !hasGeo && !pendingGeoIpsRef.current.has(ip)) {
+            fetchMissingGeo(ip);
+          }
+
           nodesMap.set(ip, {
             id: ip,
             role: ip === src ? "source" : "destination",
@@ -706,36 +781,39 @@ export default function NetworkMap({
             apps: app && app.toLowerCase() !== "unknown" ? [app] : [],
             is_internal: isInt,
             latitude: isInt
-              ? deviceLocation.latitude || 20.0
-              : prob >= 0.25
-                ? 52.3676
-                : 37.7749,
+              ? deviceLocation.latitude || 18.5
+              : hasGeo
+                ? flowGeo.latitude
+                : null,
             longitude: isInt
-              ? deviceLocation.longitude || 0.0
-              : prob >= 0.25
-                ? 4.9041
-                : -122.4194,
+              ? deviceLocation.longitude || 73.8
+              : hasGeo
+                ? flowGeo.longitude
+                : null,
             city: isInt
               ? deviceLocation.city
                 ? `LAN (${deviceLocation.city})`
                 : "Local Host"
-              : prob >= 0.25
-                ? "Adversary Origin"
-                : "External Service",
+              : hasGeo && flowGeo.city
+                ? flowGeo.city
+                : flow.dst_identity || "External Host",
             country: isInt
               ? deviceLocation.country || "Local Network (Defender HQ)"
-              : prob >= 0.25
-                ? "Remote"
-                : "Global",
+              : hasGeo && flowGeo.country
+                ? flowGeo.country
+                : "Remote",
             org: isInt
               ? "Defender Local Interface"
-              : prob >= 0.25
-                ? "Adversary Infrastructure"
-                : "External Transit",
+              : hasGeo && flowGeo.org
+                ? flowGeo.org
+                : flow.dst_identity ||
+                  flow.src_identity ||
+                  app ||
+                  "External Transit",
             flag: isInt
               ? deviceLocation.flag || "📍"
-              : prob >= 0.25
-                ? "⚠️"
+              : hasGeo && flowGeo.flag
+                ? flowGeo.flag
                 : "🌐",
           });
         } else {
@@ -749,11 +827,40 @@ export default function NetworkMap({
           ) {
             n.apps = [...(n.apps || []), app];
           }
+          if (!n.is_internal && (n.latitude == null || n.longitude == null)) {
+            const flowGeo =
+              (ip === src ? flow.src_geo : flow.dst_geo) || geoCache[ip];
+            if (
+              flowGeo &&
+              typeof flowGeo.latitude === "number" &&
+              typeof flowGeo.longitude === "number"
+            ) {
+              n.latitude = flowGeo.latitude;
+              n.longitude = flowGeo.longitude;
+              if (flowGeo.city) n.city = flowGeo.city;
+              if (flowGeo.country) n.country = flowGeo.country;
+              if (flowGeo.org) n.org = flowGeo.org;
+              if (flowGeo.flag) n.flag = flowGeo.flag;
+            }
+          }
         }
       });
 
       const srcNode = nodesMap.get(src);
       const dstNode = nodesMap.get(dst);
+
+      const srcLat =
+        srcNode?.latitude ??
+        (srcNode?.is_internal ? deviceLocation.latitude : null);
+      const srcLon =
+        srcNode?.longitude ??
+        (srcNode?.is_internal ? deviceLocation.longitude : null);
+      const dstLat =
+        dstNode?.latitude ??
+        (dstNode?.is_internal ? deviceLocation.latitude : null);
+      const dstLon =
+        dstNode?.longitude ??
+        (dstNode?.is_internal ? deviceLocation.longitude : null);
 
       edges.push({
         source: src,
@@ -764,16 +871,20 @@ export default function NetworkMap({
         flow_count: flow.flow_count || 1,
         app_name: app,
         protocol: flow.protocol || "TCP",
-        src_lat: srcNode?.latitude ?? (deviceLocation.latitude || 20.0),
-        src_lon: srcNode?.longitude ?? (deviceLocation.longitude || 0.0),
-        dst_lat: dstNode?.latitude ?? 37.7749,
-        dst_lon: dstNode?.longitude ?? -122.4194,
-        src_city: srcNode?.city || deviceLocation.city || "Local Host",
+        src_lat: srcLat,
+        src_lon: srcLon,
+        dst_lat: dstLat,
+        dst_lon: dstLon,
+        src_city:
+          srcNode?.city ||
+          (srcNode?.is_internal ? deviceLocation.city : "Host"),
         dst_city: dstNode?.city || "Remote",
         src_country:
-          srcNode?.country || deviceLocation.country || "Local Network",
+          srcNode?.country ||
+          (srcNode?.is_internal ? deviceLocation.country : "Local Network"),
         dst_country: dstNode?.country || "Global",
-        src_flag: srcNode?.flag || deviceLocation.flag || "🌐",
+        src_flag:
+          srcNode?.flag || (srcNode?.is_internal ? deviceLocation.flag : "🌐"),
         dst_flag: dstNode?.flag || "🌐",
       });
     });
@@ -788,6 +899,8 @@ export default function NetworkMap({
     liveFlows,
     hostIdentity,
     deviceLocation,
+    geoCache,
+    fetchMissingGeo,
   ]);
 
   // Filtered nodes based on densityMode, hideBroadcast, stageFilter, and search
@@ -1189,7 +1302,7 @@ export default function NetworkMap({
         map.setView([25.0, 15.0], 1.5);
       }
     }
-  }, [locationClusters, visibleEdges, isDark, focusedFlow]);
+  }, [locationClusters, visibleEdges, isDark, focusedFlow, deviceLocation]);
 
   // Recenter Map
   const handleRecenter = () => {
@@ -1243,7 +1356,7 @@ export default function NetworkMap({
 
     // Compute LAN flows and identify primary LAN host
     let primaryLanIp =
-      hostIdentity?.primary_ip || internalNodes[0]?.id || "192.168.0.24";
+      hostIdentity?.primary_ip || internalNodes[0]?.id || "Local Machine";
     const lanHostname = hostIdentity?.hostname || "Local Machine";
     const lanAppsSet = new Set();
     let lanFlowCount = 0;
@@ -1253,7 +1366,9 @@ export default function NetworkMap({
     if (internalNodes.length > 0) {
       let mostActive =
         internalNodes.find((n) => n.id === primaryLanIp) ||
-        internalNodes.find((n) => n.id.startsWith("192.168.")) ||
+        internalNodes.find(
+          (n) => n.id.startsWith("192.168.") || n.id.startsWith("10."),
+        ) ||
         internalNodes[0];
 
       internalNodes.forEach((n) => {
@@ -1286,8 +1401,8 @@ export default function NetworkMap({
 
     const lanAppsList = Array.from(lanAppsSet);
 
-    // Derive gateway IP from LAN subnet
-    let gatewayIp = "192.168.0.1";
+    // Derive gateway IP from LAN subnet dynamically
+    let gatewayIp = "LAN Gateway";
     if (primaryLanIp && primaryLanIp.includes(".")) {
       const parts = primaryLanIp.split(".");
       if (parts.length === 4) {
@@ -1402,6 +1517,15 @@ export default function NetworkMap({
         iconType = "database";
         color = "#3B82F6";
       } else if (
+        orgStr.includes("spotify") ||
+        appStr.includes("spotify") ||
+        appStr.includes("spotifylauncher")
+      ) {
+        serviceKey = "spotify";
+        displayName = "Spotify Audio";
+        iconType = "cloud";
+        color = "#1DB954";
+      } else if (
         orgStr.includes("google") ||
         appStr.includes("chrome") ||
         appStr.includes("agy") ||
@@ -1447,11 +1571,14 @@ export default function NetworkMap({
         const customName =
           node?.org &&
           node.org !== "External Autonomous System" &&
-          node.org !== "External IP"
+          node.org !== "External IP" &&
+          node.org !== "Remote Origin"
             ? node.org.slice(0, 18)
             : node?.city
               ? `${node.city} Transit`
-              : "ISP Backbone";
+              : e.app_name && e.app_name !== "Network Flow"
+                ? e.app_name
+                : "External Service";
         serviceKey = `service_${customName.replace(/\s+/g, "_").toLowerCase()}`;
         displayName = customName;
         iconType = "globe";
@@ -1489,22 +1616,6 @@ export default function NetworkMap({
       if (e.stage && e.stage !== "Benign") cluster.maxStage = e.stage;
     });
 
-    if (serviceClusters.size === 0) {
-      serviceClusters.set("telecom", {
-        key: "telecom",
-        displayName: "ISP & Telecom",
-        iconType: "database",
-        color: "#3B82F6",
-        flowCount: 0,
-        ips: new Set(),
-        apps: new Set(),
-        maxRisk: 0,
-        maxStage: "Benign",
-        nodes: [],
-        edges: [],
-      });
-    }
-
     const sortedServices = Array.from(serviceClusters.values()).sort(
       (a, b) => b.flowCount - a.flowCount,
     );
@@ -1532,7 +1643,7 @@ export default function NetworkMap({
       isThreat: lanMaxRisk >= 0.25,
       isGateway: false,
       raw: {
-        id: primaryLanIp || "192.168.0.24",
+        id: primaryLanIp || "Local Machine",
         hostname: lanHostname,
         name: `${lanHostname} (${primaryLanIp})`,
         city: internalNodes[0]?.city || deviceLocation.city || "Local Host",
@@ -1756,7 +1867,7 @@ export default function NetworkMap({
       width,
       canvasHeight,
     };
-  }, [combinedGraph.nodes, combinedGraph.edges, hostIdentity]);
+  }, [combinedGraph.nodes, combinedGraph.edges, hostIdentity, deviceLocation]);
 
   // Auto-fit entire topology so all 3 columns and all nodes are visible without cutoffs
   const fitAllTopology = useCallback(() => {
@@ -2097,6 +2208,28 @@ export default function NetworkMap({
               <RotateCcw size={10} /> FIT ALL
             </button>
           )}
+
+          <button
+            onClick={handleClearMapCache}
+            disabled={clearingCache}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "2px 6px",
+              background: "transparent",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)",
+              color: clearingCache
+                ? "var(--text-muted)"
+                : "var(--text-secondary)",
+              cursor: clearingCache ? "not-allowed" : "pointer",
+              fontSize: "0.68rem",
+            }}
+            title="Flush GeoIP cache from disk and memory to force fresh live lookups"
+          >
+            <Trash2 size={10} /> {clearingCache ? "CLEARING..." : "FLUSH CACHE"}
+          </button>
 
           <button
             onClick={toggleFullscreen}

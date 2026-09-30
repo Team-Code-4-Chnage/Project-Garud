@@ -610,6 +610,13 @@ async def archive_and_reset_cycle(db: AsyncSession, reason: str = "manual") -> d
     except Exception as e:
         logger.warning("Could not reset network_state tracker: %s", e)
 
+    try:
+        from ..geoip import clear_geoip_cache
+        clear_geoip_cache()
+        logger.info("Successfully cleared geoip cache for new cycle")
+    except Exception as e:
+        logger.warning("Could not clear geoip cache: %s", e)
+
     new_cycle_id = CycleState.initialize(force=True)
 
     logger.info("Initialized fresh cycle: %s", new_cycle_id)

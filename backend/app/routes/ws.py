@@ -246,7 +246,7 @@ async def get_recent_flows(
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get the most recent flow records across all sessions for live feed bootstrapping."""
+    """Get the most recent flow records across all sessions for live feed bootstrapping, enriched with real GeoIP."""
     stmt = (
         select(FlowRecordDB)
         .order_by(desc(FlowRecordDB.timestamp), desc(FlowRecordDB.id))
@@ -254,6 +254,17 @@ async def get_recent_flows(
     )
     result = await db.execute(stmt)
     flows = result.scalars().all()
+
+    unique_ips = set()
+    for f in flows:
+        if f.src_ip:
+            unique_ips.add(f.src_ip)
+        if f.dst_ip:
+            unique_ips.add(f.dst_ip)
+
+    from ..geoip import resolve_ip_geo, resolve_ips_batch
+    resolve_ips_batch(list(unique_ips))
+
     return [
         {
             "id": f.id,
@@ -279,6 +290,8 @@ async def get_recent_flows(
             "is_alert": bool(f.predicted_stage and f.predicted_stage != "Benign" and f.infiltration_prob is not None and f.infiltration_prob > 0.5),
             "timestamp": f.timestamp.isoformat() if f.timestamp else None,
             "_ts": f.timestamp.isoformat() if f.timestamp else None,
+            "src_geo": resolve_ip_geo(f.src_ip) if f.src_ip else None,
+            "dst_geo": resolve_ip_geo(f.dst_ip) if f.dst_ip else None,
         }
         for f in flows
     ]
