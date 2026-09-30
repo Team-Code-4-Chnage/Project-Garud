@@ -92,10 +92,10 @@ async def get_system_mode():
 
 
 @router.post("/mode")
-async def set_system_mode(req: ModeUpdateRequest):
+async def set_system_mode(req: ModeUpdateRequest, db: AsyncSession = Depends(get_db)):
     """
     Switch between 'live' and 'simulated' modes.
-    When switching to 'live', automatically stops any running simulator.
+    When switching to 'live', automatically stops any running simulator and cleans simulated records.
     When switching to 'simulated', automatically stops any running live capture.
     """
     new_mode = req.mode.strip().lower()
@@ -111,7 +111,15 @@ async def set_system_mode(req: ModeUpdateRequest):
         stopped = SystemState.stop_simulator()
         if stopped:
             logger.info("Switched to LIVE mode — stopped background simulator.")
-        network_tracker.reset("simulated")
+        try:
+            await db.execute(delete(FlowRecordDB).where(FlowRecordDB.source == "simulated"))
+            await db.execute(delete(SessionDB).where(SessionDB.source == "simulated"))
+            await db.commit()
+        except Exception as err:
+            logger.warning("Could not purge simulated DB records on mode switch: %s", err)
+        network_tracker.reset()
+        from ..geoip import clear_geoip_cache
+        clear_geoip_cache()
         if not SystemState.is_capture_running():
             try:
                 await start_live_capture()

@@ -110,10 +110,14 @@ async def get_topology(
     limit_val = limit if isinstance(limit, int) else getattr(limit, "default", 150)
     min_risk_val = min_risk if isinstance(min_risk, (int, float)) else getattr(min_risk, "default", 0.0)
 
+    from .system import SystemState
+
     now_utc = datetime.now(timezone.utc)
     stmt = select(SessionDB)
+    if SystemState.mode == "live":
+        stmt = stmt.where(SessionDB.source != "simulated")
     if is_active_only:
-        cutoff = now_utc - timedelta(seconds=max(max_age * 2, 300))
+        cutoff = now_utc - timedelta(seconds=max_age)
         stmt = stmt.where(SessionDB.last_seen >= cutoff)
     stmt = stmt.order_by(SessionDB.latest_risk_score.desc(), SessionDB.last_seen.desc()).limit(limit_val * 2)
     result = await db.execute(stmt)
@@ -134,12 +138,12 @@ async def get_topology(
         is_threat = prob >= 0.25 or (s.latest_stage and s.latest_stage != "Benign")
 
         if is_active_only:
-            # Threat aging check: do not show stale threats from hours ago if active_only=True
-            if is_threat and s.last_seen:
-                s_seen = s.last_seen if s.last_seen.tzinfo else s.last_seen.replace(tzinfo=timezone.utc)
-                age = (now_utc - s_seen).total_seconds()
-                if age > max(max_age * 2, 180):
-                    continue
+            if not s.last_seen:
+                continue
+            s_seen = s.last_seen if s.last_seen.tzinfo else s.last_seen.replace(tzinfo=timezone.utc)
+            age = (now_utc - s_seen).total_seconds()
+            if age > max_age:
+                continue
 
             if not is_threat:
                 # 1. Process Liveness Check: If an application is associated, verify it is actually running
@@ -162,21 +166,6 @@ async def get_topology(
                 if target_binaries and running_procs and not any(b in running_procs for b in target_binaries):
                     continue
 
-                # 2. Socket / Recency Check
-                has_live_socket = (
-                    s.src_port in active_sockets
-                    or s.dst_port in active_sockets
-                    or (s.src_port, s.dst_port) in active_sockets
-                )
-                is_recent = False
-                if s.last_seen:
-                    s_seen = s.last_seen if s.last_seen.tzinfo else s.last_seen.replace(tzinfo=timezone.utc)
-                    age = (now_utc - s_seen).total_seconds()
-                    is_recent = age <= max_age
-
-                if not has_live_socket and not is_recent:
-                    continue
-
         seen_session_keys.add(s.session_key)
         sessions.append({
             "session_key": s.session_key,
@@ -197,8 +186,14 @@ async def get_topology(
 
     # Also include recent active flows from FlowRecordDB (matching live event logs)
     if len(sessions) < limit:
+        flow_stmt = select(FlowRecordDB)
+        if SystemState.mode == "live":
+            flow_stmt = flow_stmt.where(FlowRecordDB.source != "simulated")
+        if is_active_only:
+            cutoff = now_utc - timedelta(seconds=max_age)
+            flow_stmt = flow_stmt.where(FlowRecordDB.timestamp >= cutoff)
         flow_stmt = (
-            select(FlowRecordDB)
+            flow_stmt
             .order_by(desc(FlowRecordDB.timestamp), desc(FlowRecordDB.id))
             .limit(limit * 2)
         )
@@ -214,6 +209,13 @@ async def get_topology(
                 continue
 
             if is_active_only:
+                if not f.timestamp:
+                    continue
+                f_seen = f.timestamp if f.timestamp.tzinfo else f.timestamp.replace(tzinfo=timezone.utc)
+                age = (now_utc - f_seen).total_seconds()
+                if age > max_age:
+                    continue
+
                 proc_raw = (f.process_name or "").lower().strip()
                 app_raw = (f.app_name or "").lower().strip()
                 target_binaries = []
@@ -229,20 +231,6 @@ async def get_topology(
                             break
 
                 if target_binaries and running_procs and not any(b in running_procs for b in target_binaries):
-                    continue
-
-                has_live_socket = (
-                    f.src_port in active_sockets
-                    or f.dst_port in active_sockets
-                    or (f.src_port, f.dst_port) in active_sockets
-                )
-                is_recent = False
-                if f.timestamp:
-                    f_seen = f.timestamp if f.timestamp.tzinfo else f.timestamp.replace(tzinfo=timezone.utc)
-                    age = (now_utc - f_seen).total_seconds()
-                    is_recent = age <= max(max_age * 2, 300)
-
-                if not has_live_socket and not is_recent:
                     continue
 
             seen_session_keys.add(skey)

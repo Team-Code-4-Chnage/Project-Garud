@@ -349,7 +349,8 @@ function NetworkForecastView() {
   }, []);
 
   const chart = useMemo(() => {
-    if (!data || data.status !== "ok") return [];
+    if (!data || (data.status !== "ok" && data.status !== "warming_up"))
+      return [];
     const stages = data.stages || [];
     const hist = data.minutes.map((m, i) => {
       const stageName =
@@ -388,9 +389,7 @@ function NetworkForecastView() {
 
   const peakObservedRisk = useMemo(() => {
     if (!chart || !chart.length) return 0;
-    const obs = chart
-      .filter((p) => p.observed != null)
-      .map((p) => p.observed);
+    const obs = chart.filter((p) => p.observed != null).map((p) => p.observed);
     return obs.length ? Math.max(...obs) : 0;
   }, [chart]);
 
@@ -522,31 +521,8 @@ function NetworkForecastView() {
     );
   }
 
-  if (data.status === "warming_up") {
-    return (
-      <div className="panel">
-        {header}
-        <div
-          className="panel-body"
-          style={{ padding: "2.5rem 1.5rem", textAlign: "center" }}
-        >
-          <Clock
-            size={28}
-            color="var(--c-gold)"
-            style={{ margin: "0 auto 10px" }}
-          />
-          <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>
-            Warming Up Network World Model
-          </div>
-          <div className="text-muted text-xs mono" style={{ marginTop: 6 }}>
-            Accumulated {data.minutes_available} of {data.minutes_needed}{" "}
-            consecutive minutes. Forecasting activates automatically once the
-            6-minute window is filled.
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // warming_up status falls through to normal render — data now has real empirical scores
+  // The chart useMemo accepts warming_up, so no early-return needed here.
 
   const cur = data.current;
   const info = data.model;
@@ -572,6 +548,30 @@ function NetworkForecastView() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {data.status === "warming_up" && (
+        <div
+          className="panel"
+          style={{
+            padding: "10px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            background: "rgba(214,179,106,0.08)",
+            border: "1px solid rgba(214,179,106,0.3)",
+            borderRadius: "var(--radius-sm)",
+          }}
+        >
+          <Clock size={16} color="var(--c-gold)" />
+          <span
+            className="text-xs mono"
+            style={{ color: "var(--c-gold)", fontWeight: 600 }}
+          >
+            Model warming up — {data.minutes_available}/{data.minutes_needed}{" "}
+            minutes collected. Showing empirical risk scores. Full LSTM forecast
+            activates once 6-minute window is filled.
+          </span>
+        </div>
+      )}
       {/* Dynamic Radar Blip CSS Styles */}
       <style>{`
         @keyframes radarBlipPing {
@@ -908,70 +908,76 @@ function NetworkForecastView() {
                     transition: "all 0.25s ease",
                   }}
                 >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span
-                    className="mono text-xs"
+                  <div
                     style={{
-                      color:
-                        isCurrent || isPassed ? phaseCol : "var(--text-muted)",
-                      fontWeight: isCurrent || isPassed ? 800 : 600,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
                     }}
                   >
-                    PHASE 0{idx + 1}
-                  </span>
-                  {isCurrent && (
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 5 }}
+                    <span
+                      className="mono text-xs"
+                      style={{
+                        color:
+                          isCurrent || isPassed
+                            ? phaseCol
+                            : "var(--text-muted)",
+                        fontWeight: isCurrent || isPassed ? 800 : 600,
+                      }}
                     >
-                      <span
-                        className="radar-blip-dot"
-                        style={{ color: phaseCol }}
-                      />
-                      <span
-                        className="mono"
+                      PHASE 0{idx + 1}
+                    </span>
+                    {isCurrent && (
+                      <div
                         style={{
-                          fontSize: "0.62rem",
-                          color: phaseCol,
-                          fontWeight: 800,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
                         }}
                       >
-                        BLIPPING
-                      </span>
-                    </div>
-                  )}
-                  {isPassed && <CheckCircle2 size={13} color={phaseCol} />}
-                </div>
+                        <span
+                          className="radar-blip-dot"
+                          style={{ color: phaseCol }}
+                        />
+                        <span
+                          className="mono"
+                          style={{
+                            fontSize: "0.62rem",
+                            color: phaseCol,
+                            fontWeight: 800,
+                          }}
+                        >
+                          BLIPPING
+                        </span>
+                      </div>
+                    )}
+                    {isPassed && <CheckCircle2 size={13} color={phaseCol} />}
+                  </div>
 
-                <div
-                  style={{
-                    fontSize: "0.85rem",
-                    fontWeight: isCurrent ? 800 : 700,
-                    color: isCurrent
-                      ? "var(--text-primary)"
-                      : isPassed
-                        ? phaseCol
-                        : "var(--text-secondary)",
-                    marginTop: 6,
-                  }}
-                >
-                  {phase.label}
+                  <div
+                    style={{
+                      fontSize: "0.85rem",
+                      fontWeight: isCurrent ? 800 : 700,
+                      color: isCurrent
+                        ? "var(--text-primary)"
+                        : isPassed
+                          ? phaseCol
+                          : "var(--text-secondary)",
+                      marginTop: 6,
+                    }}
+                  >
+                    {phase.label}
+                  </div>
+                  <div
+                    className="mono text-xs text-muted"
+                    style={{ fontSize: "0.68rem", marginTop: 2 }}
+                  >
+                    {phase.tech}
+                  </div>
                 </div>
-                <div
-                  className="mono text-xs text-muted"
-                  style={{ fontSize: "0.68rem", marginTop: 2 }}
-                >
-                  {phase.tech}
-                </div>
-              </div>
-            );
-          });
-        })()}
+              );
+            });
+          })()}
         </div>
       </div>
 
@@ -1106,7 +1112,11 @@ function NetworkForecastView() {
               />
               <Tooltip content={<CustomForecastTooltip />} />
               <Legend
-                wrapperStyle={{ color: "var(--text-secondary)", fontSize: 11, paddingTop: 8 }}
+                wrapperStyle={{
+                  color: "var(--text-secondary)",
+                  fontSize: 11,
+                  paddingTop: 8,
+                }}
               />
               <ReferenceLine
                 y={cur.threshold}

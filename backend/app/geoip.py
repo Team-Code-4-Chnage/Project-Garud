@@ -82,8 +82,9 @@ def _save_disk_cache():
         now = time.time()
         DISK_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
         valid_entries = {}
+        sim_prefixes = ("185.220.", "194.26.", "45.33.", "198.51.100.", "224.77.")
         for k, v in _GEO_CACHE.items():
-            if v.get("is_internal"):
+            if v.get("is_internal") or any(k.startswith(p) for p in sim_prefixes):
                 continue
             cached_at = v.get("cached_at", now)
             # Evict entries that exceeded TTL
@@ -280,15 +281,12 @@ KNOWN_PREFIX_COORDS = {
     "194.26.": {"lat": 52.3676, "lon": 4.9041, "city": "Amsterdam", "country": "Netherlands", "country_code": "NL", "org": "Adversary Infrastructure", "flag": "🇳🇱"},
     "45.33.": {"lat": 32.7767, "lon": -96.7970, "city": "Dallas", "country": "United States", "country_code": "US", "org": "Adversary C2 Node", "flag": "🇺🇸"},
     "198.51.100.": {"lat": 50.1109, "lon": 8.6821, "city": "Frankfurt", "country": "Germany", "country_code": "DE", "org": "Exfiltration Drop Host", "flag": "🇩🇪"},
-    "224.77.": {"lat": 52.3676, "lon": 4.9041, "city": "Amsterdam", "country": "Netherlands", "country_code": "NL", "org": "Adversary C2 Beacon Channel", "flag": "⚠️"},
 }
 
 
 def _is_private_or_special(ip_str: str) -> bool:
     if not ip_str or ip_str == "unknown":
         return True
-    if ip_str.startswith("224.77."):
-        return False
     local_ips = _get_local_ips()
     if ip_str in local_ips:
         return True
@@ -298,7 +296,7 @@ def _is_private_or_special(ip_str: str) -> bool:
             ip.is_private
             or ip.is_loopback
             or ip.is_reserved
-            or (ip.is_multicast and ip_str.startswith(("224.0.0.", "239.")))
+            or ip.is_multicast
             or ip.is_link_local
             or ip_str.startswith("26.")  # Common Radmin VPN / internal subnet
         )

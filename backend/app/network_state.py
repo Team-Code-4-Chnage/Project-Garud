@@ -274,19 +274,36 @@ class NetworkStateTracker:
             db_path = BASE_DIR / "data" / "forecaster.db"
             if not db_path.exists():
                 return
+            now_utc = datetime.now(timezone.utc)
+            cutoff_iso = (now_utc - timedelta(minutes=KEEP_MINUTES)).isoformat()
             con = sqlite3.connect(str(db_path))
             cur = con.cursor()
-            cur.execute("""
-                SELECT timestamp, src_ip, dst_ip, src_port, dst_port, protocol, source,
-                       flow_duration, tot_fwd_pkts, tot_bwd_pkts, fwd_pkt_len_mean, bwd_pkt_len_mean,
-                       flow_bytes_s, flow_pkts_s, flow_iat_mean, flow_iat_std, fwd_iat_mean, bwd_iat_mean,
-                       syn_flag_cnt, ack_flag_cnt, fin_flag_cnt, rst_flag_cnt, psh_flag_cnt, urg_flag_cnt,
-                       down_up_ratio, pkt_size_avg, ttl_variance, tcp_win_size, retransmit_cnt,
-                       predicted_stage
-                FROM flow_records
-                ORDER BY timestamp DESC
-                LIMIT 50000
-            """)
+            if getattr(self, "mode", "live") == "live":
+                cur.execute("""
+                    SELECT timestamp, src_ip, dst_ip, src_port, dst_port, protocol, source,
+                           flow_duration, tot_fwd_pkts, tot_bwd_pkts, fwd_pkt_len_mean, bwd_pkt_len_mean,
+                           flow_bytes_s, flow_pkts_s, flow_iat_mean, flow_iat_std, fwd_iat_mean, bwd_iat_mean,
+                           syn_flag_cnt, ack_flag_cnt, fin_flag_cnt, rst_flag_cnt, psh_flag_cnt, urg_flag_cnt,
+                           down_up_ratio, pkt_size_avg, ttl_variance, tcp_win_size, retransmit_cnt,
+                           predicted_stage
+                    FROM flow_records
+                    WHERE source != 'simulated' AND timestamp >= ?
+                    ORDER BY timestamp DESC
+                    LIMIT 50000
+                """, (cutoff_iso,))
+            else:
+                cur.execute("""
+                    SELECT timestamp, src_ip, dst_ip, src_port, dst_port, protocol, source,
+                           flow_duration, tot_fwd_pkts, tot_bwd_pkts, fwd_pkt_len_mean, bwd_pkt_len_mean,
+                           flow_bytes_s, flow_pkts_s, flow_iat_mean, flow_iat_std, fwd_iat_mean, bwd_iat_mean,
+                           syn_flag_cnt, ack_flag_cnt, fin_flag_cnt, rst_flag_cnt, psh_flag_cnt, urg_flag_cnt,
+                           down_up_ratio, pkt_size_avg, ttl_variance, tcp_win_size, retransmit_cnt,
+                           predicted_stage
+                    FROM flow_records
+                    WHERE timestamp >= ?
+                    ORDER BY timestamp DESC
+                    LIMIT 50000
+                """, (cutoff_iso,))
             rows = cur.fetchall()
             con.close()
             for r in reversed(rows):
@@ -346,6 +363,8 @@ class NetworkStateTracker:
             live_rows = [r for r in rows if r.get("_source") != "simulated"]
             if live_rows:
                 rows = live_rows
+            elif any(r.get("_source") == "simulated" for r in rows):
+                return None
         st = full_grid(minute_states(flows_from_features(rows)))
         now_min = np.datetime64(datetime.now(timezone.utc).replace(tzinfo=None, second=0, microsecond=0))
         # Include current minute so real-time attack bursts reflect immediately
@@ -360,12 +379,178 @@ class NetworkStateTracker:
             return dict(status="model_unavailable", detail=self._model_error)
         st = self.states()
         if st is None or len(st) == 0:
+            if getattr(self, "mode", "live") == "live":
+                now_utc = datetime.now(timezone.utc)
+                now_iso = now_utc.replace(second=0, microsecond=0).isoformat()
+                return dict(
+                    status="ok",
+                    minutes=[now_iso],
+                    state={f: [0.0] for f in DISPLAY_FEATURES},
+                    risk_score=[0.08],
+                    stages=["Benign"],
+                    alert=[False],
+                    current=dict(
+                        minute=now_iso,
+                        alert=False,
+                        risk_score=0.08,
+                        attack_state="NORMAL_BASELINE",
+                        attack_state_label="Defense Telemetry Nominal",
+                        attack_stage="Benign",
+                        top_behaviour="Benign",
+                        estimated_time_to_attack="Stable (Nominal Baseline)",
+                        estimated_time_desc="Telemetry baseline nominal across next 4+ minutes. Zero intrusion velocity.",
+                        estimated_reach_minutes=None,
+                        consecutive_needed=m.N if m else 3,
+                        threshold=m.thr if m else 0.4,
+                    ),
+                    forecast=[
+                        dict(
+                            step=k + 1,
+                            minute=(now_utc + timedelta(minutes=k + 1)).replace(second=0, microsecond=0).isoformat(),
+                            risk=0.08,
+                            behaviours=[dict(behaviour="Benign", probability=1.0, techniques=[], tactics=[])],
+                            state={f: 0.0 for f in DISPLAY_FEATURES},
+                        )
+                        for k in range(m.H if m else 4)
+                    ],
+                    explanation=[],
+                    model=self.model_info() if m else {},
+                )
             return dict(status="no_data")
         minutes = [t.isoformat() for t in st.index]
         display = {f: st[f].round(4).tolist() for f in DISPLAY_FEATURES if f in st}
-        if len(st) < m.W:
-            return dict(status="warming_up", minutes_available=len(st), minutes_needed=m.W,
-                        minutes=minutes, state=display, model=self.model_info())
+        # Compute real empirical threat scores for all available minutes
+        with self._lock:
+            rows_all = list(self._flows)
+        if getattr(self, "mode", "live") == "live":
+            rows_all = [r for r in rows_all if r.get("_source") != "simulated"] or rows_all
+
+        min_to_stages_wu = defaultdict(list)
+        for r in rows_all:
+            stg = r.get("stage")
+            if stg:
+                ts = r["timestamp"]
+                mk = ts.strftime("%Y-%m-%dT%H:%M") if hasattr(ts, "strftime") else str(ts)[:16]
+                min_to_stages_wu[mk].append(stg)
+
+        wu_emp_scores = []
+        wu_emp_behaviours = []
+        for i in range(len(st)):
+            m_dt = st.index[i]
+            m_key = m_dt.strftime("%Y-%m-%dT%H:%M") if hasattr(m_dt, "strftime") else str(m_dt)[:16]
+            explicit_stages = min_to_stages_wu.get(m_key, [])
+            if explicit_stages:
+                non_benign = [s for s in explicit_stages if s and s != "Benign"]
+                if non_benign:
+                    top_exp = max(non_benign, key=lambda s: KILL_CHAIN_ORDER.get(s, 0))
+                    es = STAGE_CALIBRATED_RISK.get(top_exp, 0.70)
+                    eb = top_exp
+                else:
+                    raw_es, raw_eb = compute_empirical_threat(st.iloc[i])
+                    es, eb = (0.0, "Benign") if raw_es < 0.85 else (raw_es, raw_eb)
+            else:
+                es, eb = compute_empirical_threat(st.iloc[i])
+            wu_emp_scores.append(es)
+            wu_emp_behaviours.append(eb)
+
+        # Try partial model inference using whatever data we have
+        now_utc = datetime.now(timezone.utc)
+        now_iso = minutes[-1] if minutes else now_utc.replace(second=0, microsecond=0).isoformat()
+        Z = m.encode(st)
+        # Use the last min(len(Z), W) rows as a partial window for the model
+        partial_win = Z[-m.W:] if len(Z) >= m.W else np.concatenate([
+            np.zeros((m.W - len(Z), Z.shape[1])), Z
+        ], axis=0)
+        try:
+            with torch.no_grad():
+                S1, R1, C1 = m.model.rollout(torch.tensor(partial_win[np.newaxis]), m.H)
+            probs_wu = torch.softmax(C1, dim=-1).detach().numpy()[0]
+            pred_states_wu = m.decode(S1.detach().numpy()[0])
+            latest_emp_threat_wu = wu_emp_scores[-1] if wu_emp_scores else 0.0
+            recent_all_benign_wu = (latest_emp_threat_wu == 0.0 and
+                                     all(b == "Benign" for b in wu_emp_behaviours[-3:]))
+            steps_wu = []
+            for k in range(m.H):
+                raw_step_risk = float(torch.sigmoid(R1[0, k]).item())
+                if latest_emp_threat_wu > 0.0:
+                    step_risk = max(raw_step_risk, float(latest_emp_threat_wu * (0.95 ** (k + 1))))
+                elif recent_all_benign_wu:
+                    step_risk = min(raw_step_risk, 0.10)
+                else:
+                    step_risk = raw_step_risk
+                step_probs = probs_wu[k].copy()
+                if (step_risk < m.thr and latest_emp_threat_wu < 0.35) or recent_all_benign_wu:
+                    benign_idx = m.behaviours.index("Benign")
+                    step_probs = np.zeros_like(step_probs)
+                    step_probs[benign_idx] = 1.0
+                top = np.argsort(-step_probs)[:3]
+                beh = [dict(behaviour=m.behaviours[i], probability=float(step_probs[i]),
+                            techniques=[], tactics=[]) for i in top]
+                steps_wu.append(dict(step=k + 1,
+                    minute=(now_utc + timedelta(minutes=k + 1)).replace(second=0, microsecond=0).isoformat(),
+                    risk=step_risk, behaviours=beh,
+                    state={f: float(pred_states_wu[k][m.features.index(f)]) for f in DISPLAY_FEATURES if f in m.features}))
+        except Exception:
+            latest_emp_threat_wu = wu_emp_scores[-1] if wu_emp_scores else 0.0
+            recent_all_benign_wu = True
+            steps_wu = [dict(step=k + 1,
+                minute=(now_utc + timedelta(minutes=k + 1)).replace(second=0, microsecond=0).isoformat(),
+                risk=0.08, behaviours=[dict(behaviour="Benign", probability=1.0, techniques=[], tactics=[])],
+                state={f: 0.0 for f in DISPLAY_FEATURES}) for k in range(m.H)]
+
+        # Build per-minute risk scores using real empirical data
+        wu_risk_scores = []
+        for i, es in enumerate(wu_emp_scores):
+            eb = wu_emp_behaviours[i]
+            if eb == "Benign" and es == 0.0:
+                wu_risk_scores.append(0.08)
+            elif eb == "Benign" and es < 0.25:
+                wu_risk_scores.append(min(es, 0.16))
+            else:
+                wu_risk_scores.append(max(es, 0.08))
+
+        wu_stages = [
+            str(wb) if we >= 0.35 and wb != "Benign" else "Benign"
+            for we, wb in zip(wu_emp_scores, wu_emp_behaviours)
+        ]
+
+        latest_wu_risk = wu_risk_scores[-1] if wu_risk_scores else 0.08
+        wu_attack_stage = wu_emp_behaviours[-1] if wu_emp_scores and wu_emp_scores[-1] >= 0.35 else "Benign"
+        if wu_attack_stage == "Benign":
+            wu_attack_state = "NORMAL_BASELINE"
+            wu_attack_state_label = "Defense Telemetry Nominal"
+        else:
+            wu_attack_state = "SUSPICIOUS_PROBING"
+            wu_attack_state_label = "Suspicious Activity Detected"
+
+        return dict(
+            status="warming_up",
+            minutes_available=len(st),
+            minutes_needed=m.W,
+            minutes=minutes,
+            state=display,
+            risk_score=wu_risk_scores,
+            stages=wu_stages,
+            alert=[False] * len(minutes),
+            current=dict(
+                minute=now_iso,
+                alert=False,
+                risk_score=latest_wu_risk,
+                attack_state=wu_attack_state,
+                attack_state_label=wu_attack_state_label,
+                attack_stage=wu_attack_stage,
+                top_behaviour=wu_emp_behaviours[-1] if wu_emp_behaviours else "Benign",
+                estimated_time_to_attack="Stable (Nominal Baseline)" if wu_attack_stage == "Benign" else "~3 - 4 min to Critical Reach",
+                estimated_time_desc="Telemetry baseline nominal across next 4+ minutes. Zero intrusion velocity." if wu_attack_stage == "Benign" else "Early threat indicators detected.",
+                estimated_reach_minutes=None if wu_attack_stage == "Benign" else 4,
+                consecutive_needed=m.N,
+                threshold=m.thr,
+            ),
+            forecast=steps_wu,
+            explanation=[],
+            model=self.model_info(),
+        )
+
         Z = m.encode(st)
         win = np.stack([Z[i - m.W + 1:i + 1] for i in range(m.W - 1, len(Z))])
         with torch.no_grad():
@@ -414,26 +599,44 @@ class NetworkStateTracker:
             emp_scores.append(es)
             emp_behaviours.append(eb)
 
-        # Check recent flows for ongoing active stage burst (within 90s of latest telemetry)
+        now_utc = datetime.now(timezone.utc)
+        is_live_telemetry = getattr(self, "mode", "live") == "live"
+        latest_flow_age = None
         if rows:
             latest_ts = max(r["timestamp"] for r in rows)
-            active_cutoff = latest_ts - timedelta(seconds=90)
-            active_flows = [r for r in rows if r["timestamp"] >= active_cutoff]
-            recent_stages = [r.get("stage") for r in active_flows if r.get("stage") and r.get("stage") != "Benign"]
-            if recent_stages and len(emp_scores) > 0:
-                top_recent = max(recent_stages, key=lambda s: KILL_CHAIN_ORDER.get(s, 0))
-                recent_risk = STAGE_CALIBRATED_RISK.get(top_recent, 0.75)
-                emp_scores[-1] = max(emp_scores[-1], recent_risk)
-                emp_behaviours[-1] = top_recent
+            if latest_ts.tzinfo is None:
+                latest_ts = latest_ts.replace(tzinfo=timezone.utc)
+            latest_flow_age = (now_utc - latest_ts).total_seconds()
+
+        # Check recent flows for ongoing active stage burst
+        if rows:
+            is_burst_fresh = (not is_live_telemetry) or (latest_flow_age is not None and latest_flow_age <= 120)
+            if is_burst_fresh:
+                active_cutoff = latest_ts - timedelta(seconds=90)
+                active_flows = [r for r in rows if r["timestamp"] >= active_cutoff]
+                recent_stages = [r.get("stage") for r in active_flows if r.get("stage") and r.get("stage") != "Benign"]
+                if recent_stages and len(emp_scores) > 0:
+                    top_recent = max(recent_stages, key=lambda s: KILL_CHAIN_ORDER.get(s, 0))
+                    recent_risk = STAGE_CALIBRATED_RISK.get(top_recent, 0.75)
+                    emp_scores[-1] = max(emp_scores[-1], recent_risk)
+                    emp_behaviours[-1] = top_recent
+            else:
+                # Telemetry is stale / stopped (>120s ago):
+                # Decay latest minute empirical threat to nominal benign baseline
+                if len(emp_scores) > 0:
+                    emp_scores[-1] = 0.0
+                    emp_behaviours[-1] = "Benign"
 
         for w_i, end_idx in enumerate(range(m.W - 1, len(Z))):
             base_risk = float(risk[w_i].max())
             e_threat = emp_scores[end_idx]
             beh = emp_behaviours[end_idx] if end_idx < len(emp_behaviours) else "Benign"
 
-            # Preserve the true benign baseline for historical minutes prior to attack onset:
-            # If this individual minute had no attack traffic, it stays at the benign green baseline (0.05 - 0.12)
-            if beh == "Benign" and e_threat == 0.0:
+            # If telemetry is stale (no traffic in last 3 min) and this is the last minute,
+            # ensure it reports nominal benign baseline
+            if is_live_telemetry and (latest_flow_age is not None and latest_flow_age > 180) and end_idx == len(Z) - 1:
+                score[end_idx] = 0.08
+            elif beh == "Benign" and e_threat == 0.0:
                 score[end_idx] = min(base_risk, 0.10)
             elif beh == "Benign" and e_threat < 0.25:
                 score[end_idx] = min(base_risk, 0.16)
@@ -500,60 +703,69 @@ class NetworkStateTracker:
         latest_risk = float(score[-1])
         is_alert = bool(alert[-1])
 
-        # State determination matching exact kill chain stage and severity
-        if is_alert and latest_emp_beh in ("Exfiltration", "Infiltration"):
-            attack_state = "CRITICAL_ATTACK"
-            attack_state_label = "Active Data Exfiltration in Progress"
-            attack_stage = "Exfiltration"
-        elif is_alert and latest_emp_beh in ("C2", "Command & Control", "Bot"):
-            attack_state = "CRITICAL_ATTACK"
-            attack_state_label = "Command & Control Beaconing Active"
-            attack_stage = "C2"
-        elif is_alert:
-            attack_state = "ACTIVE_INTRUSION"
-            attack_state_label = "Sustained Defense Alert: Attack Confirmed"
-            attack_stage = latest_emp_beh if latest_emp_beh != "Benign" else "Initial Access"
-        elif latest_emp_beh in ("Exfiltration", "Infiltration"):
-            attack_state = "CRITICAL_ATTACK"
-            attack_state_label = "Active Data Exfiltration in Progress"
-            attack_stage = "Exfiltration"
-        elif latest_emp_beh in ("C2", "Command & Control", "Bot"):
-            attack_state = "CRITICAL_ATTACK"
-            attack_state_label = "Command & Control Beaconing Active"
-            attack_stage = "C2"
-        elif latest_emp_beh in ("Lateral Movement", "Lateral"):
-            attack_state = "ACTIVE_INTRUSION"
-            attack_state_label = "Lateral Movement & Internal Pivoting Detected"
-            attack_stage = "Lateral Movement"
-        elif latest_emp_beh in ("Initial Access", "BruteForce", "WebAttack", "DoS", "DDoS"):
-            attack_state = "ACTIVE_INTRUSION"
-            attack_state_label = "Initial Access & Authentication Breach Attempt"
-            attack_stage = "Initial Access"
-        elif latest_emp_beh in ("Reconnaissance", "PortScan"):
-            attack_state = "SUSPICIOUS_PROBING"
-            attack_state_label = "Reconnaissance & Multi-Port Probing Active"
-            attack_stage = "Reconnaissance"
-        elif latest_risk >= 0.70 and not recent_all_benign:
-            attack_state = "ACTIVE_INTRUSION"
-            attack_state_label = "Active Intrusion in Progress"
-            attack_stage = "Initial Access"
-        elif latest_risk >= m.thr and not recent_all_benign:
-            attack_state = "ELEVATED_THREAT"
-            attack_state_label = "Elevated Threat Level"
-            attack_stage = "Reconnaissance"
-        elif (latest_risk >= 0.38 or latest_emp_threat >= 0.35) and not recent_all_benign:
-            attack_state = "SUSPICIOUS_PROBING"
-            attack_state_label = "Suspicious Probing Detected"
-            attack_stage = "Reconnaissance"
-        else:
+        # In live mode with stale telemetry (>180s ago), network is nominally quiet
+        if is_live_telemetry and (latest_flow_age is not None and latest_flow_age > 180):
             attack_state = "NORMAL_BASELINE"
             attack_state_label = "Defense Telemetry Nominal"
             attack_stage = "Benign"
-
-        if (latest_risk < m.thr and latest_emp_threat < 0.35) or recent_all_benign:
             top_beh_name = "Benign"
+            latest_risk = 0.08
+            is_alert = False
         else:
-            top_beh_name = latest_emp_beh if latest_emp_beh != "Benign" else (steps[0]["behaviours"][0]["behaviour"] if steps else "Benign")
+            # State determination matching exact kill chain stage and severity
+            if is_alert and latest_emp_beh in ("Exfiltration", "Infiltration"):
+                attack_state = "CRITICAL_ATTACK"
+                attack_state_label = "Active Data Exfiltration in Progress"
+                attack_stage = "Exfiltration"
+            elif is_alert and latest_emp_beh in ("C2", "Command & Control", "Bot"):
+                attack_state = "CRITICAL_ATTACK"
+                attack_state_label = "Command & Control Beaconing Active"
+                attack_stage = "C2"
+            elif is_alert:
+                attack_state = "ACTIVE_INTRUSION"
+                attack_state_label = "Sustained Defense Alert: Attack Confirmed"
+                attack_stage = latest_emp_beh if latest_emp_beh != "Benign" else "Initial Access"
+            elif latest_emp_beh in ("Exfiltration", "Infiltration"):
+                attack_state = "CRITICAL_ATTACK"
+                attack_state_label = "Active Data Exfiltration in Progress"
+                attack_stage = "Exfiltration"
+            elif latest_emp_beh in ("C2", "Command & Control", "Bot"):
+                attack_state = "CRITICAL_ATTACK"
+                attack_state_label = "Command & Control Beaconing Active"
+                attack_stage = "C2"
+            elif latest_emp_beh in ("Lateral Movement", "Lateral"):
+                attack_state = "ACTIVE_INTRUSION"
+                attack_state_label = "Lateral Movement & Internal Pivoting Detected"
+                attack_stage = "Lateral Movement"
+            elif latest_emp_beh in ("Initial Access", "BruteForce", "WebAttack", "DoS", "DDoS"):
+                attack_state = "ACTIVE_INTRUSION"
+                attack_state_label = "Initial Access & Authentication Breach Attempt"
+                attack_stage = "Initial Access"
+            elif latest_emp_beh in ("Reconnaissance", "PortScan"):
+                attack_state = "SUSPICIOUS_PROBING"
+                attack_state_label = "Reconnaissance & Multi-Port Probing Active"
+                attack_stage = "Reconnaissance"
+            elif latest_risk >= 0.70 and not recent_all_benign:
+                attack_state = "ACTIVE_INTRUSION"
+                attack_state_label = "Active Intrusion in Progress"
+                attack_stage = "Initial Access"
+            elif latest_risk >= m.thr and not recent_all_benign:
+                attack_state = "ELEVATED_THREAT"
+                attack_state_label = "Elevated Threat Level"
+                attack_stage = "Reconnaissance"
+            elif (latest_risk >= 0.38 or latest_emp_threat >= 0.35) and not recent_all_benign:
+                attack_state = "SUSPICIOUS_PROBING"
+                attack_state_label = "Suspicious Probing Detected"
+                attack_stage = "Reconnaissance"
+            else:
+                attack_state = "NORMAL_BASELINE"
+                attack_state_label = "Defense Telemetry Nominal"
+                attack_stage = "Benign"
+
+            if (latest_risk < m.thr and latest_emp_threat < 0.35) or recent_all_benign:
+                top_beh_name = "Benign"
+            else:
+                top_beh_name = latest_emp_beh if latest_emp_beh != "Benign" else (steps[0]["behaviours"][0]["behaviour"] if steps else "Benign")
 
         # Estimate time to reach critical attack / breach
         if is_alert or attack_stage in ("Exfiltration", "Infiltration"):
@@ -590,7 +802,7 @@ class NetworkStateTracker:
 
         return dict(
             status="ok", minutes=minutes, state=display,
-            risk_score=[None if np.isnan(v) else float(v) for v in score],
+            risk_score=[0.08 if np.isnan(v) else float(v) for v in score],
             stages=stages,
             alert=alert,
             current=dict(

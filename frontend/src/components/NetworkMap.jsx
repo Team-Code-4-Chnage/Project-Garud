@@ -718,6 +718,7 @@ export default function NetworkMap({
       setClearingCache(true);
       await apiPost("/graph/geoip/clear_cache");
       setGeoCache({});
+      setGraphData({ nodes: [], edges: [], highRiskNodes: [] });
       if (pendingGeoIpsRef.current) pendingGeoIpsRef.current.clear();
       await loadTopology();
     } catch (e) {
@@ -737,7 +738,19 @@ export default function NetworkMap({
       edges.map((e) => e.session_key || `${e.source}->${e.target}`),
     );
 
+    const nowMs = Date.now();
     (liveFlows || []).forEach((flow) => {
+      // In live mode, ignore any stale simulated flows
+      if (systemMode === "live" && flow.source === "simulated") return;
+
+      // Discard stale flows older than 90 seconds from the live map
+      const flowTs = flow.timestamp
+        ? new Date(flow.timestamp).getTime()
+        : flow._ts
+          ? new Date(flow._ts).getTime()
+          : nowMs;
+      if (nowMs - flowTs > 90000) return;
+
       const src = flow.src_ip;
       const dst = flow.dst_ip;
       if (!src || !dst) return;

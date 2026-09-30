@@ -61,6 +61,22 @@ async def lifespan(app: FastAPI):
     CycleState.initialize()
     logger.info("Active monitoring cycle initialized: %s (started %s)", CycleState.cycle_id, CycleState.started_at.isoformat())
 
+    # Ensure clean state on startup in live mode
+    try:
+        from sqlalchemy import delete
+
+        from .database import FlowRecordDB, SessionDB, async_session
+        from .network_state import tracker
+        from .routes.system import SystemState
+        if SystemState.mode == "live":
+            async with async_session() as db:
+                await db.execute(delete(FlowRecordDB).where(FlowRecordDB.source == "simulated"))
+                await db.execute(delete(SessionDB).where(SessionDB.source == "simulated"))
+                await db.commit()
+            tracker.reset()
+    except Exception as e:
+        logger.debug("Startup cleanup deferred: %s", e)
+
     if not API_KEY:
         logger.warning("=" * 60)
         logger.warning("SECURITY NOTICE: API_KEY is not configured in environment.")

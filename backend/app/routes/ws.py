@@ -246,9 +246,16 @@ async def get_recent_flows(
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get the most recent flow records across all sessions for live feed bootstrapping, enriched with real GeoIP."""
+    from datetime import datetime, timedelta, timezone
+
+    from .system import SystemState
+
+    stmt = select(FlowRecordDB)
+    if SystemState.mode == "live":
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=60)
+        stmt = stmt.where(FlowRecordDB.source != "simulated", FlowRecordDB.timestamp >= cutoff)
     stmt = (
-        select(FlowRecordDB)
+        stmt
         .order_by(desc(FlowRecordDB.timestamp), desc(FlowRecordDB.id))
         .limit(limit)
     )
