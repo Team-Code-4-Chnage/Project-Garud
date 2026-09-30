@@ -702,12 +702,20 @@ export default function NetworkMap({
 
   const handleStopSimulation = async () => {
     try {
+      // Clear client-side caches immediately so simulated IPs vanish from map
+      setGeoCache({});
+      setGraphData({ nodes: [], edges: [], highRiskNodes: [] });
+      if (pendingGeoIpsRef.current) pendingGeoIpsRef.current.clear();
+      // Switch mode server-side (also purges simulated DB rows + server geoip cache)
       await apiPost("/system/mode", { mode: "live" });
+      // Extra: flush server-side geoip cache to remove any simulation IPs persisted to disk
+      await apiPost("/graph/geoip/clear_cache");
       setSystemMode("live");
       setSimulating(false);
-      setTimeout(loadTopology, 1000);
+      setTimeout(loadTopology, 1200);
     } catch (e) {
       console.error("Failed to switch to live mode:", e);
+      setSimulating(false);
     }
   };
 

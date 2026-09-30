@@ -118,8 +118,9 @@ async def set_system_mode(req: ModeUpdateRequest, db: AsyncSession = Depends(get
         except Exception as err:
             logger.warning("Could not purge simulated DB records on mode switch: %s", err)
         network_tracker.reset()
-        from ..geoip import clear_geoip_cache
+        from ..geoip import clear_geoip_cache, evict_simulated_ips
         clear_geoip_cache()
+        evict_simulated_ips()
         if not SystemState.is_capture_running():
             try:
                 await start_live_capture()

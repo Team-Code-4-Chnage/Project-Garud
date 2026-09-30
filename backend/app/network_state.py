@@ -466,23 +466,50 @@ class NetworkStateTracker:
                 S1, R1, C1 = m.model.rollout(torch.tensor(partial_win[np.newaxis]), m.H)
             probs_wu = torch.softmax(C1, dim=-1).detach().numpy()[0]
             pred_states_wu = m.decode(S1.detach().numpy()[0])
-            latest_emp_threat_wu = wu_emp_scores[-1] if wu_emp_scores else 0.0
-            recent_all_benign_wu = (latest_emp_threat_wu == 0.0 and
-                                     all(b == "Benign" for b in wu_emp_behaviours[-3:]))
+            # Use peak threat from the last 5 minutes (not just last minute)
+            # so attack forecasts persist even if the last minute happens to be benign
+            THREAT_HORIZON = 5
+            recent_scores_wu = wu_emp_scores[-THREAT_HORIZON:] if wu_emp_scores else [0.0]
+            recent_behs_wu = wu_emp_behaviours[-THREAT_HORIZON:] if wu_emp_behaviours else ["Benign"]
+            peak_emp_threat_wu = max(recent_scores_wu)
+            peak_emp_beh_wu = max(
+                recent_behs_wu,
+                key=lambda b: KILL_CHAIN_ORDER.get(b, 0)
+            )
+            # Only consider all-benign if no attack in last 5 minutes
+            recent_all_benign_wu = (peak_emp_threat_wu == 0.0)
+            # Minutes since peak attack (for decay)
+            try:
+                peak_idx = len(recent_scores_wu) - 1 - next(
+                    i for i, v in enumerate(reversed(recent_scores_wu)) if v >= 0.35
+                )
+                minutes_since_peak = len(recent_scores_wu) - 1 - peak_idx
+            except StopIteration:
+                minutes_since_peak = THREAT_HORIZON
             steps_wu = []
             for k in range(m.H):
                 raw_step_risk = float(torch.sigmoid(R1[0, k]).item())
-                if latest_emp_threat_wu > 0.0:
-                    step_risk = max(raw_step_risk, float(latest_emp_threat_wu * (0.95 ** (k + 1))))
+                if peak_emp_threat_wu > 0.0:
+                    # Decay from peak, accounting for how many minutes ago the peak was
+                    effective_age = minutes_since_peak + k + 1
+                    decayed = float(peak_emp_threat_wu * (0.92 ** effective_age))
+                    step_risk = max(raw_step_risk, decayed)
                 elif recent_all_benign_wu:
                     step_risk = min(raw_step_risk, 0.10)
                 else:
                     step_risk = raw_step_risk
                 step_probs = probs_wu[k].copy()
-                if (step_risk < m.thr and latest_emp_threat_wu < 0.35) or recent_all_benign_wu:
+                target_beh_wu = STAGE_TO_BEHAVIOUR.get(peak_emp_beh_wu, peak_emp_beh_wu)
+                if (step_risk < m.thr and peak_emp_threat_wu < 0.35) or recent_all_benign_wu:
                     benign_idx = m.behaviours.index("Benign")
                     step_probs = np.zeros_like(step_probs)
                     step_probs[benign_idx] = 1.0
+                elif peak_emp_threat_wu >= m.thr and target_beh_wu in m.behaviours:
+                    beh_idx = m.behaviours.index(target_beh_wu)
+                    blend_w = min(0.85, (peak_emp_threat_wu - 0.35) * 1.5)
+                    step_probs = (1.0 - blend_w) * step_probs
+                    step_probs[beh_idx] += blend_w
+                    step_probs /= step_probs.sum()
                 top = np.argsort(-step_probs)[:3]
                 beh = [dict(behaviour=m.behaviours[i], probability=float(step_probs[i]),
                             techniques=[], tactics=[]) for i in top]
@@ -491,7 +518,6 @@ class NetworkStateTracker:
                     risk=step_risk, behaviours=beh,
                     state={f: float(pred_states_wu[k][m.features.index(f)]) for f in DISPLAY_FEATURES if f in m.features}))
         except Exception:
-            latest_emp_threat_wu = wu_emp_scores[-1] if wu_emp_scores else 0.0
             recent_all_benign_wu = True
             steps_wu = [dict(step=k + 1,
                 minute=(now_utc + timedelta(minutes=k + 1)).replace(second=0, microsecond=0).isoformat(),
@@ -662,27 +688,45 @@ class NetworkStateTracker:
         last_minute = st.index[-1]
         latest_emp_threat = emp_scores[-1]
         latest_emp_beh = emp_behaviours[-1]
-        recent_all_benign = (latest_emp_threat == 0.0 and all(b == "Benign" for b in emp_behaviours[-3:]))
+
+        # Use peak threat from last 5 minutes so attack forecasts persist even if
+        # the most recent minute is benign (e.g. burst attack followed by quiet)
+        THREAT_HORIZON = 5
+        recent_emp_scores = emp_scores[-THREAT_HORIZON:]
+        recent_emp_behs = emp_behaviours[-THREAT_HORIZON:]
+        peak_emp_threat = max(recent_emp_scores)
+        peak_emp_beh = max(recent_emp_behs, key=lambda b: KILL_CHAIN_ORDER.get(b, 0))
+        # Only mark all-benign if no attack in last 5 minutes
+        recent_all_benign = (peak_emp_threat == 0.0)
+        # Compute minutes since the most recent attack peak for decay
+        try:
+            rev_scores = list(reversed(recent_emp_scores))
+            peak_back = next(i for i, v in enumerate(rev_scores) if v >= 0.35)
+            minutes_since_peak = peak_back
+        except StopIteration:
+            minutes_since_peak = THREAT_HORIZON
 
         steps = []
         for k in range(m.H):
             raw_step_risk = float(torch.sigmoid(R1[0, k]).item())
-            if latest_emp_threat > 0.0:
-                step_risk = max(raw_step_risk, float(latest_emp_threat * (0.95 ** (k + 1))))
+            if peak_emp_threat > 0.0:
+                effective_age = minutes_since_peak + k + 1
+                decayed = float(peak_emp_threat * (0.92 ** effective_age))
+                step_risk = max(raw_step_risk, decayed)
             elif recent_all_benign:
                 step_risk = min(raw_step_risk, 0.10)
             else:
                 step_risk = raw_step_risk
 
             step_probs = probs[k].copy()
-            target_beh = STAGE_TO_BEHAVIOUR.get(latest_emp_beh, latest_emp_beh)
-            if (step_risk < m.thr and latest_emp_threat < 0.35) or recent_all_benign:
+            target_beh = STAGE_TO_BEHAVIOUR.get(peak_emp_beh, peak_emp_beh)
+            if (step_risk < m.thr and peak_emp_threat < 0.35) or recent_all_benign:
                 benign_idx = m.behaviours.index("Benign")
                 step_probs = np.zeros_like(step_probs)
                 step_probs[benign_idx] = 1.0
-            elif latest_emp_threat >= m.thr and target_beh in m.behaviours:
+            elif peak_emp_threat >= m.thr and target_beh in m.behaviours:
                 beh_idx = m.behaviours.index(target_beh)
-                blend_w = min(0.85, (latest_emp_threat - 0.35) * 1.5)
+                blend_w = min(0.85, (peak_emp_threat - 0.35) * 1.5)
                 step_probs = (1.0 - blend_w) * step_probs
                 step_probs[beh_idx] += blend_w
                 step_probs /= step_probs.sum()

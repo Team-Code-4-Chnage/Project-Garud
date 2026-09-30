@@ -123,6 +123,35 @@ def clear_geoip_cache() -> Dict[str, Any]:
     return {"evicted": old_count, "remaining": len(_GEO_CACHE)}
 
 
+# Known simulation IP prefixes — evicted from cache on simulation stop
+_SIM_PREFIXES = (
+    "185.220.", "194.26.", "45.33.", "198.51.100.", "224.77.",
+    "10.0.0.", "172.16.", "172.17.", "172.18.", "172.19.",
+    "172.20.", "172.21.", "172.22.", "172.23.", "172.24.",
+    "172.25.", "172.26.", "172.27.", "172.28.", "172.29.",
+    "172.30.", "172.31.",
+)
+
+
+def evict_simulated_ips() -> Dict[str, Any]:
+    """
+    Evict all known simulation IP prefixes from in-memory and disk GeoIP cache.
+    Called when switching from simulated → live mode to ensure no ghost IPs on the map.
+    """
+    global _GEO_CACHE
+    evicted_keys = [
+        k for k in list(_GEO_CACHE.keys())
+        if any(k.startswith(p) for p in _SIM_PREFIXES) or _GEO_CACHE[k].get("is_simulated")
+    ]
+    for k in evicted_keys:
+        _GEO_CACHE.pop(k, None)
+    if evicted_keys:
+        _save_disk_cache()
+        logger.info("Evicted %d simulated IP entries from GeoIP cache", len(evicted_keys))
+    return {"evicted": len(evicted_keys), "remaining": len(_GEO_CACHE)}
+
+
+
 _load_disk_cache()
 
 
