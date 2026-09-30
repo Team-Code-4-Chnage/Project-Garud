@@ -29,11 +29,11 @@ from .config import BASE_DIR, FLOW_FEATURES
 from .mitre import lookup as mitre_lookup
 
 try:
-    from worldmodel_v2.model import NetStateWorldModel
+    from worldmodel_v3.model import NetStateWorldModel
     from worldmodel_v3.state import flows_from_features, full_grid, minute_states
 except ImportError:  # backend started from backend/: add the repository root
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-    from worldmodel_v2.model import NetStateWorldModel
+    from worldmodel_v3.model import NetStateWorldModel
     from worldmodel_v3.state import flows_from_features, full_grid, minute_states
 
 logger = logging.getLogger(__name__)

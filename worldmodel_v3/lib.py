@@ -18,7 +18,7 @@ import torch.nn.functional as Fn
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
-from worldmodel_v2.model import NetStateWorldModel  # noqa: E402
+from worldmodel_v3.model import NetStateWorldModel  # noqa: E402
 from worldmodel_v3.state import DIRECTION_FEATURES, HOST_CONCENTRATION_FEATURES  # noqa: E402
 
 W, H = 6, 4

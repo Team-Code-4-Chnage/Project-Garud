@@ -1,5 +1,7 @@
 # World Model V3: Dataset Upgrade, Network State and Evaluation Report
 
+> Status note (2026-09-30): the per-flow model in `backend/artifacts/` was replaced on 2026-09-28/29 by weights trained on synthetic sessions (`setup/run_all.py`). References below to a "shipped" or "V1" model and to its F1 of 0.86 describe the earlier model trained on real CIC-IDS2017 flows. V2 (`worldmodel_v2/`) was an earlier experiment; its code was removed and only its model class lives on as `worldmodel_v3/model.py`. Current numbers are in [model_card.md](model_card.md).
+
 Status: the network-state model described in section 15 is served by the backend next to the V1 flow model; the rest of this document is the research that led to it. The results are a mixed picture and do not support a claim that NetForecast is SIH-complete. Every number below was measured by code in this repository; raw outputs are in `experiments/v3_lodo.json`, `experiments/v3_behaviour.json`, and the aggregation is `experiments/summarize_v3.py`.
 
 ## 1. Candidate dataset comparison

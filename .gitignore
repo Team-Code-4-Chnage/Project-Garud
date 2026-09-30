@@ -63,7 +63,6 @@ scratch/
 scratch_prompt.txt
 backups/
 backend/artifacts/backup_*/
-backend/artifacts_v2/
 demo/*.bak
 
 # ─── Root-level JS (frontend is self-contained in frontend/) ───────────────────
@@ -76,6 +75,5 @@ render.yaml
 
 # ─── AI-generated images / one-off root scripts ─────────────────────────────────
 ChatGPT*.png
-pipeline_fixed.py
 backend/data/forecaster.db-journal
 backend/data/geoip_cache.json

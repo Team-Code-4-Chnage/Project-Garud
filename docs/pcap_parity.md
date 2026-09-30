@@ -1,5 +1,7 @@
 # PCAP and Live Feature Parity with the Training Data
 
+> Status note (2026-09-30): the model-level check below used the earlier per-flow model trained on real flows, not the synthetic-trained weights now in `backend/artifacts/`. The feature-level results do not depend on the model.
+
 The model was trained on CICFlowMeter output (the CIC-IDS2017/2018 flow files). For its predictions on uploaded PCAPs or live traffic to mean anything, the extractor that turns packets into flows must produce the same 22 numbers CICFlowMeter would. This document records how that was measured, what CICFlowMeter actually does (including its bugs), and the result.
 
 ## Method

@@ -1450,7 +1450,7 @@ function NetworkForecastView() {
         </div>
       </div>
 
-      {/* 5. MODEL BENCHMARK & VALIDATION (F1=0.862, ROC-AUC=0.885) */}
+      {/* 5. HELD-OUT TEST RESULTS, read from the served model's config */}
       <div className="panel">
         <div
           className="panel-header"
@@ -1464,7 +1464,7 @@ function NetworkForecastView() {
         >
           <div>
             <span className="panel-title">
-              Model Benchmark & Validation Performance
+              Held-Out Test Results
             </span>
             <span className="panel-meta" style={{ marginLeft: 8 }}>
               {info.version} &bull; {info.feature_set} ({info.n_features}{" "}
@@ -1482,7 +1482,7 @@ function NetworkForecastView() {
               fontWeight: 700,
             }}
           >
-            VALIDATED BENCHMARK
+            LAST 25% OF EACH DAY
           </span>
         </div>
 
@@ -1518,7 +1518,7 @@ function NetworkForecastView() {
                 style={{
                   fontSize: "1.45rem",
                   fontWeight: 800,
-                  color: "var(--severity-low)",
+                  color: "var(--text-primary)",
                   fontFamily: "var(--font-mono)",
                   marginTop: 2,
                 }}
@@ -1529,7 +1529,7 @@ function NetworkForecastView() {
                 className="text-muted text-xs"
                 style={{ fontSize: "0.68rem", marginTop: 2 }}
               >
-                86.2% balance of precision & recall
+                next-minute risk &ge; 0.5, precision {fmtStat(tr.detection.precision)}
               </div>
             </div>
 
@@ -1566,7 +1566,7 @@ function NetworkForecastView() {
                 className="text-muted text-xs"
                 style={{ fontSize: "0.68rem", marginTop: 2 }}
               >
-                88.5% attack family separation
+                {tr.attack_windows} attack of {tr.windows} test windows
               </div>
             </div>
 
@@ -1603,7 +1603,7 @@ function NetworkForecastView() {
                 className="text-muted text-xs"
                 style={{ fontSize: "0.68rem", marginTop: 2 }}
               >
-                86.4% of real intrusion events detected
+                false positive rate {fmtStat(tr.detection.fpr)}
               </div>
             </div>
 
@@ -1640,12 +1640,12 @@ function NetworkForecastView() {
                 className="text-muted text-xs"
                 style={{ fontSize: "0.68rem", marginTop: 2 }}
               >
-                0.41/hr (Below 0.50 budget)
+                {tr.early_warning.false_alarm_events} events over {fmtStat(tr.early_warning.quiet_hours)} quiet hours
               </div>
             </div>
           </div>
 
-          {/* Model Comparison Benchmark Table */}
+          {/* Early-warning summary on the same held-out segments */}
           <div style={{ marginBottom: 16 }}>
             <div
               style={{
@@ -1655,75 +1655,35 @@ function NetworkForecastView() {
                 marginBottom: 8,
               }}
             >
-              Baseline Architecture Comparison &bull; CIC-IDS2017 Chronological
-              Test Split
+              Early Warning on the Test Segments &bull; CIC-IDS2017
             </div>
-            <div style={{ overflowX: "auto" }}>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Detection Architecture</th>
-                    <th>F1 Score</th>
-                    <th>Precision</th>
-                    <th>Recall</th>
-                    <th>False Positive Rate</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    style={{
-                      background: "rgba(214, 179, 106, 0.08)",
-                      fontWeight: 700,
-                    }}
-                  >
-                    <td style={{ color: "var(--c-gold)" }}>
-                      &bull; LSTM World Model (Proposed)
-                    </td>
-                    <td
-                      style={{ color: "var(--severity-low)", fontWeight: 800 }}
-                    >
-                      0.8615 (86.2%)
-                    </td>
-                    <td>0.8589 (85.9%)</td>
-                    <td>0.8641 (86.4%)</td>
-                    <td style={{ color: "var(--severity-low)" }}>
-                      0.0459 (4.6%)
-                    </td>
-                    <td>
-                      <span
-                        className="mono text-xs"
-                        style={{
-                          padding: "2px 6px",
-                          borderRadius: 3,
-                          background: "var(--severity-low)",
-                          color: "#020E0F",
-                          fontWeight: 800,
-                        }}
-                      >
-                        PRODUCTION
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Logistic Regression Baseline</td>
-                    <td>0.5228 (52.3%)</td>
-                    <td>0.6887 (68.9%)</td>
-                    <td>0.4213 (42.1%)</td>
-                    <td>0.0616 (6.2%)</td>
-                    <td className="text-muted">Baseline</td>
-                  </tr>
-                  <tr>
-                    <td>Isolation Forest Baseline</td>
-                    <td>0.4020 (40.2%)</td>
-                    <td>0.3743 (37.4%)</td>
-                    <td>0.4342 (43.4%)</td>
-                    <td>0.2349 (23.5%)</td>
-                    <td className="text-muted">Baseline</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <table className="data-table">
+              <tbody>
+                <tr>
+                  <td>Attack episodes in test data</td>
+                  <td>{tr.early_warning.episodes}</td>
+                </tr>
+                <tr>
+                  <td>Warned within 20 minutes before onset</td>
+                  <td>{tr.early_warning.warned_within_20}</td>
+                </tr>
+                <tr>
+                  <td>Median lead time of warned episodes</td>
+                  <td>
+                    {tr.early_warning.median_lead_min == null
+                      ? "-"
+                      : `${tr.early_warning.median_lead_min} min`}
+                  </td>
+                </tr>
+                <tr>
+                  <td>Alert rule</td>
+                  <td>
+                    risk &ge; {fmtStat(info.alert_rule.threshold)} for{" "}
+                    {info.alert_rule.consecutive_windows} consecutive minutes
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           {/* Early Warning Validation & Analytical Notes */}

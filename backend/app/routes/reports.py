@@ -6,6 +6,7 @@ import csv
 import io
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
@@ -312,6 +313,16 @@ async def _build_forensic_html(db: AsyncSession) -> tuple[str, datetime]:
         </div>
         """
 
+
+    _prov = (artifacts.config or {}).get("provenance", {}) if artifacts.is_loaded else {}
+    model_train_data = (
+        f"{Path(str(_prov['trained_on']).replace(chr(92), '/')).name} "
+        f"({_prov.get('attack_sessions', '?')} attack / {_prov.get('benign_sessions', '?')} benign sessions)"
+        if _prov.get("trained_on") else "unknown"
+    )
+    _f1 = (_prov.get("test_metrics") or {}).get("f1")
+    model_test_f1 = f"{_f1:.4f} (same-distribution split)" if _f1 is not None else "not recorded"
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -554,7 +565,7 @@ async def _build_forensic_html(db: AsyncSession) -> tuple[str, datetime]:
         <tr><td><strong>Neural Architecture:</strong></td><td>2-Layer Stacked LSTM (Hidden=256, Dropout=0.25)</td><td><strong>Sequence Window:</strong></td><td>W=6 temporal flows</td></tr>
         <tr><td><strong>Inference Target:</strong></td><td>Multi-Step Lookahead (&Delta;t state transition)</td><td><strong>Feature Dimension:</strong></td><td>22 CIC-IDS2017 flow vectors</td></tr>
         <tr><td><strong>Taxonomy Mapping:</strong></td><td>6 MITRE ATT&CK Stages</td><td><strong>Thresholding:</strong></td><td>Adaptive EMA (&mu; + 2&sigma; envelope)</td></tr>
-        <tr><td><strong>Training Benchmark:</strong></td><td>CIC-IDS2017 (320,000 real flows)</td><td><strong>Validation F1-Score:</strong></td><td><strong>84.46%</strong> (vs 50.67% Logistic Reg)</td></tr>
+        <tr><td><strong>Training Data:</strong></td><td>{model_train_data}</td><td><strong>Held-out Test F1:</strong></td><td>{model_test_f1}</td></tr>
       </table>
     </div>
     <div class="card">

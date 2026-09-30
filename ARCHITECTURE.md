@@ -1,111 +1,111 @@
-# Project Garud Architecture
+# Architecture
 
-Project Garud is a React/Vite security dashboard backed by a FastAPI service. The backend ingests network-flow telemetry, normalizes it into 22 features, evaluates six-flow windows with a PyTorch LSTM, persists operational state in SQLite, and exposes REST and WebSocket APIs for the dashboard.
+This document describes what the code does today. Measured results are in [docs/model_card.md](docs/model_card.md).
 
-## System Diagram
+## Overview
 
-The following diagram is also shown in the [README](README.md#system-architecture).
-
-```mermaid
-flowchart TB
-    subgraph INGEST ["1. Telemetry Ingestion Layer"]
-        L1["Live NIC Sniffer<br/>(Scapy / Npcap)"]
-        L2["PCAP / PCAPNG<br/>(PcapReader)"]
-        L3["CSV Flow Logs<br/>(Batch Upload)"]
-    end
-
-    subgraph PREPROC ["2. Flow Extraction & Normalization"]
-        FE["22-Feature Extractor<br/>(Durations, Flags, IATs, Sizes)"]
-        SC["StandardScaler<br/>(Train-Fitted Parameters)"]
-        SB["Session Buffer<br/>(Sliding Window W=6)"]
-        INGEST --> FE --> SC --> SB
-    end
-
-    subgraph CORE ["3. Deep World Model Core"]
-        LSTM["2-Layer Stacked LSTM<br/>(Hidden=256, Dropout=0.25)"]
-        H1["Next-State Head<br/>(Linear -> 22 Features)"]
-        H2["Infiltration Head<br/>(MLP -> Risk Logit)"]
-        H3["MITRE Stage Head<br/>(MLP -> 6 Classes)"]
-        SB --> LSTM
-        LSTM --> H1
-        LSTM --> H2
-        LSTM --> H3
-    end
-
-    subgraph FORECAST ["4. Forward Rollout & Explainability"]
-        MC["Monte Carlo Simulator<br/>(k=6 Steps, N=20 Rollouts)"]
-        AT["Adaptive Threshold<br/>(EMA + 2σ Baseline)"]
-        SHAP["SHAP / Gradient<br/>Feature Attribution"]
-        H1 --> MC
-        H2 --> AT
-        LSTM --> SHAP
-    end
-
-    subgraph SOC ["5. Decision Support & UI"]
-        D1["Kill-Chain Radar"]
-        D2["Monte Carlo Bands"]
-        D3["Feature Attribution Bar"]
-        D4["Forensic Reports (CSV/JSON)"]
-        AT --> D1
-        MC --> D2
-        SHAP --> D3
-        D1 & D2 & D3 --> D4
-    end
+```text
+ live capture (Scapy)     PCAP / PCAPNG upload     CSV upload     POST /ingest
+        |                        |                     |               |
+        +------------------------+----------+----------+---------------+
+                                            |
+                          capture/flow_table.py + flow_state.py
+                          (CICFlowMeter-style flow reconstruction, 22 features)
+                                            |
+                                  backend/app/ingestion.py
+             validation, session resolution, SQLite persistence, WebSocket broadcast
+                     |                                              |
+        per-flow path (per session)                    network-state path (all flows)
+        6-flow window -> LSTM model                    1-minute state vector -> LSTM model
+        backend/app/inference.py                       backend/app/network_state.py
+                     |                                              |
+        plausibility rules, adaptive                   rule-based indicators blended with
+        threshold, alert + ledger                      model output, sustained-alert rule
+                     |                                              |
+                     +---------------------+------------------------+
+                                           |
+                        REST + WebSocket API (FastAPI)  ->  React dashboard
 ```
 
-## Runtime Components
+## Components
 
-### Ingestion and preprocessing
+### Flow extraction (`capture/`)
 
-- `capture/` contains shared flow reconstruction, packet parsing, live capture, and signature detection.
-- `backend/app/routes/ingest.py` accepts individual flows and CSV uploads.
-- `backend/app/routes/pcap.py` reconstructs flows from PCAP/PCAPNG input.
-- `backend/app/ingestion.py` validates records, resolves sessions, updates buffers, persists data, and triggers inference.
-- `backend/app/model_loader.py` loads `world_model.pt`, `scaler.pkl`, and `config.json` from `backend/artifacts/`.
+- `flow_table.py` and `flow_state.py` reconstruct bidirectional flows from packets and compute the 22 features the per-flow model expects. The same code serves live capture and PCAP upload. Feature parity with CICFlowMeter labelled data is checked by `backend/tests/test_cic_semantics.py`, `test_flow_parity.py` and `test_pcap_parity_real.py`; limits are in [docs/pcap_parity.md](docs/pcap_parity.md).
+- `signatures.py` detects Heartbleed by parsing TLS heartbeat records in raw payloads. This is a deterministic signature, not a model output.
+- `live_capture.py` runs as a separate process started by the system routes.
 
-All model inputs use the configured 22-feature order. The scaler is fitted during training and reused at inference. A six-flow session window is required before the sequence model produces its primary prediction.
+### Backend (`backend/app/`)
 
-### Model and forecasting
+| Module | Responsibility |
+| --- | --- |
+| `main.py` | Application setup, CORS, optional API key, security headers, optional rate limiting, router registration |
+| `ingestion.py` | Validates flows, resolves sessions, keeps per-session windows, calls the models, creates alerts, broadcasts events |
+| `model_loader.py`, `inference.py` | Loads the per-flow model; single prediction, rollout with Monte Carlo input noise, SHAP and gradient attribution |
+| `network_state.py` | Per-minute network state, network-state model, forecast payload, sustained-alert rule |
+| `database.py` | Async SQLite models: flows, sessions, alerts, cycle archives |
+| `drift.py` | Compares live feature distributions with baseline statistics |
+| `geoip.py`, `graph_state.py`, `routes/graph.py` | GeoIP lookup (in-memory cache only) and topology graph |
+| `mitre.py` | Analyst-written mapping from behaviour classes to ATT&CK techniques, with reasoning and an ambiguity flag |
+| `routes/` | HTTP and WebSocket endpoints; the list is in the README |
 
-The production flow model is a two-layer LSTM with three output heads:
+SQLite file: `backend/data/forecaster.db`. Operating cycles are archived as JSON in `backend/data/archives/`.
 
-1. Next-state regression predicts the next 22-feature vector.
-2. The infiltration head produces the binary risk score used by alerting.
-3. The stage head predicts one of six dataset-derived labels.
+### Per-flow model (`backend/artifacts/`)
 
-`backend/app/inference.py` performs single-window prediction and autoregressive forecast rollouts. Monte Carlo input noise provides a forecast spread. The adaptive threshold uses the configured alert baseline and EMA smoothing. These labels are operational proxies, not proof of a real multi-stage campaign.
+Two-layer LSTM (hidden 256, dropout 0.25) over a window of 6 flows x 22 features, standardised with `scaler.pkl`. Three heads: next-flow feature regression, a malicious-probability head, and a 6-class stage head (Benign, Reconnaissance, Initial Access, Lateral Movement, C2, Exfiltration). A per-class logit bias from `config.json` is applied to the stage logits. Forecasting rolls the next-state head forward and re-scores each predicted state.
 
-The repository also contains the network-state experiment and served V3 path under `worldmodel_v2/`, `worldmodel_v3/`, `backend/app/network_state.py`, and `backend/artifacts_v3/`. It aggregates flows into one-minute state vectors and exposes the network forecast route.
+The shipped weights were trained on synthetic sessions (see the model card). Stage names are labels of that synthetic generator.
 
-### Persistence and APIs
+### Rule layer around the per-flow model (`ingestion.py`)
 
-`backend/app/database.py` owns the async SQLite models for flows, sessions, alerts, and cycle archives. The FastAPI application in `backend/app/main.py` registers route modules for:
+Model output is post-processed before it becomes an alert:
 
-- Prediction and forecasting: `/predict`, `/forecast`.
-- Ingestion: `/ingest`, `/ingest/csv`, `/ingest/pcap`.
-- Explainability: `/explain` and export/view variants.
-- Network state and topology: `/network/*`, `/topology`, and GeoIP routes.
-- Alerts, reports, MITRE mappings, system controls, and WebSocket sessions.
+- Adaptive threshold: exponential moving average plus two standard deviations of the session's recent probabilities, bounded by the configured base threshold and 0.95.
+- `validate_attack_plausibility` forces the stage to Benign for trusted local processes, for live-capture traffic on ports 53, 80, 443, 8080 and 8443, for outbound "Lateral Movement", and for live-capture "Reconnaissance".
+- If the malicious head fires while the stage head says Benign, the stage is set to Initial Access (web ports) or Reconnaissance (other ports).
+- A Heartbleed signature match raises a critical alert regardless of the model.
 
-Optional `X-API-Key` authentication, CORS, rate limiting, Pydantic validation, and security headers are applied by the backend middleware. `/health` and the OpenAPI endpoints provide service diagnostics.
+These are hand-written rules. They reduce false alarms on the local host's own traffic and they also mean the reported stage is not always the model's argmax.
 
-### Frontend
+### Network-state model (`backend/artifacts_v3/`, `worldmodel_v3/`)
 
-`frontend/src/App.jsx` owns navigation, health polling, system controls, and the WebSocket connection. Dashboard, network forecast, alert, explainability, report, ingestion, live-log, topology, and settings components consume the backend through `frontend/src/api.js`.
+- `worldmodel_v3/state.py` builds one 45-dimensional state per minute from all flows: volume, duration and inter-arrival statistics, flag ratios, unique address and port counts, entropies, protocol shares, connection rates. IP addresses are never features.
+- The model is a two-layer LSTM (hidden 128, dropout 0.3) over 6 minutes. It rolls forward 4 minutes and predicts the state, a risk value and a behaviour class (Benign, PortScan, BruteForce, DoS, DDoS, WebAttack, Bot, Infiltration, Heartbleed) for each step.
+- Alert rule (in `config.json`): the maximum predicted risk over the next 4 minutes must reach 0.518 for at least 5 consecutive minutes. Threshold and length were chosen on validation segments under a false-alarm budget.
+- The same state builder (`worldmodel_v3/state.py`) is used for training data and at serving time.
 
-## Training and Evaluation
+### Rules applied on top of the network-state model (`network_state.py`)
 
-Dataset preparation and augmentation live under `data/`. `pipeline_fixed.py` trains the flow model and writes the production artifact directory. `worldmodel_v2/` and `worldmodel_v3/` contain the network-state training and evaluation workflow. `experiments/` contains calibration, model evaluation, parity, family-holdout, replay, and threshold experiments. Results in JSON and CSV files are recorded experiment outputs, not automatic retraining.
+The forecast shown to the user is not only model output:
 
-Retraining is manual. The resulting weights, scaler, and configuration must be kept together before deployment. Backend tests cover inference, API behavior, flow semantics, signatures, network state, graph behavior, security, and explainability.
+- `compute_empirical_threat` scores each minute with fixed thresholds on port fan-out, port entropy, SYN/RST ratios, connection rate, byte counts and similar, and assigns a stage from five rule families.
+- `STAGE_CALIBRATED_RISK` maps a stage label carried by ingested flows to a constant risk (for example 0.68 for Reconnaissance, 0.94 for Exfiltration).
+- The per-minute risk is the model risk capped to 0.10 to 0.16 on benign minutes, or the larger of the model risk and the rule score on attack minutes.
+- The forecast for the next four minutes is the model risk, raised to a projection of the recent rule score: growing toward 0.99 while a threat is current and not falling, decaying by a factor of 0.92 per minute after it stops.
+- In live mode, when the newest flow is older than 3 minutes the current risk is reported as 0.08 (idle baseline).
+- When fewer than 6 minutes of data exist, the status is `warming_up` and the model runs on a zero-padded window.
 
-## Deployment Boundaries
+These constants and thresholds are engineering choices, not trained values.
 
-The backend and frontend run directly in Python and Node environments. SQLite stores local service state; model artifacts are read from the configured artifact directories. Environment variables are documented in `.env.example`.
+### Frontend (`frontend/src/`)
 
-## Limitations
+React 19 with Vite, Recharts for charts and Leaflet for the map. `App.jsx` handles navigation, health polling and the WebSocket connection. Views: dashboard, live logs, alerts, network forecast and map, explainability, reports, ingestion, settings. All data comes from the backend through `api.js`; the model result panel on the forecast view reads the served model's `config.json`.
 
-- Stage labels are derived from public dataset labels and do not represent verified attacker progression.
-- PCAP/live visibility depends on capture permissions and available interfaces.
-- Model quality depends on dataset coverage and can degrade under network or attack-family shift.
-- The network-state forecast is a separate experimental/served path from the six-flow model and should be evaluated with its own documented metrics.
+### Modes
+
+- `live`: real capture or uploaded files. Simulated flows are ignored.
+- `simulated`: `demo/traffic_simulator.py` produces synthetic attack scenarios for demonstration. Data from this mode is marked with source `simulated` and can be purged.
+
+## Training and evaluation code
+
+| Path | Purpose |
+| --- | --- |
+| `setup/run_all.py` | Generates synthetic campaigns and trains the per-flow model |
+| `pipeline_fixed.py` | Per-flow training pipeline for real flow data |
+| `worldmodel_v3/` | Network-state model, state builder, training, leave-one-day-out and behaviour studies |
+| `data/` | Dataset download, preprocessing, augmentation, window builder |
+| `experiments/` | Evaluation, calibration, parity and replay scripts with recorded JSON outputs |
+| `lab/` | Isolated-lab data collection (see [LAB_SETUP.md](LAB_SETUP.md)) |
+
+Recorded JSON files in `experiments/` (`v3_*.json`) are outputs of the leave-one-day-out and behaviour studies in `worldmodel_v3/`.
