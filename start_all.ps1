@@ -62,6 +62,80 @@ function Get-Python312 {
     return $null
 }
 
+function Get-NodeTools {
+    $node = Get-Command node.exe -ErrorAction SilentlyContinue
+    $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
+    if ($node -and $npm) {
+        return @{
+            Node = $node.Source
+            Npm = $npm.Source
+        }
+    }
+
+    $nodePaths = @(
+        (Join-Path $env:ProgramFiles "nodejs\node.exe"),
+        (Join-Path $env:LocalAppData "Programs\nodejs\node.exe")
+    )
+    foreach ($nodePath in $nodePaths) {
+        if (Test-Path -LiteralPath $nodePath) {
+            $nodeDirectory = Split-Path -Parent $nodePath
+            $npmPath = Join-Path $nodeDirectory "npm.cmd"
+            if (Test-Path -LiteralPath $npmPath) {
+                return @{
+                    Node = $nodePath
+                    Npm = $npmPath
+                }
+            }
+        }
+    }
+
+    return $null
+}
+
+function Add-NodeToPath {
+    param (
+        [Parameter(Mandatory = $true)]
+        [hashtable]$NodeTools
+    )
+
+    $nodeDirectory = Split-Path -Parent $NodeTools.Node
+    if (($env:Path -split ";") -notcontains $nodeDirectory) {
+        $env:Path = "$nodeDirectory;$env:Path"
+    }
+}
+
+Write-Host "[0/4] Checking Node.js and npm environment..." -ForegroundColor Yellow
+$nodeTools = Get-NodeTools
+if (-not $nodeTools) {
+    $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+    if (-not $winget) {
+        throw "Node.js and npm are not installed, and winget is not available to install Node.js automatically."
+    }
+
+    Write-Host "Node.js and npm were not found. Installing the Node.js LTS bundle with winget..." -ForegroundColor Yellow
+    & $winget.Source install --id OpenJS.NodeJS.LTS --exact --scope user `
+        --accept-source-agreements --accept-package-agreements
+    if ($LASTEXITCODE -ne 0) {
+        throw "Node.js installation failed with exit code $LASTEXITCODE."
+    }
+
+    $nodeTools = Get-NodeTools
+    if (-not $nodeTools) {
+        throw "Node.js was installed, but node.exe and npm.cmd could not be located. Restart PowerShell and run this script again."
+    }
+}
+Add-NodeToPath -NodeTools $nodeTools
+& $nodeTools.Node --version
+if ($LASTEXITCODE -ne 0) {
+    throw "Node.js was found but could not be executed."
+}
+& $nodeTools.Npm --version
+if ($LASTEXITCODE -ne 0) {
+    throw "npm was found but could not be executed."
+}
+Write-Host "Node.js and npm are ready." -ForegroundColor Green
+Write-Host ""
+
 Write-Host "[0/4] Checking Python 3.12 environment..." -ForegroundColor Yellow
 $python312 = Get-Python312
 if (-not $python312) {
@@ -162,8 +236,12 @@ Write-Host ""
 if (-not (Test-Path "$ROOT\frontend\node_modules\leaflet")) {
     Write-Host "[2/4] Installing missing frontend dependencies..." -ForegroundColor Yellow
     Push-Location "$ROOT\frontend"
-    npm install --silent
+    & $nodeTools.Npm install --silent
+    $npmExitCode = $LASTEXITCODE
     Pop-Location
+    if ($npmExitCode -ne 0) {
+        throw "Failed to install frontend dependencies with npm (exit code $npmExitCode)."
+    }
 }
 
 $frontendPort = Get-NetTCPConnection -LocalPort 5173 -State Listen -ErrorAction SilentlyContinue
@@ -175,7 +253,7 @@ if ($frontendPort) {
         "-NoExit"
         "-ExecutionPolicy", "Bypass"
         "-Command"
-        "Set-Location '$ROOT\frontend'; npm run dev"
+        "Set-Location '$ROOT\frontend'; & '$($nodeTools.Npm)' run dev"
     )
     Start-Sleep -Seconds 2
     Write-Host "Frontend server initiated!" -ForegroundColor Green

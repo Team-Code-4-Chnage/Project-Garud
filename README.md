@@ -69,6 +69,7 @@ npm run dev
 ```
 
 The dashboard is at `http://localhost:5173`, the API at `http://localhost:8000` (`/docs` for OpenAPI, `/health` for status). On Windows, `start_all.ps1` starts both.
+The Windows startup script checks for Node.js and npm first and installs the Node.js LTS bundle with `winget` when they are missing.
 
 Docker images for the two parts are defined in `backend/Dockerfile` and `frontend/Dockerfile`. The backend image expects the repository root as build context.
 
