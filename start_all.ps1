@@ -107,16 +107,49 @@ function Add-NodeToPath {
 Write-Host "[0/4] Checking Node.js and npm environment..." -ForegroundColor Yellow
 $nodeTools = Get-NodeTools
 if (-not $nodeTools) {
-    $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
-    if (-not $winget) {
-        throw "Node.js and npm are not installed, and winget is not available to install Node.js automatically."
+    $checksumsUrl = "https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt"
+    Write-Host "Node.js and npm were not found. Finding the latest Node.js 22 Windows installer..." -ForegroundColor Yellow
+    try {
+        $checksums = (Invoke-WebRequest -Uri $checksumsUrl -UseBasicParsing -ErrorAction Stop).Content
+    } catch {
+        throw "Could not retrieve Node.js 22 installer checksums from $checksumsUrl : $($_.Exception.Message)"
     }
 
-    Write-Host "Node.js and npm were not found. Installing the Node.js LTS bundle with winget..." -ForegroundColor Yellow
-    & $winget.Source install --id OpenJS.NodeJS.LTS --exact --scope user `
-        --accept-source-agreements --accept-package-agreements
-    if ($LASTEXITCODE -ne 0) {
-        throw "Node.js installation failed with exit code $LASTEXITCODE."
+    $msiChecksum = $null
+    $msiName = $null
+    foreach ($line in ($checksums -split "\r?\n")) {
+        if ($line -match '^([0-9a-fA-F]{64})\s+node-v22\.[0-9]+\.[0-9]+-x64\.msi$') {
+            $msiChecksum = $Matches[1].ToLowerInvariant()
+            $msiName = $line.Trim().Split()[-1]
+            break
+        }
+    }
+    if (-not $msiName) {
+        throw "The Node.js 22 checksum list did not contain a Windows x64 MSI."
+    }
+
+    $installer = Join-Path $env:TEMP $msiName
+    $installerUrl = "https://nodejs.org/dist/latest-v22.x/$msiName"
+    Write-Host "Downloading $msiName..." -ForegroundColor Yellow
+    try {
+        Invoke-WebRequest -Uri $installerUrl -OutFile $installer -UseBasicParsing -ErrorAction Stop
+        $actualChecksum = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actualChecksum -ne $msiChecksum) {
+            throw "Downloaded Node.js installer checksum does not match the official checksum."
+        }
+
+        $installProcess = Start-Process -FilePath "msiexec.exe" `
+            -ArgumentList "/i `"$installer`" /passive /norestart" `
+            -Verb RunAs -Wait -PassThru
+        if ($installProcess.ExitCode -notin @(0, 3010)) {
+            throw "Node.js installation failed with exit code $($installProcess.ExitCode)."
+        }
+    } catch {
+        throw "Could not install Node.js 22: $($_.Exception.Message)"
+    } finally {
+        if (Test-Path -LiteralPath $installer) {
+            Remove-Item -LiteralPath $installer -Force
+        }
     }
 
     $nodeTools = Get-NodeTools
