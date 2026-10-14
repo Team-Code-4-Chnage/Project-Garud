@@ -43,7 +43,7 @@ Every figure above is reproducible with the commands in [docs/model_card.md](doc
 
 ## Requirements
 
-- Python 3.10 or newer (CI uses 3.11), Node.js and npm
+- Python 3.12, Node.js and npm
 - PyTorch (a CPU build is sufficient)
 - Npcap (Windows) or libpcap (Linux) and administrator rights for live capture
 - Optional: `slowapi` for rate limiting; `pyarrow` for Parquet files (both in `requirements.txt`)
@@ -53,7 +53,7 @@ Every figure above is reproducible with the commands in [docs/model_card.md](doc
 Backend, from the repository root:
 
 ```bash
-python -m venv backend/venv
+py -3.12 -m venv backend/venv
 backend/venv/Scripts/activate          # Linux/macOS: source backend/venv/bin/activate
 pip install -r backend/requirements.txt
 cd backend

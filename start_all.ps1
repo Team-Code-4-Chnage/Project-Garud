@@ -9,11 +9,123 @@ param (
 )
 
 $ROOT = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Item -LiteralPath .).FullName }
-$PYTHON = "$ROOT\backend\venv\Scripts\python.exe"
+$BACKEND = Join-Path $ROOT "backend"
+$VENV = Join-Path $BACKEND "venv"
+$PYTHON = Join-Path $VENV "Scripts\python.exe"
+$REQUIREMENTS = Join-Path $BACKEND "requirements.txt"
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Project Garud - NetForecast" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
+function Get-Python312 {
+    $launcher = Get-Command py.exe -ErrorAction SilentlyContinue
+    if ($launcher) {
+        & $launcher.Source -3.12 -c "import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            return @{
+                Path = $launcher.Source
+                Arguments = @("-3.12")
+            }
+        }
+    }
+
+    $python = Get-Command python.exe -ErrorAction SilentlyContinue
+    if ($python) {
+        & $python.Source -c "import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            return @{
+                Path = $python.Source
+                Arguments = @()
+            }
+        }
+    }
+
+    $knownPaths = @(
+        (Join-Path $env:LocalAppData "Programs\Python\Python312\python.exe"),
+        (Join-Path $env:ProgramFiles "Python312\python.exe"),
+        (Join-Path ${env:ProgramFiles(x86)} "Python312\python.exe")
+    )
+    foreach ($path in $knownPaths) {
+        if (Test-Path -LiteralPath $path) {
+            & $path -c "import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)" 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                return @{
+                    Path = $path
+                    Arguments = @()
+                }
+            }
+        }
+    }
+
+    return $null
+}
+
+Write-Host "[0/4] Checking Python 3.12 environment..." -ForegroundColor Yellow
+$python312 = Get-Python312
+if (-not $python312) {
+    $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+    $launcher = Get-Command py.exe -ErrorAction SilentlyContinue
+    if ($winget) {
+        Write-Host "Python 3.12 was not found. Installing it with winget..." -ForegroundColor Yellow
+        & $winget.Source install --id Python.Python.3.12 --exact --scope user `
+            --accept-source-agreements --accept-package-agreements
+        if ($LASTEXITCODE -ne 0) {
+            throw "Python 3.12 installation failed with exit code $LASTEXITCODE."
+        }
+    } elseif ($launcher) {
+        Write-Host "Python 3.12 was not found. Installing it with the Python launcher..." -ForegroundColor Yellow
+        & $launcher.Source install 3.12
+        if ($LASTEXITCODE -ne 0) {
+            throw "Python 3.12 installation failed with exit code $LASTEXITCODE."
+        }
+    } else {
+        throw "Python 3.12 is not installed and neither winget nor the Python launcher is available."
+    }
+
+    $python312 = Get-Python312
+    if (-not $python312) {
+        throw "Python 3.12 was installed, but it could not be located. Restart PowerShell and run this script again."
+    }
+}
+
+$venvPython = $PYTHON
+$venvIsPython312 = $false
+if (Test-Path -LiteralPath $venvPython) {
+    & $venvPython -c "import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)" 2>$null
+    $venvIsPython312 = ($LASTEXITCODE -eq 0)
+}
+
+if (-not $venvIsPython312) {
+    if (Test-Path -LiteralPath $VENV) {
+        Write-Host "Existing backend venv is not Python 3.12. Recreating it..." -ForegroundColor Yellow
+        Remove-Item -LiteralPath $VENV -Recurse -Force
+    }
+
+    Write-Host "Creating backend venv with Python 3.12..." -ForegroundColor Yellow
+    & $python312.Path @($python312.Arguments) -m venv $VENV
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $venvPython)) {
+        throw "Failed to create the backend virtual environment with Python 3.12."
+    }
+}
+
+$activate = Join-Path $VENV "Scripts\Activate.ps1"
+if (-not (Test-Path -LiteralPath $activate)) {
+    throw "The backend virtual environment activation script was not created."
+}
+
+. $activate
+Write-Host "Installing backend requirements..." -ForegroundColor Yellow
+& $venvPython -m pip install --upgrade pip
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to upgrade pip in the backend virtual environment."
+}
+& $venvPython -m pip install -r $REQUIREMENTS
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to install backend requirements."
+}
+Write-Host "Python 3.12 backend environment is ready." -ForegroundColor Green
 Write-Host ""
 
 # 1. Start Backend (Port 8000)

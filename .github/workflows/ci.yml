@@ -20,7 +20,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: 'pip'
 
       - name: Install Dependencies
@@ -93,7 +93,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Python dependency audit
         run: |
@@ -103,4 +103,3 @@ jobs:
       - name: npm audit
         run: |
           cd frontend && npm audit --omit=dev || true
-

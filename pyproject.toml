@@ -3,7 +3,7 @@ name = "project-garud"
 version = "1.0.0"
 description = "Project Garud — Autonomous Network Attack Forecasting & Deep World Model Telemetry Engine"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12,<3.13"
 dependencies = [
   "fastapi>=0.104.0",
   "uvicorn[standard]>=0.24.0",
@@ -55,7 +55,7 @@ search_path = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B"]
