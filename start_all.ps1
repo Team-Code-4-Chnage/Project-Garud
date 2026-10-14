@@ -107,16 +107,37 @@ function Add-NodeToPath {
 Write-Host "[0/4] Checking Node.js and npm environment..." -ForegroundColor Yellow
 $nodeTools = Get-NodeTools
 if (-not $nodeTools) {
-    $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
-    if (-not $winget) {
-        throw "Node.js and npm are not installed, and winget is not available to install Node.js automatically."
+    Write-Host "Node.js and npm were not found. Downloading the latest Node.js 22 Windows installer..." -ForegroundColor Yellow
+    try {
+        $release = Invoke-RestMethod -Uri "https://nodejs.org/dist/index.json" -ErrorAction Stop |
+            Where-Object {
+                $_.version -match '^v22\.' -and $_.files -contains "win-x64-msi"
+            } |
+            Select-Object -First 1
+    } catch {
+        throw "Could not retrieve the Node.js 22 release information: $($_.Exception.Message)"
     }
 
-    Write-Host "Node.js and npm were not found. Installing the Node.js LTS bundle with winget..." -ForegroundColor Yellow
-    & $winget.Source install --id OpenJS.NodeJS.LTS --exact --scope user `
-        --accept-source-agreements --accept-package-agreements
-    if ($LASTEXITCODE -ne 0) {
-        throw "Node.js installation failed with exit code $LASTEXITCODE."
+    if (-not $release) {
+        throw "Could not find a Node.js 22 Windows x64 installer."
+    }
+
+    $installer = Join-Path $env:TEMP "node-$($release.version)-x64.msi"
+    $installerUrl = "https://nodejs.org/dist/$($release.version)/node-$($release.version)-x64.msi"
+    try {
+        Invoke-WebRequest -Uri $installerUrl -OutFile $installer -UseBasicParsing -ErrorAction Stop
+        $installProcess = Start-Process -FilePath "msiexec.exe" `
+            -ArgumentList "/i `"$installer`" /passive /norestart" `
+            -Verb RunAs -Wait -PassThru
+        if ($installProcess.ExitCode -notin @(0, 3010)) {
+            throw "Node.js installation failed with exit code $($installProcess.ExitCode)."
+        }
+    } catch {
+        throw "Could not install Node.js 22: $($_.Exception.Message)"
+    } finally {
+        if (Test-Path -LiteralPath $installer) {
+            Remove-Item -LiteralPath $installer -Force
+        }
     }
 
     $nodeTools = Get-NodeTools
