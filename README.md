@@ -1,5 +1,15 @@
 # Project Garud
 
+## Setup — read this first
+
+**Important:** Open PowerShell, change into the repository directory, and run the startup script:
+
+```powershell
+.\start_all.ps1
+```
+
+**Do not interrupt the script. The initial setup can take up to 20 minutes while dependencies and services are prepared.**
+
 Network-flow monitoring and attack-forecasting platform, built for Smart India Hackathon 2026 (problem statement 26153, *AI Based Network Attack Forecasting from Network Traffic Data*).
 
 A FastAPI backend ingests network flows (live capture, PCAP files, tables, API), scores them with PyTorch and scikit-learn models, stores sessions and alerts in SQLite, and serves a React dashboard with a live map, alert console, network-wide forecast, explainability views, exportable reports and an isolated offline analysis of uploaded files.
@@ -47,29 +57,6 @@ Every figure above is reproducible with the commands in [docs/model_card.md](doc
 - PyTorch (a CPU build is sufficient)
 - Npcap (Windows) or libpcap (Linux) and administrator rights for live capture
 - Optional: `slowapi` for rate limiting; `pyarrow` for Parquet files (both in `requirements.txt`)
-
-## Run
-
-Backend, from the repository root:
-
-```bash
-py -3.12 -m venv backend/venv
-backend/venv/Scripts/activate          # Linux/macOS: source backend/venv/bin/activate
-pip install -r backend/requirements.txt
-cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-Frontend, in a second terminal:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The dashboard is at `http://localhost:5173`, the API at `http://localhost:8000` (`/docs` for OpenAPI, `/health` for status). On Windows, `start_all.ps1` starts both.
-The Windows startup script checks for Node.js and npm first and installs the Node.js LTS bundle with `winget` when they are missing.
 
 Docker images for the two parts are defined in `backend/Dockerfile` and `frontend/Dockerfile`. The backend image expects the repository root as build context.
 
