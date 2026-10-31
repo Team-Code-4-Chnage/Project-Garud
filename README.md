@@ -5,7 +5,7 @@
 **Important:** Open PowerShell, change into the repository directory, and run the startup script:
 
 ```powershell
-git clone https://github.com/Team-Code-4Chnage/Project-Garud.git
+git clone https://github.com/Team-Code-4-Chnage/Project-Garud.git
 cd Project-Garud
 powershell.exe -ExecutionPolicy Bypass -File start_all.ps1
 ```
