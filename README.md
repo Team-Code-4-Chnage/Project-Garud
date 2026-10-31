@@ -5,7 +5,9 @@
 **Important:** Open PowerShell, change into the repository directory, and run the startup script:
 
 ```powershell
-.\start_all.ps1
+git clone https://github.com/Team-Code-4Chnage/Project-Garud.git
+cd Project-Garud
+powershell.exe -ExecutionPolicy Bypass -File start_all.ps1
 ```
 
 **Do not interrupt the script. The initial setup can take up to 20 minutes while dependencies and services are prepared.**
